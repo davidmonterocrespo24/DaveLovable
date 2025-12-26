@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, forwardRef, useMemo } from 'react';
 
 const mockCode: Record<string, string> = {
   'App.tsx': `import { Header } from './components/Header';
@@ -82,6 +82,28 @@ export const Header = () => {
     </header>
   );
 };`,
+  'index.css': `@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+}
+
+body {
+  @apply bg-background text-foreground;
+}`,
+  'main.tsx': `import React from 'react';
+import ReactDOM from 'react-dom/client';
+import App from './App';
+import './index.css';
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);`,
 };
 
 interface CodeEditorProps {
@@ -89,85 +111,140 @@ interface CodeEditorProps {
   isTyping: boolean;
 }
 
-export const CodeEditor = ({ selectedFile, isTyping }: CodeEditorProps) => {
-  const [displayedCode, setDisplayedCode] = useState('');
-  const code = mockCode[selectedFile] || '// Select a file to view its contents';
+// Token types for syntax highlighting
+type TokenType = 'keyword' | 'string' | 'comment' | 'component' | 'tag' | 'attribute' | 'operator' | 'number' | 'function' | 'plain';
 
-  useEffect(() => {
-    if (isTyping) {
-      setDisplayedCode('');
-      let index = 0;
-      const interval = setInterval(() => {
-        if (index < code.length) {
-          setDisplayedCode(code.slice(0, index + 1));
-          index++;
+interface Token {
+  type: TokenType;
+  value: string;
+}
+
+const tokenColors: Record<TokenType, string> = {
+  keyword: 'text-purple-400',
+  string: 'text-green-400',
+  comment: 'text-muted-foreground/60',
+  component: 'text-cyan-400',
+  tag: 'text-blue-400',
+  attribute: 'text-orange-300',
+  operator: 'text-pink-400',
+  number: 'text-orange-400',
+  function: 'text-yellow-300',
+  plain: 'text-foreground/90',
+};
+
+const tokenize = (line: string): Token[] => {
+  const tokens: Token[] = [];
+  let remaining = line;
+
+  const patterns: [RegExp, TokenType][] = [
+    [/^(\/\/.*)/, 'comment'],
+    [/^(import|export|from|const|let|var|function|return|if|else|interface|type|default|async|await)\b/, 'keyword'],
+    [/^(<\/?)([A-Z][a-zA-Z]*)/, 'component'],
+    [/^(<\/?)([a-z][a-z0-9]*)\b/, 'tag'],
+    [/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/, 'function'],
+    [/^(["'`])(?:(?!\1)[^\\]|\\.)*\1/, 'string'],
+    [/^(\d+\.?\d*)/, 'number'],
+    [/^([=<>!&|+\-*/%{}()[\];:,.?]+)/, 'operator'],
+    [/^([a-zA-Z_][a-zA-Z0-9_]*)/, 'plain'],
+    [/^(\s+)/, 'plain'],
+  ];
+
+  while (remaining.length > 0) {
+    let matched = false;
+
+    for (const [pattern, type] of patterns) {
+      const match = remaining.match(pattern);
+      if (match) {
+        if (type === 'component' || type === 'tag') {
+          // Handle JSX tags specially
+          tokens.push({ type: 'operator', value: match[1] });
+          tokens.push({ type, value: match[2] });
         } else {
-          clearInterval(interval);
+          tokens.push({ type, value: match[0] });
         }
-      }, 5);
-      return () => clearInterval(interval);
-    } else {
-      setDisplayedCode(code);
+        remaining = remaining.slice(match[0].length);
+        matched = true;
+        break;
+      }
     }
-  }, [code, isTyping]);
 
-  const lines = displayedCode.split('\n');
+    if (!matched) {
+      tokens.push({ type: 'plain', value: remaining[0] });
+      remaining = remaining.slice(1);
+    }
+  }
 
+  return tokens;
+};
+
+const SyntaxHighlightedLine = ({ line }: { line: string }) => {
+  const tokens = useMemo(() => tokenize(line), [line]);
+  
   return (
-    <div className="h-full bg-[#0d1117] overflow-auto font-mono text-sm">
-      <div className="flex">
-        <div className="py-4 px-2 text-right text-muted-foreground/50 select-none border-r border-white/5">
-          {lines.map((_, i) => (
-            <div key={i} className="leading-6 text-xs">
-              {i + 1}
-            </div>
-          ))}
-        </div>
-        <pre className="p-4 overflow-x-auto flex-1">
-          <code className="text-gray-300">
-            {displayedCode.split('\n').map((line, i) => (
-              <div key={i} className="leading-6">
-                {highlightSyntax(line)}
-              </div>
-            ))}
-            {isTyping && (
-              <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5" />
-            )}
-          </code>
-        </pre>
-      </div>
-    </div>
+    <span>
+      {tokens.map((token, i) => (
+        <span key={i} className={tokenColors[token.type]}>
+          {token.value}
+        </span>
+      ))}
+    </span>
   );
 };
 
-const highlightSyntax = (line: string) => {
-  // Simple syntax highlighting
-  const keywords = ['import', 'export', 'const', 'function', 'return', 'from', 'interface', 'type'];
-  const reactKeywords = ['div', 'span', 'button', 'header', 'nav', 'main', 'h1', 'h3', 'p', 'a'];
-  
-  let result = line;
-  
-  // Highlight strings
-  result = result.replace(/(["'`])(.*?)\1/g, '<span class="text-green-400">$&</span>');
-  
-  // Highlight keywords
-  keywords.forEach(kw => {
-    const regex = new RegExp(`\\b${kw}\\b`, 'g');
-    result = result.replace(regex, `<span class="text-purple-400">${kw}</span>`);
-  });
-  
-  // Highlight JSX tags
-  reactKeywords.forEach(tag => {
-    const regex = new RegExp(`<(/?)${tag}`, 'g');
-    result = result.replace(regex, `<span class="text-blue-400">&lt;$1${tag}</span>`);
-  });
-  
-  // Highlight component names (PascalCase)
-  result = result.replace(/<([A-Z][a-zA-Z]*)/g, '<span class="text-cyan-400">&lt;$1</span>');
-  result = result.replace(/<\/([A-Z][a-zA-Z]*)/g, '<span class="text-cyan-400">&lt;/$1</span>');
-  
-  // Highlight comments
-  result = result.replace(/(\/\/.*$)/g, '<span class="text-gray-500">$1</span>');
-  
-  return <span dangerouslySetInnerHTML={{ __html: result }} />;
-};
+export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
+  ({ selectedFile, isTyping }, ref) => {
+    const [displayedCode, setDisplayedCode] = useState('');
+    const code = mockCode[selectedFile] || '// Select a file to view its contents';
+
+    useEffect(() => {
+      if (isTyping) {
+        setDisplayedCode('');
+        let index = 0;
+        const interval = setInterval(() => {
+          if (index < code.length) {
+            setDisplayedCode(code.slice(0, index + 1));
+            index++;
+          } else {
+            clearInterval(interval);
+          }
+        }, 5);
+        return () => clearInterval(interval);
+      } else {
+        setDisplayedCode(code);
+      }
+    }, [code, isTyping]);
+
+    const lines = displayedCode.split('\n');
+
+    return (
+      <div ref={ref} className="h-full bg-[#0d1117] overflow-auto font-mono text-sm">
+        <div className="flex min-h-full">
+          {/* Line Numbers */}
+          <div className="py-4 px-2 text-right text-muted-foreground/40 select-none border-r border-border/30 sticky left-0 bg-[#0d1117]">
+            {lines.map((_, i) => (
+              <div key={i} className="leading-6 text-xs px-2">
+                {i + 1}
+              </div>
+            ))}
+          </div>
+          
+          {/* Code Content */}
+          <pre className="p-4 overflow-x-auto flex-1">
+            <code>
+              {lines.map((line, i) => (
+                <div key={i} className="leading-6">
+                  <SyntaxHighlightedLine line={line} />
+                </div>
+              ))}
+              {isTyping && (
+                <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5" />
+              )}
+            </code>
+          </pre>
+        </div>
+      </div>
+    );
+  }
+);
+
+CodeEditor.displayName = 'CodeEditor';
