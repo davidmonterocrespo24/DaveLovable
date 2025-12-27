@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  Sparkles, 
-  Settings, 
-  Share2, 
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import {
+  Sparkles,
+  Settings,
+  Share2,
   ChevronLeft,
   PanelLeftClose,
   PanelLeft,
@@ -11,6 +11,7 @@ import {
   Zap,
   History
 } from 'lucide-react';
+import { useProject } from '@/hooks/useProjects';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -25,15 +26,23 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const Editor = () => {
-  const [selectedFile, setSelectedFile] = useState('App.tsx');
+  const { projectId } = useParams<{ projectId: string }>();
+  const navigate = useNavigate();
+  const { data: project, isLoading: projectLoading } = useProject(Number(projectId));
+
+  const [selectedFile, setSelectedFile] = useState<{ name: string; id: number; content: string } | null>(null);
   const [activeView, setActiveView] = useState<'code' | 'preview' | 'split'>('split');
   const [showExplorer, setShowExplorer] = useState(true);
   const [showChat, setShowChat] = useState(true);
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
-  const [tabs, setTabs] = useState([
-    { id: '1', name: 'App.tsx', isActive: true },
-  ]);
+  const [tabs, setTabs] = useState<Array<{ id: string; name: string; isActive: boolean; fileId?: number }>>([]);
+
+  useEffect(() => {
+    if (!projectId || isNaN(Number(projectId))) {
+      navigate('/projects');
+    }
+  }, [projectId, navigate]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -42,26 +51,28 @@ const Editor = () => {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleFileSelect = (fileName: string) => {
-    setSelectedFile(fileName);
-    const existingTab = tabs.find(t => t.name === fileName);
+  const handleFileSelect = (file: { name: string; id: number; content: string }) => {
+    setSelectedFile(file);
+    const existingTab = tabs.find(t => t.fileId === file.id);
     if (!existingTab) {
       setTabs(prev => [
         ...prev.map(t => ({ ...t, isActive: false })),
-        { id: Date.now().toString(), name: fileName, isActive: true }
+        { id: file.id.toString(), name: file.name, isActive: true, fileId: file.id }
       ]);
     } else {
-      setTabs(prev => prev.map(t => ({ ...t, isActive: t.name === fileName })));
+      setTabs(prev => prev.map(t => ({ ...t, isActive: t.fileId === file.id })));
     }
   };
 
   const handleTabClose = (id: string) => {
     setTabs(prev => {
       const filtered = prev.filter(t => t.id !== id);
-      if (filtered.length === 0) return prev;
-      if (prev.find(t => t.id === id)?.isActive) {
+      if (filtered.length === 0) {
+        setSelectedFile(null);
+        return [];
+      }
+      if (prev.find(t => t.id === id)?.isActive && selectedFile) {
         filtered[filtered.length - 1].isActive = true;
-        setSelectedFile(filtered[filtered.length - 1].name);
       }
       return filtered;
     });
@@ -69,25 +80,45 @@ const Editor = () => {
 
   const handleTabSelect = (id: string) => {
     setTabs(prev => prev.map(t => ({ ...t, isActive: t.id === id })));
-    const tab = tabs.find(t => t.id === id);
-    if (tab) setSelectedFile(tab.name);
   };
 
-  const handleSendMessage = (message: string) => {
-    setIsTyping(true);
+  const handleCodeChange = () => {
     setIsPreviewLoading(true);
     setTimeout(() => {
-      setIsTyping(false);
       setIsPreviewLoading(false);
-    }, 3000);
+    }, 1000);
   };
+
+  if (projectLoading) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading project...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!project) {
+    return (
+      <div className="h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg font-semibold mb-2">Project not found</p>
+          <Link to="/projects" className="text-primary hover:underline">
+            Back to projects
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Top Bar */}
       <header className="h-12 flex items-center justify-between px-4 border-b border-border/50 bg-background/80 backdrop-blur-sm shrink-0">
         <div className="flex items-center gap-3">
-          <Link to="/" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/projects" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
             <ChevronLeft className="w-4 h-4" />
           </Link>
           <div className="w-px h-6 bg-border/50" />
@@ -96,7 +127,7 @@ const Editor = () => {
               <Sparkles className="w-4 h-4 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-sm font-semibold">my-awesome-app</h1>
+              <h1 className="text-sm font-semibold">{project.name}</h1>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span className="text-xs text-muted-foreground">Synced</span>
@@ -138,7 +169,10 @@ const Editor = () => {
         {showChat && (
           <>
             <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-              <ChatPanel onSendMessage={handleSendMessage} />
+              <ChatPanel
+                projectId={Number(projectId)}
+                onCodeChange={handleCodeChange}
+              />
             </ResizablePanel>
             <ResizableHandle withHandle />
           </>
@@ -173,7 +207,11 @@ const Editor = () => {
               {showExplorer && activeView !== 'preview' && (
                 <>
                   <ResizablePanel defaultSize={18} minSize={15} maxSize={30}>
-                    <FileExplorer selectedFile={selectedFile} onSelectFile={handleFileSelect} />
+                    <FileExplorer
+                      projectId={Number(projectId)}
+                      selectedFile={selectedFile?.name || ''}
+                      onSelectFile={handleFileSelect}
+                    />
                   </ResizablePanel>
                   <ResizableHandle />
                 </>
