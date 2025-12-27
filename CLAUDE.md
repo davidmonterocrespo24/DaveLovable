@@ -96,6 +96,32 @@ backend/projects/project_X/
 
 **Bundle Endpoint:** `GET /api/v1/projects/{id}/bundle` returns all files in format for WebContainers API
 
+## WebContainers Integration
+
+The preview uses **WebContainers** (by StackBlitz) to run Node.js directly in the browser:
+
+**Service:** [front/src/services/webcontainer.ts](front/src/services/webcontainer.ts)
+- `loadProject(projectId)` - Fetches files, runs npm install, starts dev server
+- Converts flat file structure to WebContainer tree format
+- Returns server URL for iframe preview
+
+**Preview Component:** [front/src/components/editor/PreviewPanelWithWebContainer.tsx](front/src/components/editor/PreviewPanelWithWebContainer.tsx)
+- Initializes WebContainer on mount
+- Shows real-time console output (npm install, Vite dev server)
+- Displays running app in iframe
+- Device preview modes (mobile, tablet, desktop)
+
+**Benefits:**
+- ✅ No backend compute for preview (runs in browser)
+- ✅ Real Node.js + npm + Vite in browser
+- ✅ Hot Module Replacement (HMR) works
+- ✅ Infinite scalability (each user = own container)
+- ✅ Offline capable after initial load
+
+**Requirements:** Chrome/Edge 89+, requires COOP/COEP headers (configured in vite.config.ts)
+
+See [WEBCONTAINERS_IMPLEMENTATION.md](WEBCONTAINERS_IMPLEMENTATION.md) for full details.
+
 ## Architecture
 
 ### Backend Multi-Agent System

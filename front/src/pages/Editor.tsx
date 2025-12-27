@@ -20,7 +20,7 @@ import {
 import { FileExplorer } from '@/components/editor/FileExplorer';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { ChatPanel } from '@/components/editor/ChatPanel';
-import { PreviewPanel } from '@/components/editor/PreviewPanel';
+import { PreviewPanel } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -241,7 +241,11 @@ const Editor = () => {
                     {/* Preview */}
                     {(activeView === 'preview' || activeView === 'split') && (
                       <ResizablePanel defaultSize={activeView === 'split' ? 50 : 100}>
-                        <PreviewPanel isLoading={isPreviewLoading} />
+                        <PreviewPanel
+                          projectId={Number(projectId)}
+                          isLoading={isPreviewLoading}
+                          onReload={handleCodeChange}
+                        />
                       </ResizablePanel>
                     )}
                   </ResizablePanelGroup>

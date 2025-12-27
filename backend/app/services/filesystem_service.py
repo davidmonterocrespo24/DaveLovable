@@ -96,6 +96,18 @@ export default defineConfig({
             "references": [{"path": "./tsconfig.node.json"}]
         }
 
+        # Create tsconfig.node.json
+        tsconfig_node = {
+            "compilerOptions": {
+                "composite": True,
+                "skipLibCheck": True,
+                "module": "ESNext",
+                "moduleResolution": "bundler",
+                "allowSyntheticDefaultImports": True
+            },
+            "include": ["vite.config.ts"]
+        }
+
         # Create tailwind.config.js
         tailwind_config = """/** @type {import('tailwindcss').Config} */
 export default {
@@ -199,6 +211,9 @@ code {
 
         (project_dir / "tsconfig.json").write_text(json.dumps(tsconfig, indent=2))
         files_created["tsconfig.json"] = json.dumps(tsconfig, indent=2)
+
+        (project_dir / "tsconfig.node.json").write_text(json.dumps(tsconfig_node, indent=2))
+        files_created["tsconfig.node.json"] = json.dumps(tsconfig_node, indent=2)
 
         (project_dir / "tailwind.config.js").write_text(tailwind_config)
         files_created["tailwind.config.js"] = tailwind_config
