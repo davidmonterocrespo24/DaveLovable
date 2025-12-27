@@ -119,7 +119,28 @@ class ChatService:
         }
 
         # Generate AI response using agents
-        orchestrator = get_orchestrator()
+        try:
+            orchestrator = get_orchestrator()
+        except ValueError as e:
+            # API key not configured
+            assistant_message = ChatMessage(
+                id=0,  # Will be set by DB
+                session_id=session.id,
+                role=MessageRole.ASSISTANT,
+                content=str(e),
+                created_at=datetime.utcnow()
+            )
+            assistant_message_db = ChatMessageCreate(
+                session_id=session.id,
+                role=MessageRole.ASSISTANT,
+                content=str(e)
+            )
+            db_assistant_message = db_message_create(db, assistant_message_db)
+            return ChatResponse(
+                session_id=session.id,
+                message=ChatMessage.model_validate(db_assistant_message),
+                code_changes=None
+            )
 
         try:
             # Use quick generation for now (can be enhanced with full orchestration)

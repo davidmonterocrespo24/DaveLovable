@@ -17,6 +17,13 @@ class AgentOrchestrator:
     """Orchestrates multiple AI agents using Microsoft AutoGen"""
 
     def __init__(self):
+        # Check if API key is configured
+        if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "your-openai-api-key-here":
+            raise ValueError(
+                "OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file. "
+                "You can get an API key from https://platform.openai.com/api-keys"
+            )
+
         self.llm_config = llm_config
         self.agents = {}
         self._initialize_agents()
