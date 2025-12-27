@@ -16,11 +16,13 @@ interface CodeEditorProps {
 const getLanguage = (filename: string): string => {
   const ext = filename.split('.').pop()?.toLowerCase();
   switch (ext) {
-    case 'ts':
     case 'tsx':
+      return 'typescript'; // TypeScript React
+    case 'ts':
       return 'typescript';
-    case 'js':
     case 'jsx':
+      return 'javascript'; // JavaScript React
+    case 'js':
       return 'javascript';
     case 'css':
       return 'css';
@@ -31,7 +33,7 @@ const getLanguage = (filename: string): string => {
     case 'md':
       return 'markdown';
     default:
-      return 'plaintext';
+      return 'typescript'; // Default to TypeScript for unknown files
   }
 };
 
@@ -73,21 +75,33 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
         allowJs: true
       });
 
-      // Add common library type definitions
-      const reactTypes = `
+      // Add type definitions for all common libraries
+      const typeDefinitions = `
+        // React types
         declare module 'react' {
           export function useState<T>(initialState: T | (() => T)): [T, (value: T) => void];
           export function useEffect(effect: () => void | (() => void), deps?: any[]): void;
           export function useRef<T>(initialValue: T): { current: T };
+          export function useMemo<T>(factory: () => T, deps: any[]): T;
+          export function useCallback<T extends (...args: any[]) => any>(callback: T, deps: any[]): T;
           export const Fragment: any;
           export default any;
+          export interface FC<P = {}> {
+            (props: P): any;
+          }
+          export interface SVGProps<T> {
+            className?: string;
+            style?: any;
+            [key: string]: any;
+          }
         }
-      `;
 
-      const lucideReactTypes = `
+        // Lucide React - allow all icon imports
         declare module 'lucide-react' {
           import { FC, SVGProps } from 'react';
           export type LucideIcon = FC<SVGProps<SVGSVGElement>>;
+          const Icon: LucideIcon;
+          export default Icon;
           export const Menu: LucideIcon;
           export const X: LucideIcon;
           export const Search: LucideIcon;
@@ -112,23 +126,79 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
           export const History: LucideIcon;
           export const Save: LucideIcon;
           export const FileText: LucideIcon;
+          // Allow any other icon
+          [key: string]: LucideIcon;
+        }
+
+        // Wildcard module declarations for common patterns
+        declare module '@/*' {
+          const content: any;
+          export default content;
+          export const [key: string]: any;
+        }
+
+        declare module '@/components/*' {
+          const content: any;
+          export default content;
+        }
+
+        declare module '@/hooks/*' {
+          const content: any;
+          export default content;
+        }
+
+        declare module '@/lib/*' {
+          const content: any;
+          export default content;
+        }
+
+        declare module '@/services/*' {
+          const content: any;
+          export default content;
+        }
+
+        // Allow all .css imports
+        declare module '*.css' {
+          const content: { [className: string]: string };
+          export default content;
+        }
+
+        // Allow all image imports
+        declare module '*.png' {
+          const content: string;
+          export default content;
+        }
+        declare module '*.jpg' {
+          const content: string;
+          export default content;
+        }
+        declare module '*.svg' {
+          const content: string;
+          export default content;
         }
       `;
 
-      monaco.languages.typescript.typescriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
-      monaco.languages.typescript.typescriptDefaults.addExtraLib(lucideReactTypes, 'file:///node_modules/@types/lucide-react/index.d.ts');
+      monaco.languages.typescript.typescriptDefaults.addExtraLib(typeDefinitions, 'file:///global.d.ts');
 
-      // Configure diagnostics to ignore certain warnings
+      // Configure diagnostics - disable module resolution errors
       monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false,
-        diagnosticCodesToIgnore: [7027, 6133, 6192, 80001] // Ignore: unreachable code, unused vars, implicit any
+        diagnosticCodesToIgnore: [
+          2792, // Cannot find module
+          2307, // Cannot find module
+          7027, // Unreachable code
+          6133, // Unused variable
+          6192, // All imports unused
+          80001, // Implicit any
+          8006  // 'interface' declarations can only be used in TypeScript files
+        ]
       });
 
       monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
         noSemanticValidation: false,
         noSyntaxValidation: false,
-        diagnosticCodesToIgnore: [7027, 6133, 6192, 80001]
+        diagnosticCodesToIgnore: [2792, 2307, 7027, 6133, 6192, 80001, 8006]
       });
     };
 
