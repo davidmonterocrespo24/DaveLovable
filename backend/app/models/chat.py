@@ -33,7 +33,7 @@ class ChatMessage(Base):
 
     # Agent metadata
     agent_name = Column(String)  # Which agent generated this (for assistant messages)
-    metadata = Column(Text)  # JSON metadata for code changes, file operations, etc.
+    message_metadata = Column(Text)  # JSON metadata for code changes, file operations, etc.
 
     # Relationships
     session = relationship("ChatSession", back_populates="messages")
