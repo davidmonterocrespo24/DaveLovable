@@ -7,6 +7,7 @@ interface CodeEditorProps {
     content: string;
   } | null;
   isTyping: boolean;
+  onContentChange?: (content: string) => void;
 }
 
 // Token types for syntax highlighting
@@ -89,8 +90,9 @@ const SyntaxHighlightedLine = ({ line }: { line: string }) => {
 };
 
 export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
-  ({ selectedFile, isTyping }, ref) => {
+  ({ selectedFile, isTyping, onContentChange }, ref) => {
     const [displayedCode, setDisplayedCode] = useState('');
+    const [editableContent, setEditableContent] = useState('');
     const code = selectedFile?.content || '// Select a file to view its contents';
 
     useEffect(() => {
@@ -108,16 +110,24 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
         return () => clearInterval(interval);
       } else {
         setDisplayedCode(code);
+        setEditableContent(code);
       }
     }, [code, isTyping]);
+
+    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newContent = e.target.value;
+      setEditableContent(newContent);
+      setDisplayedCode(newContent);
+      onContentChange?.(newContent);
+    };
 
     const lines = displayedCode.split('\n');
 
     return (
-      <div ref={ref} className="h-full bg-[#0d1117] overflow-auto font-mono text-sm">
+      <div ref={ref} className="h-full bg-[#0d1117] overflow-auto font-mono text-sm relative">
         <div className="flex min-h-full">
           {/* Line Numbers */}
-          <div className="py-4 px-2 text-right text-muted-foreground/40 select-none border-r border-border/30 sticky left-0 bg-[#0d1117]">
+          <div className="py-4 px-2 text-right text-muted-foreground/40 select-none border-r border-border/30 sticky left-0 bg-[#0d1117] z-10">
             {lines.map((_, i) => (
               <div key={i} className="leading-6 text-xs px-2">
                 {i + 1}
@@ -125,8 +135,21 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
             ))}
           </div>
 
-          {/* Code Content */}
-          <pre className="p-4 overflow-x-auto flex-1">
+          {/* Editable Textarea (invisible but functional) */}
+          <textarea
+            value={editableContent}
+            onChange={handleContentChange}
+            disabled={!selectedFile || isTyping}
+            className="absolute inset-0 p-4 pl-[60px] bg-transparent text-transparent caret-white resize-none outline-none font-mono text-sm leading-6 z-20"
+            spellCheck={false}
+            style={{
+              caretColor: 'white',
+              WebkitTextFillColor: 'transparent'
+            }}
+          />
+
+          {/* Code Content (syntax highlighted, read-only display) */}
+          <pre className="p-4 overflow-x-auto flex-1 pointer-events-none">
             <code>
               {lines.map((line, i) => (
                 <div key={i} className="leading-6">

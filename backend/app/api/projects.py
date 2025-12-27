@@ -10,6 +10,7 @@ from app.schemas import (
     ProjectWithFiles,
     ProjectFile,
     ProjectFileCreate,
+    ProjectFileUpdate,
 )
 from app.services import ProjectService
 from app.services.filesystem_service import FileSystemService
@@ -108,10 +109,11 @@ def add_file_to_project(
 def update_file(
     project_id: int,
     file_id: int,
-    content: str,
+    file_update: ProjectFileUpdate,
     db: Session = Depends(get_db)
 ):
     """Update a file's content"""
+    content = file_update.content or ''
     return ProjectService.update_file(db, file_id, project_id, MOCK_USER_ID, content)
 
 

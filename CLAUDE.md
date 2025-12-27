@@ -67,25 +67,40 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 Backend runs on http://localhost:8000 with API documentation at http://localhost:8000/docs
 
-## File Storage System
+## File Storage & Version Control System
 
-The backend uses a **dual storage strategy**:
+The backend uses a **filesystem + Git architecture**:
 
-1. **SQLite Database** - Stores file metadata and content for fast querying
-2. **Physical Filesystem** - Stores actual files at `backend/projects/project_{id}/` for WebContainers
+1. **SQLite Database** - Stores only file metadata (filename, filepath, language, timestamps)
+2. **Physical Filesystem** - Stores actual file content at `backend/projects/project_{id}/`
+3. **Git Repositories** - Each project is a Git repo for version control
+
+**IMPORTANT:** File content is **NOT** stored in the database. It's stored only in the filesystem and versioned with Git.
 
 **File System Service** ([backend/app/services/filesystem_service.py](backend/app/services/filesystem_service.py)):
-- `create_project_structure(project_id, name)` - Creates complete Vite + React project
+- `create_project_structure(project_id, name)` - Creates complete Vite + React project + Git init
 - `write_file(project_id, filepath, content)` - Writes file to disk
+- `read_file(project_id, filepath)` - Reads file from disk
 - `get_all_files(project_id)` - Returns all files for WebContainers bundle
+
+**Git Service** ([backend/app/services/git_service.py](backend/app/services/git_service.py)):
+- `init_repository(project_id)` - Initialize Git repo
+- `commit_changes(project_id, message, files)` - Commit changes
+- `get_commit_history(project_id, limit)` - Get commit log
+- `get_file_at_commit(project_id, filepath, commit_hash)` - Get file at specific commit
+- `restore_commit(project_id, commit_hash)` - Restore to previous commit
 
 **Project Structure:**
 ```
 backend/projects/project_X/
+├── .git/                  # Git repository for version control
+├── .gitignore
 ├── package.json           # Vite + React + TypeScript + Tailwind
 ├── vite.config.ts
 ├── tsconfig.json
+├── tsconfig.node.json
 ├── tailwind.config.js
+├── postcss.config.js
 ├── index.html
 └── src/
     ├── main.tsx
@@ -94,7 +109,9 @@ backend/projects/project_X/
     └── components/        # AI-generated components
 ```
 
-**Bundle Endpoint:** `GET /api/v1/projects/{id}/bundle` returns all files in format for WebContainers API
+**Bundle Endpoint:** `GET /api/v1/projects/{id}/bundle` returns all files (read from filesystem) in format for WebContainers API
+
+**Git Commits:** Every file change creates a Git commit with descriptive message
 
 ## WebContainers Integration
 

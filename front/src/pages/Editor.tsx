@@ -9,9 +9,12 @@ import {
   PanelLeft,
   Cloud,
   Zap,
-  History
+  History,
+  Save,
+  FileText
 } from 'lucide-react';
 import { useProject } from '@/hooks/useProjects';
+import { useUpdateFile } from '@/hooks/useFiles';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -24,13 +27,18 @@ import { PreviewPanel } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/hooks/use-toast';
 
 const Editor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { data: project, isLoading: projectLoading } = useProject(Number(projectId));
+  const updateFileMutation = useUpdateFile();
 
   const [selectedFile, setSelectedFile] = useState<{ name: string; id: number; content: string } | null>(null);
+  const [editedContent, setEditedContent] = useState<string>('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeView, setActiveView] = useState<'code' | 'preview' | 'split'>('split');
   const [showExplorer, setShowExplorer] = useState(true);
   const [showChat, setShowChat] = useState(true);
@@ -51,8 +59,25 @@ const Editor = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Keyboard shortcut for saving (Ctrl+S)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (hasUnsavedChanges && selectedFile) {
+          handleSaveFile();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hasUnsavedChanges, selectedFile, editedContent]);
+
   const handleFileSelect = (file: { name: string; id: number; content: string }) => {
     setSelectedFile(file);
+    setEditedContent(file.content);
+    setHasUnsavedChanges(false);
     const existingTab = tabs.find(t => t.fileId === file.id);
     if (!existingTab) {
       setTabs(prev => [
@@ -61,6 +86,37 @@ const Editor = () => {
       ]);
     } else {
       setTabs(prev => prev.map(t => ({ ...t, isActive: t.fileId === file.id })));
+    }
+  };
+
+  const handleContentChange = (newContent: string) => {
+    setEditedContent(newContent);
+    setHasUnsavedChanges(newContent !== selectedFile?.content);
+  };
+
+  const handleSaveFile = async () => {
+    if (!selectedFile || !hasUnsavedChanges) return;
+
+    try {
+      await updateFileMutation.mutateAsync({
+        projectId: Number(projectId),
+        fileId: selectedFile.id,
+        data: { content: editedContent }
+      });
+
+      setSelectedFile({ ...selectedFile, content: editedContent });
+      setHasUnsavedChanges(false);
+
+      toast({
+        title: "File saved",
+        description: `${selectedFile.name} has been saved successfully.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error saving file",
+        description: "There was an error saving the file. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -139,6 +195,26 @@ const Editor = () => {
         <div className="flex items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
+              <Button
+                variant={hasUnsavedChanges ? "default" : "ghost"}
+                size="sm"
+                className="gap-2"
+                onClick={handleSaveFile}
+                disabled={!hasUnsavedChanges || updateFileMutation.isPending}
+              >
+                <Save className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {updateFileMutation.isPending ? 'Saving...' : hasUnsavedChanges ? 'Save*' : 'Saved'}
+                </span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {hasUnsavedChanges ? 'Save changes (Ctrl+S)' : 'No changes to save'}
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
               <Button variant="ghost" size="sm" className="gap-2">
                 <History className="w-4 h-4" />
                 <span className="hidden sm:inline">History</span>
@@ -151,11 +227,11 @@ const Editor = () => {
             <Cloud className="w-4 h-4 text-primary" />
             <span className="text-xs font-medium">Cloud</span>
           </div>
-          
+
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>
-          
+
           <Button size="sm" className="gap-2">
             <Share2 className="w-4 h-4" />
             Share
@@ -232,7 +308,11 @@ const Editor = () => {
                     {/* Code Editor */}
                     {(activeView === 'code' || activeView === 'split') && (
                       <ResizablePanel defaultSize={activeView === 'split' ? 50 : 100}>
-                        <CodeEditor selectedFile={selectedFile} isTyping={isTyping} />
+                        <CodeEditor
+                          selectedFile={selectedFile ? { ...selectedFile, content: editedContent } : null}
+                          isTyping={isTyping}
+                          onContentChange={handleContentChange}
+                        />
                       </ResizablePanel>
                     )}
 
