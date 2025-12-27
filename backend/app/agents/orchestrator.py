@@ -79,14 +79,46 @@ class AgentOrchestrator:
             write_json,
         ]
 
-        # Coding Agent - Generates code with tools
+        # Coding Agent - Generates code (tools disabled for DeepSeek compatibility)
+        simple_prompt = """You are an expert React/TypeScript developer.
+
+When asked to create components or write code, you MUST:
+1. Generate complete, working code
+2. Wrap ALL code in markdown code blocks with language (```tsx, ```ts, ```css)
+3. Use TypeScript with proper types
+4. Use Tailwind CSS for styling
+5. Make code production-ready
+
+Example:
+```tsx
+import React from 'react';
+
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+}
+
+export const Button: React.FC<ButtonProps> = ({ label, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+    >
+      {label}
+    </button>
+  );
+};
+```
+
+Always generate complete code in markdown blocks."""
+
         self.coding_agent = AssistantAgent(
             name="CodingAgent",
-            description="Expert coding agent that can read, write, and modify files",
-            system_message=CODING_AGENT_SYSTEM_MESSAGE,
+            description="Expert coding agent that generates React/TypeScript code",
+            system_message=simple_prompt,
             model_client=self.model_client,
-            tools=tools,
-            reflect_on_tool_use=True,
+            tools=[],  # Temporarily disable tools for DeepSeek
+            reflect_on_tool_use=False,
         )
 
         # UI Designer Agent - Focuses on UI/UX

@@ -67,7 +67,15 @@ export interface SendChatMessageRequest {
 }
 
 export interface SendChatMessageResponse {
-  response: string;
+  message: {
+    role: string;
+    content: string;
+    agent_name: string | null;
+    message_metadata: string | null;
+    id: number;
+    session_id: number;
+    created_at: string;
+  };
   session_id: number;
   code_changes?: Array<{
     filename: string;

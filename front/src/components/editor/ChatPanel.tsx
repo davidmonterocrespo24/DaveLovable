@@ -2,7 +2,6 @@ import { useState, useRef, useEffect, forwardRef } from 'react';
 import { Send, Sparkles, User, Bot, Paperclip, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSendChatMessage, useChatSession } from '@/hooks/useChat';
-import type { ChatMessage } from '@/services/api';
 
 interface Message {
   id: string;
@@ -105,7 +104,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: response.response,
+          content: response.message.content,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiResponse]);
