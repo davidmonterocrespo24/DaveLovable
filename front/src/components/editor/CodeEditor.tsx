@@ -1,113 +1,11 @@
 import { useState, useEffect, forwardRef, useMemo } from 'react';
 
-const mockCode: Record<string, string> = {
-  'App.tsx': `import { Header } from './components/Header';
-import { Card } from './components/Card';
-import { Button } from './components/Button';
-
-function App() {
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800">
-      <Header />
-      <main className="container mx-auto px-4 py-12">
-        <h1 className="text-4xl font-bold text-white mb-8">
-          Welcome to My App
-        </h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card title="Feature 1" description="Amazing feature" />
-          <Card title="Feature 2" description="Another feature" />
-          <Card title="Feature 3" description="Best feature" />
-        </div>
-        <Button>Get Started</Button>
-      </main>
-    </div>
-  );
-}
-
-export default App;`,
-  'Button.tsx': `interface ButtonProps {
-  children: React.ReactNode;
-  variant?: 'primary' | 'secondary';
-  onClick?: () => void;
-}
-
-export const Button = ({ 
-  children, 
-  variant = 'primary', 
-  onClick 
-}: ButtonProps) => {
-  return (
-    <button
-      onClick={onClick}
-      className={\`px-6 py-3 rounded-lg font-medium transition-all
-        \${variant === 'primary' 
-          ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-          : 'bg-white/10 hover:bg-white/20 text-white'
-        }\`}
-    >
-      {children}
-    </button>
-  );
-};`,
-  'Card.tsx': `interface CardProps {
-  title: string;
-  description: string;
-}
-
-export const Card = ({ title, description }: CardProps) => {
-  return (
-    <div className="p-6 rounded-xl bg-white/5 border border-white/10 
-                    hover:border-purple-500/50 transition-all">
-      <h3 className="text-xl font-semibold text-white mb-2">
-        {title}
-      </h3>
-      <p className="text-gray-400">{description}</p>
-    </div>
-  );
-};`,
-  'Header.tsx': `import { Menu } from 'lucide-react';
-
-export const Header = () => {
-  return (
-    <header className="border-b border-white/10 px-6 py-4">
-      <nav className="flex items-center justify-between">
-        <span className="text-xl font-bold text-white">MyApp</span>
-        <div className="hidden md:flex gap-6">
-          <a href="#" className="text-gray-300 hover:text-white">Home</a>
-          <a href="#" className="text-gray-300 hover:text-white">Features</a>
-          <a href="#" className="text-gray-300 hover:text-white">Pricing</a>
-        </div>
-        <Menu className="md:hidden text-white" />
-      </nav>
-    </header>
-  );
-};`,
-  'index.css': `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-}
-
-body {
-  @apply bg-background text-foreground;
-}`,
-  'main.tsx': `import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App';
-import './index.css';
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);`,
-};
-
 interface CodeEditorProps {
-  selectedFile: string;
+  selectedFile: {
+    name: string;
+    id: number;
+    content: string;
+  } | null;
   isTyping: boolean;
 }
 
@@ -142,7 +40,7 @@ const tokenize = (line: string): Token[] => {
     [/^(<\/?)([A-Z][a-zA-Z]*)/, 'component'],
     [/^(<\/?)([a-z][a-z0-9]*)\b/, 'tag'],
     [/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/, 'function'],
-    [/^(["'`])(?:(?!\1)[^\\]|\\.)*\1/, 'string'],
+    [/^(["'\`])(?:(?!\1)[^\]|\.)*\1/, 'string'],
     [/^(\d+\.?\d*)/, 'number'],
     [/^([=<>!&|+\-*/%{}()[\];:,.?]+)/, 'operator'],
     [/^([a-zA-Z_][a-zA-Z0-9_]*)/, 'plain'],
@@ -156,7 +54,6 @@ const tokenize = (line: string): Token[] => {
       const match = remaining.match(pattern);
       if (match) {
         if (type === 'component' || type === 'tag') {
-          // Handle JSX tags specially
           tokens.push({ type: 'operator', value: match[1] });
           tokens.push({ type, value: match[2] });
         } else {
@@ -179,7 +76,7 @@ const tokenize = (line: string): Token[] => {
 
 const SyntaxHighlightedLine = ({ line }: { line: string }) => {
   const tokens = useMemo(() => tokenize(line), [line]);
-  
+
   return (
     <span>
       {tokens.map((token, i) => (
@@ -194,7 +91,7 @@ const SyntaxHighlightedLine = ({ line }: { line: string }) => {
 export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
   ({ selectedFile, isTyping }, ref) => {
     const [displayedCode, setDisplayedCode] = useState('');
-    const code = mockCode[selectedFile] || '// Select a file to view its contents';
+    const code = selectedFile?.content || '// Select a file to view its contents';
 
     useEffect(() => {
       if (isTyping) {
@@ -227,7 +124,7 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
               </div>
             ))}
           </div>
-          
+
           {/* Code Content */}
           <pre className="p-4 overflow-x-auto flex-1">
             <code>

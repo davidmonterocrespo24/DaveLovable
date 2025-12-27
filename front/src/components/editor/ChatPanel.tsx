@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, forwardRef } from 'react';
 import { Send, Sparkles, User, Bot, Paperclip, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useSendChatMessage, useChatSession } from '@/hooks/useChat';
+import type { ChatMessage } from '@/services/api';
 
 interface Message {
   id: string;
@@ -13,22 +15,34 @@ const initialMessages: Message[] = [
   {
     id: '1',
     role: 'assistant',
-    content: '¡Hola! Soy tu asistente de desarrollo. Puedo ayudarte a crear y modificar tu aplicación. ¿Qué te gustaría construir hoy?',
+    content: 'Hello! I\'m your development assistant. I can help you create and modify your application. What would you like to build today?',
     timestamp: new Date(),
   },
 ];
 
 interface ChatPanelProps {
-  onSendMessage: (message: string) => void;
+  projectId: number;
+  sessionId?: number;
+  onCodeChange?: () => void;
 }
 
 export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
-  ({ onSendMessage }, ref) => {
+  ({ projectId, sessionId, onCodeChange }, ref) => {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
+    const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    // Get chat session if sessionId is provided
+    const { data: session } = useChatSession(
+      projectId,
+      currentSessionId || 0,
+      !!currentSessionId
+    );
+
+    // Send message mutation
+    const sendMessageMutation = useSendChatMessage();
 
     const scrollToBottom = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -38,6 +52,19 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
       scrollToBottom();
     }, [messages]);
 
+    // Load messages from session
+    useEffect(() => {
+      if (session?.messages) {
+        const loadedMessages: Message[] = session.messages.map((msg) => ({
+          id: msg.id.toString(),
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+        }));
+        setMessages([...initialMessages, ...loadedMessages]);
+      }
+    }, [session]);
+
     // Auto-resize textarea
     useEffect(() => {
       if (textareaRef.current) {
@@ -46,8 +73,8 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
       }
     }, [input]);
 
-    const handleSend = () => {
-      if (!input.trim() || isTyping) return;
+    const handleSend = async () => {
+      if (!input.trim() || sendMessageMutation.isPending) return;
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -57,41 +84,53 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
       };
 
       setMessages((prev) => [...prev, userMessage]);
+      const messageContent = input;
       setInput('');
-      onSendMessage(input);
 
-      // Simulate AI response
-      setIsTyping(true);
-      setTimeout(() => {
+      try {
+        const response = await sendMessageMutation.mutateAsync({
+          projectId,
+          data: {
+            message: messageContent,
+            session_id: currentSessionId,
+          },
+        });
+
+        // Update session ID if it's a new session
+        if (response.session_id && !currentSessionId) {
+          setCurrentSessionId(response.session_id);
+        }
+
+        // Add AI response to messages
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: getAIResponse(input),
+          content: response.response,
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiResponse]);
-        setIsTyping(false);
-      }, 2000);
-    };
 
-    const getAIResponse = (userInput: string): string => {
-      const input = userInput.toLowerCase();
-      if (input.includes('botón') || input.includes('button')) {
-        return '¡Perfecto! He añadido un nuevo componente Button con estilos modernos y variantes primary/secondary. Puedes verlo en el código y en la vista previa.';
+        // Notify parent if code changes were made
+        if (response.code_changes && response.code_changes.length > 0 && onCodeChange) {
+          onCodeChange();
+        }
+      } catch (error) {
+        console.error('Failed to send message:', error);
+        // Add error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'Sorry, I encountered an error processing your request. Please try again.',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, errorMessage]);
       }
-      if (input.includes('header') || input.includes('navbar')) {
-        return 'He creado un Header responsive con navegación. Incluye un menú hamburguesa para móviles y links de navegación para desktop.';
-      }
-      if (input.includes('card') || input.includes('tarjeta')) {
-        return 'He generado un componente Card con efectos hover y bordes con gradiente. Perfecto para mostrar contenido destacado.';
-      }
-      return 'Entendido. He actualizado el código según tu solicitud. Puedes ver los cambios en tiempo real en la vista previa a la derecha.';
     };
 
     const suggestions = [
-      'Añade un botón con gradiente',
-      'Crea un header responsive',
-      'Añade animaciones hover',
+      'Add a button with gradient',
+      'Create a responsive header',
+      'Add hover animations',
     ];
 
     const formatTime = (date: Date) => {
@@ -107,7 +146,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
           </div>
           <div>
             <h3 className="font-semibold text-sm">Lovable AI</h3>
-            <p className="text-xs text-muted-foreground">Tu asistente de desarrollo</p>
+            <p className="text-xs text-muted-foreground">Your development assistant</p>
           </div>
         </div>
 
@@ -148,7 +187,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
             </div>
           ))}
           
-          {isTyping && (
+          {sendMessageMutation.isPending && (
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
                 <Bot className="w-4 h-4 text-primary-foreground" />
@@ -156,7 +195,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
               <div className="bg-muted/30 p-3 rounded-2xl rounded-tl-sm border border-border/30">
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">Generando código...</span>
+                  <span className="text-xs text-muted-foreground">Generating code...</span>
                 </div>
               </div>
             </div>
@@ -166,13 +205,13 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
         </div>
 
         {/* Suggestions */}
-        {messages.length <= 2 && !isTyping && (
+        {messages.length <= 2 && !sendMessageMutation.isPending && (
           <div className="px-4 pb-2 flex flex-wrap gap-2">
             {suggestions.map((suggestion) => (
               <button
                 key={suggestion}
                 onClick={() => setInput(suggestion)}
-                className="text-xs px-3 py-1.5 rounded-full bg-muted/20 hover:bg-muted/40 
+                className="text-xs px-3 py-1.5 rounded-full bg-muted/20 hover:bg-muted/40
                            text-muted-foreground hover:text-foreground transition-colors border border-border/30"
               >
                 {suggestion}
@@ -195,12 +234,12 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                     handleSend();
                   }
                 }}
-                placeholder="Describe qué quieres crear..."
+                placeholder="Describe what you want to create..."
                 className="w-full bg-muted/20 border border-border/30 rounded-xl px-4 py-3 pr-20
                            text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50
                            placeholder:text-muted-foreground min-h-[48px] max-h-32 transition-all"
                 rows={1}
-                disabled={isTyping}
+                disabled={sendMessageMutation.isPending}
               />
               <div className="absolute right-2 bottom-2 flex items-center gap-1">
                 <button 
@@ -219,10 +258,10 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
             </div>
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || isTyping}
+              disabled={!input.trim() || sendMessageMutation.isPending}
               className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 p-0 shrink-0"
             >
-              {isTyping ? (
+              {sendMessageMutation.isPending ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <Send className="w-5 h-5" />
