@@ -1,41 +1,61 @@
 import { forwardRef, useState, useMemo } from 'react';
 import { ChevronRight, ChevronDown, File, Folder, Search, MoreHorizontal } from 'lucide-react';
+import { useFiles } from '@/hooks/useFiles';
+import type { ProjectFile } from '@/services/api';
 
 interface FileNode {
   name: string;
   type: 'file' | 'folder';
   children?: FileNode[];
+  fileId?: number;
+  content?: string;
 }
 
-const mockFiles: FileNode[] = [
-  {
-    name: 'src',
-    type: 'folder',
-    children: [
-      {
-        name: 'components',
-        type: 'folder',
-        children: [
-          { name: 'Button.tsx', type: 'file' },
-          { name: 'Card.tsx', type: 'file' },
-          { name: 'Header.tsx', type: 'file' },
-        ],
-      },
-      { name: 'App.tsx', type: 'file' },
-      { name: 'index.css', type: 'file' },
-      { name: 'main.tsx', type: 'file' },
-    ],
-  },
-  { name: 'package.json', type: 'file' },
-  { name: 'vite.config.ts', type: 'file' },
-  { name: 'tailwind.config.ts', type: 'file' },
-];
+// Helper function to build a file tree from flat file list
+function buildFileTree(files: ProjectFile[]): FileNode[] {
+  const root: Map<string, FileNode> = new Map();
+
+  files.forEach((file) => {
+    const pathParts = file.filepath.split('/').filter(Boolean);
+    let currentLevel = root;
+
+    // Navigate/create folders
+    for (let i = 0; i < pathParts.length - 1; i++) {
+      const folderName = pathParts[i];
+      if (!currentLevel.has(folderName)) {
+        currentLevel.set(folderName, {
+          name: folderName,
+          type: 'folder',
+          children: [],
+        });
+      }
+      const folder = currentLevel.get(folderName)!;
+      if (!folder.children) folder.children = [];
+
+      // Create map for next level
+      const nextLevel = new Map<string, FileNode>();
+      folder.children.forEach(child => nextLevel.set(child.name, child));
+      folder.children = Array.from(nextLevel.values());
+      currentLevel = nextLevel;
+    }
+
+    // Add file
+    currentLevel.set(file.filename, {
+      name: file.filename,
+      type: 'file',
+      fileId: file.id,
+      content: file.content,
+    });
+  });
+
+  return Array.from(root.values());
+}
 
 interface FileItemProps {
   node: FileNode;
   depth: number;
   selectedFile: string;
-  onSelect: (name: string) => void;
+  onSelect: (file: { name: string; id: number; content: string }) => void;
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   path: string;
@@ -69,8 +89,8 @@ const FileItem = ({
   const handleClick = () => {
     if (node.type === 'folder') {
       onToggleFolder(currentPath);
-    } else {
-      onSelect(node.name);
+    } else if (node.fileId && node.content !== undefined) {
+      onSelect({ name: node.name, id: node.fileId, content: node.content });
     }
   };
 
@@ -133,14 +153,18 @@ const FileItem = ({
 };
 
 interface FileExplorerProps {
+  projectId: number;
   selectedFile: string;
-  onSelectFile: (name: string) => void;
+  onSelectFile: (file: { name: string; id: number; content: string }) => void;
 }
 
 export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
-  ({ selectedFile, onSelectFile }, ref) => {
+  ({ projectId, selectedFile, onSelectFile }, ref) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'src/components']));
+
+    // Fetch files from backend
+    const { data: files = [], isLoading } = useFiles(projectId);
 
     const handleToggleFolder = (path: string) => {
       setExpandedFolders(prev => {
@@ -154,10 +178,13 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
       });
     };
 
+    // Build file tree from backend files
+    const fileTree = useMemo(() => buildFileTree(files), [files]);
+
     // Filter files based on search query
     const filteredFiles = useMemo(() => {
-      if (!searchQuery.trim()) return mockFiles;
-      
+      if (!searchQuery.trim()) return fileTree;
+
       const filterNode = (node: FileNode): FileNode | null => {
         if (node.name.toLowerCase().includes(searchQuery.toLowerCase())) {
           return node;
@@ -173,8 +200,8 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
         return null;
       };
 
-      return mockFiles.map(filterNode).filter((n): n is FileNode => n !== null);
-    }, [searchQuery]);
+      return fileTree.map(filterNode).filter((n): n is FileNode => n !== null);
+    }, [searchQuery, fileTree]);
 
     return (
       <div ref={ref} className="h-full bg-background/50 flex flex-col">
@@ -201,18 +228,28 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
 
         {/* File Tree */}
         <div className="flex-1 overflow-y-auto py-1">
-          {filteredFiles.map((file) => (
-            <FileItem
-              key={file.name}
-              node={file}
-              depth={0}
-              selectedFile={selectedFile}
-              onSelect={onSelectFile}
-              expandedFolders={expandedFolders}
-              onToggleFolder={handleToggleFolder}
-              path=""
-            />
-          ))}
+          {isLoading ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              Loading files...
+            </div>
+          ) : filteredFiles.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+              No files found
+            </div>
+          ) : (
+            filteredFiles.map((file) => (
+              <FileItem
+                key={file.name}
+                node={file}
+                depth={0}
+                selectedFile={selectedFile}
+                onSelect={onSelectFile}
+                expandedFolders={expandedFolders}
+                onToggleFolder={handleToggleFolder}
+                path=""
+              />
+            ))
+          )}
         </div>
       </div>
     );
