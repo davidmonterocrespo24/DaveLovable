@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     # OpenAI / LLM Configuration
     OPENAI_API_KEY: Optional[str] = None
+    OPENAI_API_BASE_URL: str = "https://api.openai.com/v1"
     OPENAI_MODEL: str = "gpt-4"
 
     # AutoGen Configuration

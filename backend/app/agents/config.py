@@ -7,6 +7,7 @@ llm_config = {
         {
             "model": settings.OPENAI_MODEL,
             "api_key": settings.OPENAI_API_KEY,
+            "base_url": settings.OPENAI_API_BASE_URL,
         }
     ],
     "cache_seed": settings.AUTOGEN_CACHE_SEED,
