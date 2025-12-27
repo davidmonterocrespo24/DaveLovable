@@ -8,6 +8,7 @@ from app.agents.config import (
     CODE_REVIEWER_AGENT_SYSTEM_MESSAGE,
     ARCHITECT_AGENT_SYSTEM_MESSAGE,
 )
+from app.agents.function_registry import get_function_map
 from app.core.config import settings
 import json
 import re
@@ -31,7 +32,10 @@ class AgentOrchestrator:
     def _initialize_agents(self):
         """Initialize all agents"""
 
-        # Coding Agent - Generates code
+        # Get function map for tool registration
+        function_map = get_function_map()
+
+        # Coding Agent - Generates code with tools
         self.coding_agent = AssistantAgent(
             name="CodingAgent",
             system_message=CODING_AGENT_SYSTEM_MESSAGE,
@@ -59,13 +63,20 @@ class AgentOrchestrator:
             llm_config=self.llm_config,
         )
 
-        # User Proxy - Represents the user
+        # User Proxy - Executes functions on behalf of agents
         self.user_proxy = UserProxyAgent(
             name="UserProxy",
             human_input_mode="NEVER",
             max_consecutive_auto_reply=0,
             code_execution_config=False,
+            function_map=function_map,
         )
+
+        # Register functions with all agents
+        for func_name, func in function_map.items():
+            self.coding_agent.register_function(
+                function_map={func_name: func}
+            )
 
         self.agents = {
             "coding": self.coding_agent,
