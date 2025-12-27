@@ -4,6 +4,7 @@ from app.models import ChatSession, ChatMessage, MessageRole, ProjectFile
 from app.schemas import ChatSessionCreate, ChatMessageCreate, ChatRequest
 from app.agents import get_orchestrator
 from app.services.filesystem_service import FileSystemService
+from app.services.git_service import GitService
 from fastapi import HTTPException, status
 import json
 
@@ -101,7 +102,7 @@ class ChatService:
             )
         )
 
-        # Get project context (existing files)
+        # Get project context (existing files from filesystem)
         project_files = db.query(ProjectFile).filter(
             ProjectFile.project_id == project_id
         ).all()
@@ -113,7 +114,7 @@ class ChatService:
                     "filename": f.filename,
                     "filepath": f.filepath,
                     "language": f.language,
-                    "content": f.content[:500],  # First 500 chars for context
+                    "content": (FileSystemService.read_file(project_id, f.filepath) or "")[:500],  # First 500 chars for context
                 }
                 for f in project_files
             ]
@@ -152,6 +153,7 @@ class ChatService:
             code_changes = result.get("code", [])
 
             # Update or create files in the project if code was generated
+            changed_files = []
             if code_changes:
                 for code_block in code_changes:
                     filename = code_block.get("filename")
@@ -161,7 +163,7 @@ class ChatService:
                     if not filename or not content:
                         continue
 
-                    # Check if file exists
+                    # Check if file exists in database
                     existing_file = db.query(ProjectFile).filter(
                         ProjectFile.project_id == project_id,
                         ProjectFile.filename == filename
@@ -170,25 +172,33 @@ class ChatService:
                     filepath = f"src/components/{filename}" if not filename.startswith("src/") else filename
 
                     if existing_file:
-                        existing_file.content = content
+                        # Update file in filesystem
+                        FileSystemService.write_file(project_id, existing_file.filepath, content)
+                        # Update metadata in database
                         if language:
                             existing_file.language = language
-                        # Update physical file
-                        FileSystemService.write_file(project_id, existing_file.filepath, content)
+                        from datetime import datetime
+                        existing_file.updated_at = datetime.utcnow()
+                        changed_files.append(existing_file.filepath)
                     else:
-                        # Create new file
+                        # Create new file in filesystem
+                        FileSystemService.write_file(project_id, filepath, content)
+                        # Create metadata in database
                         new_file = ProjectFile(
                             project_id=project_id,
                             filename=filename,
                             filepath=filepath,
-                            content=content,
                             language=language
                         )
                         db.add(new_file)
-                        # Write physical file
-                        FileSystemService.write_file(project_id, filepath, content)
+                        changed_files.append(filepath)
 
                 db.commit()
+
+                # Commit all changes to Git
+                if changed_files:
+                    commit_message = f"AI generated code: {chat_request.message[:50]}"
+                    GitService.commit_changes(project_id, commit_message, changed_files)
 
             # Save assistant message with the actual agent response
             assistant_message = ChatService.add_message(
