@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -109,7 +109,7 @@ def add_file_to_project(
 def update_file(
     project_id: int,
     file_id: int,
-    file_update: ProjectFileUpdate,
+    file_update: ProjectFileUpdate = Body(...),
     db: Session = Depends(get_db)
 ):
     """Update a file's content"""
