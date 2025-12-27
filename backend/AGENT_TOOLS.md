@@ -10,9 +10,13 @@ The agent system now includes a comprehensive set of tools that allow agents to 
 
 ### Components
 
-1. **tools.py** - Core tool implementations
-   - Contains the actual Python functions that perform operations
-   - Returns standardized dictionaries with `success`, `data`, and `error` fields
+1. **tools/** - Core tool implementations organized by category
+   - **file_operations.py** - File read, write, edit, delete, and list operations
+   - **search_operations.py** - Glob, grep, and fuzzy file search
+   - **terminal_operations.py** - Terminal command execution
+   - **json_operations.py** - JSON file read, write, and validation
+   - **__init__.py** - Package exports for easy importing
+   - Each module returns standardized dictionaries with `success`, `data`, and `error` fields
 
 2. **function_registry.py** - AutoGen function wrappers
    - Wraps tools with proper type annotations for AutoGen
@@ -250,9 +254,25 @@ Potential additions to the tool system:
 2. Verify parameter types match the annotations
 3. Review agent logs for detailed error messages
 
+## File Structure
+
+```
+backend/app/agents/
+├── tools/
+│   ├── __init__.py               # Package exports
+│   ├── file_operations.py        # File CRUD operations
+│   ├── search_operations.py      # Search tools (glob, grep, file_search)
+│   ├── terminal_operations.py    # Terminal command execution
+│   └── json_operations.py        # JSON read/write/validate
+├── function_registry.py          # AutoGen function wrappers
+├── prompts.py                    # Agent system prompts with tool schemas
+├── config.py                     # Agent configuration
+└── orchestrator.py               # Agent initialization and orchestration
+```
+
 ## References
 
 - AutoGen Documentation: https://microsoft.github.io/autogen/
 - Tool Definitions: `backend/app/agents/prompts.py`
-- Tool Implementations: `backend/app/agents/tools.py`
+- Tool Implementations: `backend/app/agents/tools/`
 - Function Registry: `backend/app/agents/function_registry.py`
