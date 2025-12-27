@@ -13,42 +13,40 @@ interface FileNode {
 
 // Helper function to build a file tree from flat file list
 function buildFileTree(files: ProjectFile[]): FileNode[] {
-  const root: Map<string, FileNode> = new Map();
+  const root: FileNode[] = [];
 
   files.forEach((file) => {
-    const pathParts = file.filepath.split('/').filter(Boolean);
-    let currentLevel = root;
+    const parts = file.filepath.split('/').filter(Boolean);
+    let currentChildren = root;
 
-    // Navigate/create folders
-    for (let i = 0; i < pathParts.length - 1; i++) {
-      const folderName = pathParts[i];
-      if (!currentLevel.has(folderName)) {
-        currentLevel.set(folderName, {
+    // Navigate through folders
+    for (let i = 0; i < parts.length - 1; i++) {
+      const folderName = parts[i];
+      let folder = currentChildren.find(node => node.name === folderName && node.type === 'folder');
+
+      if (!folder) {
+        folder = {
           name: folderName,
           type: 'folder',
           children: [],
-        });
+        };
+        currentChildren.push(folder);
       }
-      const folder = currentLevel.get(folderName)!;
-      if (!folder.children) folder.children = [];
 
-      // Create map for next level
-      const nextLevel = new Map<string, FileNode>();
-      folder.children.forEach(child => nextLevel.set(child.name, child));
-      folder.children = Array.from(nextLevel.values());
-      currentLevel = nextLevel;
+      currentChildren = folder.children!;
     }
 
-    // Add file
-    currentLevel.set(file.filename, {
-      name: file.filename,
+    // Add the file
+    const fileName = parts[parts.length - 1];
+    currentChildren.push({
+      name: fileName,
       type: 'file',
       fileId: file.id,
       content: file.content,
     });
   });
 
-  return Array.from(root.values());
+  return root;
 }
 
 interface FileItemProps {
