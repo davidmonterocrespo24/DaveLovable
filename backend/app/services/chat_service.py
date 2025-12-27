@@ -143,21 +143,22 @@ class ChatService:
             )
 
         try:
-            # Use quick generation for now (can be enhanced with full orchestration)
-            result = orchestrator.generate_code(chat_request.message, context)
+            # Use CodingAgent to generate code
+            result = await orchestrator.generate_code(chat_request.message, context)
 
-            # Prepare response content
-            response_content = "I've generated the code based on your request."
-            code_changes = []
+            # Get the actual response text from the agent
+            response_content = result.get("response_text", "I processed your request.")
+            code_changes = result.get("code", [])
 
-            if result.get("success") and result.get("code"):
-                code_changes = result["code"]
-
-                # Update or create files in the project
+            # Update or create files in the project if code was generated
+            if code_changes:
                 for code_block in code_changes:
                     filename = code_block.get("filename")
                     content = code_block.get("content")
                     language = code_block.get("language")
+
+                    if not filename or not content:
+                        continue
 
                     # Check if file exists
                     existing_file = db.query(ProjectFile).filter(
@@ -182,9 +183,7 @@ class ChatService:
 
                 db.commit()
 
-                response_content += f"\n\nI've created/updated {len(code_changes)} file(s) for you."
-
-            # Save assistant message
+            # Save assistant message with the actual agent response
             assistant_message = ChatService.add_message(
                 db,
                 ChatMessageCreate(

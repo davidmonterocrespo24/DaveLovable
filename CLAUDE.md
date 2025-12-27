@@ -234,3 +234,5 @@ Testing infrastructure is not yet implemented. When adding tests:
 
 
 All test on the test folder
+
+Nunca toques el AGENT_SYSTEM_PROMPT , pero puedes modificar los otros

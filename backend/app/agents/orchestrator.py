@@ -1,82 +1,123 @@
 from typing import List, Dict, Optional
-import autogen
-from autogen import AssistantAgent, UserProxyAgent, GroupChat, GroupChatManager
+from autogen_agentchat.agents import AssistantAgent
+from autogen_agentchat.teams import RoundRobinGroupChat
+from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
+from autogen_agentchat.messages import TextMessage
+from autogen_core import CancellationToken
+from autogen_ext.models.openai import OpenAIChatCompletionClient
 from app.agents.config import (
-    llm_config,
     CODING_AGENT_SYSTEM_MESSAGE,
     UI_DESIGNER_AGENT_SYSTEM_MESSAGE,
     CODE_REVIEWER_AGENT_SYSTEM_MESSAGE,
     ARCHITECT_AGENT_SYSTEM_MESSAGE,
 )
-from app.agents.function_registry import get_function_map
+from app.agents.tools import (
+    read_file,
+    write_file,
+    edit_file,
+    delete_file,
+    list_dir,
+    glob_search,
+    grep_search,
+    file_search,
+    run_terminal_cmd,
+    read_json,
+    write_json,
+)
 from app.core.config import settings
 import json
 import re
 
 
 class AgentOrchestrator:
-    """Orchestrates multiple AI agents using Microsoft AutoGen"""
+    """Orchestrates multiple AI agents using Microsoft AutoGen 0.4"""
 
     def __init__(self):
         # Check if API key is configured
         if not settings.OPENAI_API_KEY or settings.OPENAI_API_KEY == "your-openai-api-key-here":
             raise ValueError(
                 "OpenAI API key is not configured. Please set OPENAI_API_KEY in your .env file. "
-                "You can get an API key from https://platform.openai.com/api-keys"
+                "You can get an API key from your LLM provider"
             )
 
-        self.llm_config = llm_config
+        # Initialize model client
+        # For non-OpenAI models, we need to provide model_info
+        model_info = {
+            "vision": True,
+            "function_calling": True,
+            "json_output": True,
+            "family": "unknown",
+            "structured_output": True,
+        }
+
+        self.model_client = OpenAIChatCompletionClient(
+            model=settings.OPENAI_MODEL,
+            api_key=settings.OPENAI_API_KEY,
+            base_url=settings.OPENAI_API_BASE_URL,
+            temperature=0.7,
+            model_info=model_info,
+        )
+
         self.agents = {}
         self._initialize_agents()
 
     def _initialize_agents(self):
-        """Initialize all agents"""
+        """Initialize all agents with tools"""
 
-        # Get function map for tool registration
-        function_map = get_function_map()
+        # Define all available tools
+        tools = [
+            read_file,
+            write_file,
+            edit_file,
+            delete_file,
+            list_dir,
+            glob_search,
+            grep_search,
+            file_search,
+            run_terminal_cmd,
+            read_json,
+            write_json,
+        ]
 
         # Coding Agent - Generates code with tools
         self.coding_agent = AssistantAgent(
             name="CodingAgent",
+            description="Expert coding agent that can read, write, and modify files",
             system_message=CODING_AGENT_SYSTEM_MESSAGE,
-            llm_config=self.llm_config,
+            model_client=self.model_client,
+            tools=tools,
+            reflect_on_tool_use=True,
         )
 
         # UI Designer Agent - Focuses on UI/UX
         self.ui_designer = AssistantAgent(
             name="UIDesigner",
+            description="UI/UX designer specialized in modern web design",
             system_message=UI_DESIGNER_AGENT_SYSTEM_MESSAGE,
-            llm_config=self.llm_config,
+            model_client=self.model_client,
+            tools=tools,
+            reflect_on_tool_use=True,
         )
 
         # Code Reviewer Agent - Reviews and improves code
         self.code_reviewer = AssistantAgent(
             name="CodeReviewer",
+            description="Expert code reviewer with deep knowledge of best practices",
             system_message=CODE_REVIEWER_AGENT_SYSTEM_MESSAGE,
-            llm_config=self.llm_config,
+            model_client=self.model_client,
+            tools=[read_file, grep_search, file_search],  # Read-only tools
+            reflect_on_tool_use=True,
         )
 
         # Architect Agent - Designs system architecture
         self.architect = AssistantAgent(
             name="Architect",
+            description="Software architect expert in designing scalable applications",
             system_message=ARCHITECT_AGENT_SYSTEM_MESSAGE,
-            llm_config=self.llm_config,
+            model_client=self.model_client,
+            tools=[read_file, list_dir, grep_search, file_search],  # Read-only tools
+            reflect_on_tool_use=True,
         )
-
-        # User Proxy - Executes functions on behalf of agents
-        self.user_proxy = UserProxyAgent(
-            name="UserProxy",
-            human_input_mode="NEVER",
-            max_consecutive_auto_reply=0,
-            code_execution_config=False,
-            function_map=function_map,
-        )
-
-        # Register functions with all agents
-        for func_name, func in function_map.items():
-            self.coding_agent.register_function(
-                function_map={func_name: func}
-            )
 
         self.agents = {
             "coding": self.coding_agent,
@@ -85,9 +126,9 @@ class AgentOrchestrator:
             "architect": self.architect,
         }
 
-    def generate_code(self, user_request: str, context: Optional[Dict] = None) -> Dict:
+    async def generate_code(self, user_request: str, context: Optional[Dict] = None) -> Dict:
         """
-        Generate code based on user request using agent collaboration
+        Generate code based on user request using the CodingAgent
 
         Args:
             user_request: The user's request/prompt
@@ -104,35 +145,29 @@ class AgentOrchestrator:
 
         full_message = f"{user_request}{context_msg}"
 
-        # Create a group chat for collaborative code generation
-        groupchat = GroupChat(
-            agents=[
-                self.user_proxy,
-                self.architect,
-                self.ui_designer,
-                self.coding_agent,
-                self.code_reviewer,
-            ],
-            messages=[],
-            max_round=settings.AUTOGEN_MAX_ROUND,
-            speaker_selection_method="round_robin",
+        # Use CodingAgent directly for faster response
+        response = await self.coding_agent.on_messages(
+            [TextMessage(content=full_message, source="user")],
+            CancellationToken()
         )
 
-        manager = GroupChatManager(groupchat=groupchat, llm_config=self.llm_config)
+        # Extract code from response
+        generated_code = []
+        messages = []
 
-        # Start the conversation
-        self.user_proxy.initiate_chat(manager, message=full_message)
-
-        # Extract code from the conversation
-        generated_code = self._extract_code_from_conversation(groupchat.messages)
+        if response.chat_message:
+            content = response.chat_message.content
+            generated_code = self._extract_code_from_message(content)
+            messages.append(self._message_to_dict(response.chat_message))
 
         return {
             "code": generated_code,
-            "messages": groupchat.messages,
+            "messages": messages,
             "success": len(generated_code) > 0,
+            "response_text": response.chat_message.content if response.chat_message else "",
         }
 
-    def quick_code_generation(self, user_request: str, agent_type: str = "coding") -> str:
+    async def quick_code_generation(self, user_request: str, agent_type: str = "coding") -> str:
         """
         Quick code generation using a single agent
 
@@ -147,21 +182,20 @@ class AgentOrchestrator:
         agent = self.agents.get(agent_type, self.coding_agent)
 
         # Create a simple conversation
-        self.user_proxy.initiate_chat(
-            agent,
-            message=user_request,
-            max_turns=2,
+        response = await agent.on_messages(
+            [TextMessage(content=user_request, source="user")],
+            CancellationToken()
         )
 
-        # Get the last message from the agent
-        if hasattr(self.user_proxy, 'chat_messages') and agent.name in self.user_proxy.chat_messages:
-            messages = self.user_proxy.chat_messages[agent.name]
-            if messages:
-                return self._extract_code_from_message(messages[-1].get('content', ''))
+        # Extract code from response
+        if response.chat_message:
+            code_blocks = self._extract_code_from_message(response.chat_message.content)
+            if code_blocks:
+                return code_blocks[0]['content']
 
         return ""
 
-    def review_code(self, code: str, context: Optional[str] = None) -> Dict:
+    async def review_code(self, code: str, context: Optional[str] = None) -> Dict:
         """
         Review existing code
 
@@ -177,33 +211,38 @@ class AgentOrchestrator:
         if context:
             message += f"\n\nContext: {context}"
 
-        self.user_proxy.initiate_chat(
-            self.code_reviewer,
-            message=message,
-            max_turns=2,
+        response = await self.code_reviewer.on_messages(
+            [TextMessage(content=message, source="user")],
+            CancellationToken()
         )
 
-        # Extract feedback
-        if hasattr(self.user_proxy, 'chat_messages') and self.code_reviewer.name in self.user_proxy.chat_messages:
-            messages = self.user_proxy.chat_messages[self.code_reviewer.name]
-            if messages:
-                return {
-                    "feedback": messages[-1].get('content', ''),
-                    "success": True,
-                }
+        if response.chat_message:
+            return {
+                "feedback": response.chat_message.content,
+                "success": True,
+            }
 
         return {"feedback": "", "success": False}
 
-    def _extract_code_from_conversation(self, messages: List[Dict]) -> List[Dict]:
+    def _message_to_dict(self, message) -> Dict:
+        """Convert AutoGen message to dict"""
+        return {
+            "source": getattr(message, "source", "unknown"),
+            "content": getattr(message, "content", ""),
+            "type": message.__class__.__name__,
+        }
+
+    def _extract_code_from_messages(self, messages: List) -> List[Dict]:
         """Extract code blocks from conversation messages"""
 
         code_blocks = []
 
         for msg in messages:
-            content = msg.get('content', '')
-            code = self._extract_code_from_message(content)
-            if code:
-                code_blocks.extend(code)
+            content = getattr(msg, "content", "")
+            if isinstance(content, str):
+                code = self._extract_code_from_message(content)
+                if code:
+                    code_blocks.extend(code)
 
         return code_blocks
 
@@ -260,6 +299,10 @@ class AgentOrchestrator:
 
         ext = ext_map.get(language, 'txt')
         return f'generated.{ext}'
+
+    async def close(self):
+        """Close the model client connection"""
+        await self.model_client.close()
 
 
 # Singleton instance

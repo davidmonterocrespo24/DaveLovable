@@ -1,11 +1,11 @@
 # FastAPI and server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
 
 # Database
-sqlalchemy==2.0.25
-alembic==1.13.1
+sqlalchemy==2.0.36
+alembic==1.14.0
 
 # Security
 python-jose[cryptography]==3.3.0
@@ -13,16 +13,15 @@ passlib[bcrypt]==1.7.4
 python-dotenv==1.0.1
 
 # Pydantic
-pydantic==2.5.3
-pydantic-settings==2.1.0
-email-validator==2.1.0
+pydantic==2.10.3
+pydantic-settings==2.7.0
+email-validator==2.2.0
 
-# AutoGen for agent orchestration
-pyautogen==0.2.18
-
-# OpenAI (compatible with pyautogen 0.2.18)
-openai==1.3.0
+# AutoGen for agent orchestration (v0.4+)
+autogen-agentchat==0.7.5
+autogen-core==0.7.5
+autogen-ext[openai]==0.7.5
 
 # Utils
-requests==2.31.0
-aiohttp==3.9.3
+requests==2.32.3
+aiohttp==3.11.11
