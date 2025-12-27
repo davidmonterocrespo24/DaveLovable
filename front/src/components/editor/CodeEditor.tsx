@@ -1,4 +1,6 @@
-import { useState, useEffect, forwardRef, useMemo } from 'react';
+import { forwardRef, useRef, useEffect } from 'react';
+import Editor, { OnMount } from '@monaco-editor/react';
+import type * as Monaco from 'monaco-editor';
 
 interface CodeEditorProps {
   selectedFile: {
@@ -10,158 +12,169 @@ interface CodeEditorProps {
   onContentChange?: (content: string) => void;
 }
 
-// Token types for syntax highlighting
-type TokenType = 'keyword' | 'string' | 'comment' | 'component' | 'tag' | 'attribute' | 'operator' | 'number' | 'function' | 'plain';
-
-interface Token {
-  type: TokenType;
-  value: string;
-}
-
-const tokenColors: Record<TokenType, string> = {
-  keyword: 'text-purple-400',
-  string: 'text-green-400',
-  comment: 'text-muted-foreground/60',
-  component: 'text-cyan-400',
-  tag: 'text-blue-400',
-  attribute: 'text-orange-300',
-  operator: 'text-pink-400',
-  number: 'text-orange-400',
-  function: 'text-yellow-300',
-  plain: 'text-foreground/90',
-};
-
-const tokenize = (line: string): Token[] => {
-  const tokens: Token[] = [];
-  let remaining = line;
-
-  const patterns: [RegExp, TokenType][] = [
-    [/^(\/\/.*)/, 'comment'],
-    [/^(import|export|from|const|let|var|function|return|if|else|interface|type|default|async|await)\b/, 'keyword'],
-    [/^(<\/?)([A-Z][a-zA-Z]*)/, 'component'],
-    [/^(<\/?)([a-z][a-z0-9]*)\b/, 'tag'],
-    [/^([a-zA-Z_][a-zA-Z0-9_]*)\s*(?=\()/, 'function'],
-    [/^(["'`])(?:(?!\1)[^\\]|\\.)*\1/, 'string'],
-    [/^(\d+\.?\d*)/, 'number'],
-    [/^([=<>!&|+\-*/%{}()[\];:,.?]+)/, 'operator'],
-    [/^([a-zA-Z_][a-zA-Z0-9_]*)/, 'plain'],
-    [/^(\s+)/, 'plain'],
-  ];
-
-  while (remaining.length > 0) {
-    let matched = false;
-
-    for (const [pattern, type] of patterns) {
-      const match = remaining.match(pattern);
-      if (match) {
-        if (type === 'component' || type === 'tag') {
-          tokens.push({ type: 'operator', value: match[1] });
-          tokens.push({ type, value: match[2] });
-        } else {
-          tokens.push({ type, value: match[0] });
-        }
-        remaining = remaining.slice(match[0].length);
-        matched = true;
-        break;
-      }
-    }
-
-    if (!matched) {
-      tokens.push({ type: 'plain', value: remaining[0] });
-      remaining = remaining.slice(1);
-    }
+// Get language from file extension
+const getLanguage = (filename: string): string => {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'ts':
+    case 'tsx':
+      return 'typescript';
+    case 'js':
+    case 'jsx':
+      return 'javascript';
+    case 'css':
+      return 'css';
+    case 'json':
+      return 'json';
+    case 'html':
+      return 'html';
+    case 'md':
+      return 'markdown';
+    default:
+      return 'plaintext';
   }
-
-  return tokens;
-};
-
-const SyntaxHighlightedLine = ({ line }: { line: string }) => {
-  const tokens = useMemo(() => tokenize(line), [line]);
-
-  return (
-    <span>
-      {tokens.map((token, i) => (
-        <span key={i} className={tokenColors[token.type]}>
-          {token.value}
-        </span>
-      ))}
-    </span>
-  );
 };
 
 export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
   ({ selectedFile, isTyping, onContentChange }, ref) => {
-    const [displayedCode, setDisplayedCode] = useState('');
-    const [editableContent, setEditableContent] = useState('');
-    const code = selectedFile?.content || '// Select a file to view its contents';
+    const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
+    const monacoRef = useRef<typeof Monaco | null>(null);
 
-    useEffect(() => {
-      if (isTyping) {
-        setDisplayedCode('');
-        let index = 0;
-        const interval = setInterval(() => {
-          if (index < code.length) {
-            setDisplayedCode(code.slice(0, index + 1));
-            index++;
-          } else {
-            clearInterval(interval);
-          }
-        }, 5);
-        return () => clearInterval(interval);
-      } else {
-        setDisplayedCode(code);
-        setEditableContent(code);
-      }
-    }, [code, isTyping]);
+    const handleEditorDidMount: OnMount = (editor, monaco) => {
+      editorRef.current = editor;
+      monacoRef.current = monaco;
 
-    const handleContentChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newContent = e.target.value;
-      setEditableContent(newContent);
-      setDisplayedCode(newContent);
-      onContentChange?.(newContent);
+      // Configure TypeScript compiler options
+      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.Latest,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        reactNamespace: 'React',
+        allowJs: true,
+        typeRoots: ['node_modules/@types'],
+        skipLibCheck: true,
+        paths: {
+          '@/*': ['./src/*']
+        }
+      });
+
+      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+        target: monaco.languages.typescript.ScriptTarget.Latest,
+        allowNonTsExtensions: true,
+        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+        module: monaco.languages.typescript.ModuleKind.ESNext,
+        noEmit: true,
+        esModuleInterop: true,
+        jsx: monaco.languages.typescript.JsxEmit.React,
+        allowJs: true
+      });
+
+      // Add common library type definitions
+      const reactTypes = `
+        declare module 'react' {
+          export function useState<T>(initialState: T | (() => T)): [T, (value: T) => void];
+          export function useEffect(effect: () => void | (() => void), deps?: any[]): void;
+          export function useRef<T>(initialValue: T): { current: T };
+          export const Fragment: any;
+          export default any;
+        }
+      `;
+
+      const lucideReactTypes = `
+        declare module 'lucide-react' {
+          import { FC, SVGProps } from 'react';
+          export type LucideIcon = FC<SVGProps<SVGSVGElement>>;
+          export const Menu: LucideIcon;
+          export const X: LucideIcon;
+          export const Search: LucideIcon;
+          export const User: LucideIcon;
+          export const ShoppingBag: LucideIcon;
+          export const ChevronRight: LucideIcon;
+          export const ChevronDown: LucideIcon;
+          export const File: LucideIcon;
+          export const Folder: LucideIcon;
+          export const MoreHorizontal: LucideIcon;
+          export const Plus: LucideIcon;
+          export const Trash2: LucideIcon;
+          export const FilePlus: LucideIcon;
+          export const Sparkles: LucideIcon;
+          export const Settings: LucideIcon;
+          export const Share2: LucideIcon;
+          export const ChevronLeft: LucideIcon;
+          export const PanelLeftClose: LucideIcon;
+          export const PanelLeft: LucideIcon;
+          export const Cloud: LucideIcon;
+          export const Zap: LucideIcon;
+          export const History: LucideIcon;
+          export const Save: LucideIcon;
+          export const FileText: LucideIcon;
+        }
+      `;
+
+      monaco.languages.typescript.typescriptDefaults.addExtraLib(reactTypes, 'file:///node_modules/@types/react/index.d.ts');
+      monaco.languages.typescript.typescriptDefaults.addExtraLib(lucideReactTypes, 'file:///node_modules/@types/lucide-react/index.d.ts');
+
+      // Configure diagnostics to ignore certain warnings
+      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+        diagnosticCodesToIgnore: [7027, 6133, 6192, 80001] // Ignore: unreachable code, unused vars, implicit any
+      });
+
+      monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+        noSemanticValidation: false,
+        noSyntaxValidation: false,
+        diagnosticCodesToIgnore: [7027, 6133, 6192, 80001]
+      });
     };
 
-    const lines = displayedCode.split('\n');
+    const handleEditorChange = (value: string | undefined) => {
+      if (value !== undefined && !isTyping) {
+        onContentChange?.(value);
+      }
+    };
+
+    // Update editor content when file changes
+    useEffect(() => {
+      if (editorRef.current && selectedFile) {
+        const currentValue = editorRef.current.getValue();
+        if (currentValue !== selectedFile.content) {
+          editorRef.current.setValue(selectedFile.content);
+        }
+      }
+    }, [selectedFile?.id]);
+
+    const language = selectedFile ? getLanguage(selectedFile.name) : 'plaintext';
+    const value = selectedFile?.content || '// Select a file to view its contents';
 
     return (
-      <div ref={ref} className="h-full bg-[#0d1117] overflow-auto font-mono text-sm relative">
-        <div className="flex min-h-full">
-          {/* Line Numbers */}
-          <div className="py-4 px-2 text-right text-muted-foreground/40 select-none border-r border-border/30 sticky left-0 bg-[#0d1117] z-10">
-            {lines.map((_, i) => (
-              <div key={i} className="leading-6 text-xs px-2">
-                {i + 1}
-              </div>
-            ))}
-          </div>
-
-          {/* Editable Textarea (invisible but functional) */}
-          <textarea
-            value={editableContent}
-            onChange={handleContentChange}
-            disabled={!selectedFile || isTyping}
-            className="absolute inset-0 p-4 pl-[60px] bg-transparent text-transparent caret-white resize-none outline-none font-mono text-sm leading-6 z-20"
-            spellCheck={false}
-            style={{
-              caretColor: 'white',
-              WebkitTextFillColor: 'transparent'
-            }}
-          />
-
-          {/* Code Content (syntax highlighted, read-only display) */}
-          <pre className="p-4 overflow-x-auto flex-1 pointer-events-none">
-            <code>
-              {lines.map((line, i) => (
-                <div key={i} className="leading-6">
-                  <SyntaxHighlightedLine line={line} />
-                </div>
-              ))}
-              {isTyping && (
-                <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-0.5" />
-              )}
-            </code>
-          </pre>
-        </div>
+      <div ref={ref} className="h-full bg-[#0d1117]">
+        <Editor
+          height="100%"
+          language={language}
+          value={value}
+          onChange={handleEditorChange}
+          onMount={handleEditorDidMount}
+          theme="vs-dark"
+          options={{
+            readOnly: !selectedFile || isTyping,
+            minimap: { enabled: false },
+            fontSize: 14,
+            lineNumbers: 'on',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 2,
+            wordWrap: 'off',
+            padding: { top: 16, bottom: 16 },
+            fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+            cursorBlinking: 'smooth',
+            smoothScrolling: true,
+          }}
+        />
       </div>
     );
   }
