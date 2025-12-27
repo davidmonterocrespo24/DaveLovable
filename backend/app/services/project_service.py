@@ -2,6 +2,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 from app.models import Project, ProjectFile, ProjectStatus
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectFileCreate
+from app.services.filesystem_service import FileSystemService
 from fastapi import HTTPException, status
 
 
@@ -20,8 +21,8 @@ class ProjectService:
         db.commit()
         db.refresh(db_project)
 
-        # Create initial project structure
-        ProjectService._create_initial_files(db, db_project.id, project.template)
+        # Create initial project structure (both DB and filesystem)
+        ProjectService._create_initial_files(db, db_project.id, db_project.name, project.template)
 
         return db_project
 
@@ -74,6 +75,10 @@ class ProjectService:
         """Delete a project"""
 
         project = ProjectService.get_project(db, project_id, owner_id)
+
+        # Delete physical files
+        FileSystemService.delete_project(project_id)
+
         db.delete(project)
         db.commit()
         return True
@@ -105,6 +110,10 @@ class ProjectService:
         db.add(db_file)
         db.commit()
         db.refresh(db_file)
+
+        # Also write to filesystem
+        FileSystemService.write_file(project_id, db_file.filepath, db_file.content)
+
         return db_file
 
     @staticmethod
@@ -134,6 +143,10 @@ class ProjectService:
         file.content = content
         db.commit()
         db.refresh(file)
+
+        # Also update filesystem
+        FileSystemService.write_file(project_id, file.filepath, content)
+
         return file
 
     @staticmethod
@@ -154,13 +167,19 @@ class ProjectService:
                 detail="File not found"
             )
 
+        # Delete from filesystem
+        FileSystemService.delete_file(project_id, file.filepath)
+
         db.delete(file)
         db.commit()
         return True
 
     @staticmethod
-    def _create_initial_files(db: Session, project_id: int, template: str):
+    def _create_initial_files(db: Session, project_id: int, project_name: str, template: str):
         """Create initial project structure based on template"""
+
+        # Create physical project structure
+        FileSystemService.create_project_structure(project_id, project_name)
 
         if template == "react-vite":
             initial_files = [

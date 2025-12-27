@@ -12,6 +12,7 @@ from app.schemas import (
     ProjectFileCreate,
 )
 from app.services import ProjectService
+from app.services.filesystem_service import FileSystemService
 
 router = APIRouter()
 
@@ -123,3 +124,24 @@ def delete_file(
     """Delete a file from a project"""
     ProjectService.delete_file(db, file_id, project_id, MOCK_USER_ID)
     return None
+
+
+@router.get("/{project_id}/bundle")
+def get_project_bundle(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Get all project files as a bundle for WebContainers
+    Returns: { "files": { "path": "content", ... } }
+    """
+    # Verify ownership
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Get all files from filesystem
+    files_list = FileSystemService.get_all_files(project_id)
+
+    # Convert to WebContainers format: { "path": "content" }
+    files_dict = {file["path"]: file["content"] for file in files_list}
+
+    return {"files": files_dict}

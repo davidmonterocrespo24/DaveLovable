@@ -9,7 +9,7 @@ This is a lovable.dev clone - a web application that allows users to create web 
 - **Frontend** (`/front`): React + TypeScript + Vite with visual code editor
 - **Backend** (`/backend`): FastAPI + SQLite + Microsoft AutoGen for AI agent orchestration
 
-The project is currently in development with frontend and backend built separately. They are **not yet connected** - the frontend is UI-only, and API integration is pending.
+The project supports **physical file storage** for WebContainers integration - generated code is saved both in the database and as physical files for browser-based preview execution.
 
 ## Development Commands
 
@@ -66,6 +66,35 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend runs on http://localhost:8000 with API documentation at http://localhost:8000/docs
+
+## File Storage System
+
+The backend uses a **dual storage strategy**:
+
+1. **SQLite Database** - Stores file metadata and content for fast querying
+2. **Physical Filesystem** - Stores actual files at `backend/projects/project_{id}/` for WebContainers
+
+**File System Service** ([backend/app/services/filesystem_service.py](backend/app/services/filesystem_service.py)):
+- `create_project_structure(project_id, name)` - Creates complete Vite + React project
+- `write_file(project_id, filepath, content)` - Writes file to disk
+- `get_all_files(project_id)` - Returns all files for WebContainers bundle
+
+**Project Structure:**
+```
+backend/projects/project_X/
+├── package.json           # Vite + React + TypeScript + Tailwind
+├── vite.config.ts
+├── tsconfig.json
+├── tailwind.config.js
+├── index.html
+└── src/
+    ├── main.tsx
+    ├── App.tsx
+    ├── index.css
+    └── components/        # AI-generated components
+```
+
+**Bundle Endpoint:** `GET /api/v1/projects/{id}/bundle` returns all files in format for WebContainers API
 
 ## Architecture
 

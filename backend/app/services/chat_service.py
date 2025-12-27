@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models import ChatSession, ChatMessage, MessageRole, ProjectFile
 from app.schemas import ChatSessionCreate, ChatMessageCreate, ChatRequest
 from app.agents import get_orchestrator
+from app.services.filesystem_service import FileSystemService
 from fastapi import HTTPException, status
 import json
 
@@ -166,20 +167,26 @@ class ChatService:
                         ProjectFile.filename == filename
                     ).first()
 
+                    filepath = f"src/components/{filename}" if not filename.startswith("src/") else filename
+
                     if existing_file:
                         existing_file.content = content
                         if language:
                             existing_file.language = language
+                        # Update physical file
+                        FileSystemService.write_file(project_id, existing_file.filepath, content)
                     else:
                         # Create new file
                         new_file = ProjectFile(
                             project_id=project_id,
                             filename=filename,
-                            filepath=f"src/{filename}",
+                            filepath=filepath,
                             content=content,
                             language=language
                         )
                         db.add(new_file)
+                        # Write physical file
+                        FileSystemService.write_file(project_id, filepath, content)
 
                 db.commit()
 

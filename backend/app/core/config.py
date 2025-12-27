@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     AUTOGEN_CACHE_SEED: int = 42
     AUTOGEN_MAX_ROUND: int = 10
 
+    # Projects Storage
+    PROJECTS_BASE_DIR: str = "./projects"
+
     class Config:
         env_file = ".env"
         case_sensitive = True
