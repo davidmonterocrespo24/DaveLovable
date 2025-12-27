@@ -1,7 +1,35 @@
 import { forwardRef, useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, Search, MoreHorizontal } from 'lucide-react';
-import { useFiles } from '@/hooks/useFiles';
+import { ChevronRight, ChevronDown, File, Folder, Search, MoreHorizontal, Plus, Trash2, FilePlus } from 'lucide-react';
+import { useFiles, useCreateFile, useDeleteFile } from '@/hooks/useFiles';
 import type { ProjectFile } from '@/services/api';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from '@/hooks/use-toast';
 
 interface FileNode {
   name: string;
@@ -57,6 +85,7 @@ interface FileItemProps {
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   path: string;
+  onDeleteFile: (fileId: number, fileName: string) => void;
 }
 
 const getFileIcon = (fileName: string) => {
@@ -72,14 +101,15 @@ const getFileIcon = (fileName: string) => {
   return <File className="w-4 h-4 text-muted-foreground" />;
 };
 
-const FileItem = ({ 
-  node, 
-  depth, 
-  selectedFile, 
-  onSelect, 
-  expandedFolders, 
+const FileItem = ({
+  node,
+  depth,
+  selectedFile,
+  onSelect,
+  expandedFolders,
   onToggleFolder,
-  path 
+  path,
+  onDeleteFile
 }: FileItemProps) => {
   const currentPath = path ? `${path}/${node.name}` : node.name;
   const isOpen = expandedFolders.has(currentPath);
@@ -92,12 +122,19 @@ const FileItem = ({
     }
   };
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (node.type === 'file' && node.fileId) {
+      onDeleteFile(node.fileId, node.name);
+    }
+  };
+
   return (
     <div>
       <div
         className={`group flex items-center gap-1 py-1.5 px-2 cursor-pointer rounded-md mx-1 transition-colors ${
-          selectedFile === node.name 
-            ? 'bg-primary/20 text-primary' 
+          selectedFile === node.name
+            ? 'bg-primary/20 text-primary'
             : 'text-muted-foreground hover:bg-muted/20 hover:text-foreground'
         }`}
         style={{ paddingLeft: `${depth * 12 + 8}px` }}
@@ -123,12 +160,21 @@ const FileItem = ({
           </>
         )}
         <span className="text-sm truncate flex-1">{node.name}</span>
-        <button 
-          className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted/30 rounded transition-all"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <MoreHorizontal className="w-3.5 h-3.5" />
-        </button>
+        {node.type === 'file' && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+              <button className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-muted/30 rounded transition-all">
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive">
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
       {node.type === 'folder' && isOpen && node.children && (
         <div>
@@ -142,6 +188,7 @@ const FileItem = ({
               expandedFolders={expandedFolders}
               onToggleFolder={onToggleFolder}
               path={currentPath}
+              onDeleteFile={onDeleteFile}
             />
           ))}
         </div>
@@ -160,9 +207,18 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
   ({ projectId, selectedFile, onSelectFile }, ref) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'src/components']));
+    const [showCreateDialog, setShowCreateDialog] = useState(false);
+    const [newFileName, setNewFileName] = useState('');
+    const [newFilePath, setNewFilePath] = useState('src/');
+    const [deleteFileId, setDeleteFileId] = useState<number | null>(null);
+    const [deleteFileName, setDeleteFileName] = useState('');
+
+    const { toast } = useToast();
 
     // Fetch files from backend
     const { data: files = [], isLoading } = useFiles(projectId);
+    const createFileMutation = useCreateFile();
+    const deleteFileMutation = useDeleteFile();
 
     const handleToggleFolder = (path: string) => {
       setExpandedFolders(prev => {
@@ -174,6 +230,87 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
         }
         return next;
       });
+    };
+
+    const handleCreateFile = async () => {
+      if (!newFileName.trim()) {
+        toast({
+          title: "Error",
+          description: "File name cannot be empty",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const fullPath = newFilePath.endsWith('/')
+        ? `${newFilePath}${newFileName}`
+        : `${newFilePath}/${newFileName}`;
+
+      const language = newFileName.endsWith('.tsx') || newFileName.endsWith('.ts')
+        ? 'tsx'
+        : newFileName.endsWith('.css')
+        ? 'css'
+        : newFileName.endsWith('.json')
+        ? 'json'
+        : 'tsx';
+
+      try {
+        await createFileMutation.mutateAsync({
+          projectId,
+          data: {
+            project_id: projectId,
+            filename: newFileName,
+            filepath: fullPath,
+            content: '',
+            language,
+          }
+        });
+
+        toast({
+          title: "File created",
+          description: `${newFileName} has been created successfully.`,
+        });
+
+        setShowCreateDialog(false);
+        setNewFileName('');
+        setNewFilePath('src/');
+      } catch (error) {
+        toast({
+          title: "Error creating file",
+          description: "There was an error creating the file. Please try again.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    const handleDeleteFile = (fileId: number, fileName: string) => {
+      setDeleteFileId(fileId);
+      setDeleteFileName(fileName);
+    };
+
+    const confirmDeleteFile = async () => {
+      if (!deleteFileId) return;
+
+      try {
+        await deleteFileMutation.mutateAsync({
+          projectId,
+          fileId: deleteFileId,
+        });
+
+        toast({
+          title: "File deleted",
+          description: `${deleteFileName} has been deleted successfully.`,
+        });
+
+        setDeleteFileId(null);
+        setDeleteFileName('');
+      } catch (error) {
+        toast({
+          title: "Error deleting file",
+          description: "There was an error deleting the file. Please try again.",
+          variant: "destructive",
+        });
+      }
     };
 
     // Build file tree from backend files
@@ -203,10 +340,18 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
 
     return (
       <div ref={ref} className="h-full bg-background/50 flex flex-col">
-        <div className="p-3 border-b border-border/50">
+        <div className="p-3 border-b border-border/50 flex items-center justify-between">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Explorer
           </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => setShowCreateDialog(true)}
+          >
+            <FilePlus className="w-4 h-4" />
+          </Button>
         </div>
         
         {/* Search */}
@@ -245,10 +390,77 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
                 expandedFolders={expandedFolders}
                 onToggleFolder={handleToggleFolder}
                 path=""
+                onDeleteFile={handleDeleteFile}
               />
             ))
           )}
         </div>
+
+        {/* Create File Dialog */}
+        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New File</DialogTitle>
+              <DialogDescription>
+                Create a new file in your project
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="filepath">File Path</Label>
+                <Input
+                  id="filepath"
+                  value={newFilePath}
+                  onChange={(e) => setNewFilePath(e.target.value)}
+                  placeholder="src/components/"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="filename">File Name</Label>
+                <Input
+                  id="filename"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  placeholder="NewComponent.tsx"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCreateFile();
+                    }
+                  }}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleCreateFile} disabled={createFileMutation.isPending}>
+                {createFileMutation.isPending ? 'Creating...' : 'Create File'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={deleteFileId !== null} onOpenChange={() => setDeleteFileId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete <strong>{deleteFileName}</strong>. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDeleteFile}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteFileMutation.isPending ? 'Deleting...' : 'Delete'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     );
   }
