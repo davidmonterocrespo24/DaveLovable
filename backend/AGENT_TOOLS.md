@@ -10,13 +10,14 @@ The agent system now includes a comprehensive set of tools that allow agents to 
 
 ### Components
 
-1. **tools/** - Core tool implementations organized by category
-   - **file_operations.py** - File read, write, edit, delete, and list operations
-   - **search_operations.py** - Glob, grep, and fuzzy file search
-   - **terminal_operations.py** - Terminal command execution
-   - **json_operations.py** - JSON file read, write, and validation
+1. **tools/** - Core tool implementations, one tool per file
+   - **File operations**: `read_file.py`, `write_file.py`, `edit_file.py`, `delete_file.py`, `list_dir.py`
+   - **Search operations**: `glob_search.py`, `grep_search.py`, `file_search.py`
+   - **Terminal operations**: `run_terminal_cmd.py`
+   - **JSON operations**: `read_json.py`, `write_json.py`
    - **__init__.py** - Package exports for easy importing
-   - Each module returns standardized dictionaries with `success`, `data`, and `error` fields
+   - **README.md** - Comprehensive tools documentation
+   - Each tool returns standardized dictionaries with `success`, `data`, and `error` fields
 
 2. **function_registry.py** - AutoGen function wrappers
    - Wraps tools with proper type annotations for AutoGen
@@ -260,10 +261,22 @@ Potential additions to the tool system:
 backend/app/agents/
 ├── tools/
 │   ├── __init__.py               # Package exports
-│   ├── file_operations.py        # File CRUD operations
-│   ├── search_operations.py      # Search tools (glob, grep, file_search)
-│   ├── terminal_operations.py    # Terminal command execution
-│   └── json_operations.py        # JSON read/write/validate
+│   ├── README.md                 # Tools documentation
+│   # File operations
+│   ├── read_file.py              # Read file contents
+│   ├── write_file.py             # Write/create files
+│   ├── edit_file.py              # Edit file contents
+│   ├── delete_file.py            # Delete files
+│   ├── list_dir.py               # List directory contents
+│   # Search operations
+│   ├── glob_search.py            # Glob pattern search
+│   ├── grep_search.py            # Text/regex search in files
+│   ├── file_search.py            # Fuzzy file name search
+│   # Terminal operations
+│   ├── run_terminal_cmd.py       # Execute terminal commands
+│   # JSON operations
+│   ├── read_json.py              # Read JSON files
+│   └── write_json.py             # Write JSON files
 ├── function_registry.py          # AutoGen function wrappers
 ├── prompts.py                    # Agent system prompts with tool schemas
 ├── config.py                     # Agent configuration

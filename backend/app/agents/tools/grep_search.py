@@ -1,49 +1,12 @@
 """
-Search operation tools for AutoGen agents.
-Provides tools to search for files and content using various methods.
+Grep search tool for AutoGen agents.
+Search for text/regex patterns within files.
 """
 
 import os
 import glob as glob_module
 import re
 from typing import Dict, Optional, Any, List
-
-
-def glob_search(
-    pattern: str,
-    dir_path: Optional[str] = None,
-    case_sensitive: bool = False,
-    explanation: str = ""
-) -> Dict[str, Any]:
-    """
-    Search files by glob pattern.
-
-    Args:
-        pattern: Glob pattern to search (e.g., '**/*.py', 'src/**/*.ts')
-        dir_path: Directory to search in (optional)
-        case_sensitive: Whether search is case-sensitive
-        explanation: Explanation for why this tool is being used
-
-    Returns:
-        Dictionary with matching file paths
-    """
-    try:
-        search_path = dir_path if dir_path else "."
-        full_pattern = os.path.join(search_path, pattern)
-        matches = glob_module.glob(full_pattern, recursive=True)
-
-        # Sort by modification time (most recent first)
-        matches.sort(key=lambda x: os.path.getmtime(x) if os.path.exists(x) else 0, reverse=True)
-
-        return {
-            "success": True,
-            "pattern": pattern,
-            "search_path": search_path,
-            "matches": matches,
-            "count": len(matches)
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
 
 
 def grep_search(
@@ -90,7 +53,10 @@ def grep_search(
             files = [f for f in files if f not in exclude_files]
 
         # Common directories to exclude
-        exclude_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv', 'dist', 'build'}
+        exclude_dirs = {
+            '.git', 'node_modules', '__pycache__', '.venv', 'venv',
+            'dist', 'build', '.next', 'out', 'coverage'
+        }
 
         # Filter and search text files only
         for file_path in files:
@@ -123,39 +89,6 @@ def grep_search(
             "results": results,
             "count": len(results),
             "truncated": len(results) >= 50
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
-def file_search(query: str, explanation: str = "") -> Dict[str, Any]:
-    """
-    Fast fuzzy file search that matches against file paths.
-
-    Args:
-        query: Part of the filename or path to search for
-        explanation: Explanation for why this tool is being used
-
-    Returns:
-        Dictionary with matching file paths
-    """
-    try:
-        matches: List[str] = []
-        query_lower = query.lower()
-
-        for file_path in glob_module.glob("**/*", recursive=True):
-            if os.path.isfile(file_path):
-                if query_lower in file_path.lower():
-                    matches.append(file_path)
-                    if len(matches) >= 10:  # Limit results
-                        break
-
-        return {
-            "success": True,
-            "query": query,
-            "matches": matches,
-            "count": len(matches),
-            "truncated": len(matches) >= 10
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
