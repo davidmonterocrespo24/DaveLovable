@@ -18,9 +18,11 @@ class FileSystemService:
     @staticmethod
     def create_project_structure(project_id: int, project_name: str) -> Dict[str, str]:
         """
-        Create physical project structure with initial files
+        Create physical project structure with initial files and initialize Git
         Returns a dict of created files and their content
         """
+        from app.services.git_service import GitService
+
         project_dir = FileSystemService.get_project_dir(project_id)
 
         # Create project directory if it doesn't exist
@@ -232,6 +234,9 @@ code {
 
         (src_dir / "index.css").write_text(index_css)
         files_created["src/index.css"] = index_css
+
+        # Initialize Git repository
+        GitService.init_repository(project_id)
 
         return files_created
 

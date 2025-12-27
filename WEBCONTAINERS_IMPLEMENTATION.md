@@ -374,6 +374,7 @@ To test the WebContainers implementation:
 - `front/package.json` - Added @webcontainer/api
 - `front/vite.config.ts` - Added COOP/COEP headers
 - `front/src/pages/Editor.tsx` - Updated import and props
+- `backend/app/services/filesystem_service.py` - Added tsconfig.node.json to project structure
 
 ### Preserved Files
 - `front/src/components/editor/PreviewPanel.tsx` - Old preview (kept as backup)

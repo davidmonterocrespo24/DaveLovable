@@ -84,15 +84,33 @@ class ProjectService:
         return True
 
     @staticmethod
-    def get_project_files(db: Session, project_id: int, owner_id: int) -> List[ProjectFile]:
-        """Get all files for a project"""
+    def get_project_files(db: Session, project_id: int, owner_id: int) -> List[dict]:
+        """Get all files for a project from filesystem"""
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
 
-        return db.query(ProjectFile).filter(
+        # Get file metadata from database
+        db_files = db.query(ProjectFile).filter(
             ProjectFile.project_id == project_id
         ).all()
+
+        # Read content from filesystem
+        files_with_content = []
+        for db_file in db_files:
+            content = FileSystemService.read_file(project_id, db_file.filepath)
+            files_with_content.append({
+                "id": db_file.id,
+                "project_id": db_file.project_id,
+                "filename": db_file.filename,
+                "filepath": db_file.filepath,
+                "content": content or "",
+                "language": db_file.language,
+                "created_at": db_file.created_at,
+                "updated_at": db_file.updated_at,
+            })
+
+        return files_with_content
 
     @staticmethod
     def add_file_to_project(
@@ -100,21 +118,45 @@ class ProjectService:
         project_id: int,
         owner_id: int,
         file_data: ProjectFileCreate
-    ) -> ProjectFile:
+    ) -> dict:
         """Add a file to a project"""
+        from app.services.git_service import GitService
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
 
-        db_file = ProjectFile(**file_data.model_dump())
+        # Extract content from file_data
+        content = file_data.content if hasattr(file_data, 'content') else ""
+
+        # Create file metadata in database (without content)
+        file_dict = file_data.model_dump()
+        file_dict.pop('content', None)  # Remove content if present
+
+        db_file = ProjectFile(**file_dict)
         db.add(db_file)
         db.commit()
         db.refresh(db_file)
 
-        # Also write to filesystem
-        FileSystemService.write_file(project_id, db_file.filepath, db_file.content)
+        # Write to filesystem
+        FileSystemService.write_file(project_id, db_file.filepath, content)
 
-        return db_file
+        # Commit to Git
+        GitService.commit_changes(
+            project_id,
+            f"Add file: {db_file.filepath}",
+            [db_file.filepath]
+        )
+
+        return {
+            "id": db_file.id,
+            "project_id": db_file.project_id,
+            "filename": db_file.filename,
+            "filepath": db_file.filepath,
+            "content": content,
+            "language": db_file.language,
+            "created_at": db_file.created_at,
+            "updated_at": db_file.updated_at,
+        }
 
     @staticmethod
     def update_file(
@@ -123,8 +165,9 @@ class ProjectService:
         project_id: int,
         owner_id: int,
         content: str
-    ) -> ProjectFile:
+    ) -> dict:
         """Update a file's content"""
+        from app.services.git_service import GitService
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
@@ -140,18 +183,37 @@ class ProjectService:
                 detail="File not found"
             )
 
-        file.content = content
+        # Update filesystem
+        FileSystemService.write_file(project_id, file.filepath, content)
+
+        # Commit to Git
+        GitService.commit_changes(
+            project_id,
+            f"Update file: {file.filepath}",
+            [file.filepath]
+        )
+
+        # Update timestamp in database
+        from datetime import datetime
+        file.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(file)
 
-        # Also update filesystem
-        FileSystemService.write_file(project_id, file.filepath, content)
-
-        return file
+        return {
+            "id": file.id,
+            "project_id": file.project_id,
+            "filename": file.filename,
+            "filepath": file.filepath,
+            "content": content,
+            "language": file.language,
+            "created_at": file.created_at,
+            "updated_at": file.updated_at,
+        }
 
     @staticmethod
     def delete_file(db: Session, file_id: int, project_id: int, owner_id: int) -> bool:
         """Delete a file from a project"""
+        from app.services.git_service import GitService
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
@@ -167,89 +229,60 @@ class ProjectService:
                 detail="File not found"
             )
 
-        # Delete from filesystem
-        FileSystemService.delete_file(project_id, file.filepath)
+        filepath = file.filepath
 
+        # Delete from filesystem
+        FileSystemService.delete_file(project_id, filepath)
+
+        # Delete from database
         db.delete(file)
         db.commit()
+
+        # Commit deletion to Git
+        GitService.commit_changes(
+            project_id,
+            f"Delete file: {filepath}"
+        )
+
         return True
 
     @staticmethod
     def _create_initial_files(db: Session, project_id: int, project_name: str, template: str):
         """Create initial project structure based on template"""
 
-        # Create physical project structure
+        # Create physical project structure (includes Git init)
         FileSystemService.create_project_structure(project_id, project_name)
 
         if template == "react-vite":
+            # Only store metadata in database (content is in filesystem)
             initial_files = [
                 {
+                    "project_id": project_id,
                     "filename": "App.tsx",
                     "filepath": "src/App.tsx",
                     "language": "tsx",
-                    "content": """import { useState } from 'react'
-
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold text-white mb-4">
-          Welcome to Your App
-        </h1>
-        <button
-          onClick={() => setCount((count) => count + 1)}
-          className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-all"
-        >
-          Count is {count}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-export default App
-""",
                 },
                 {
+                    "project_id": project_id,
                     "filename": "main.tsx",
                     "filepath": "src/main.tsx",
                     "language": "tsx",
-                    "content": """import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './App'
-import './index.css'
-
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-)
-""",
                 },
                 {
+                    "project_id": project_id,
                     "filename": "index.css",
                     "filepath": "src/index.css",
                     "language": "css",
-                    "content": """@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-}
-
-body {
-  margin: 0;
-  padding: 0;
-}
-""",
+                },
+                {
+                    "project_id": project_id,
+                    "filename": "tsconfig.node.json",
+                    "filepath": "tsconfig.node.json",
+                    "language": "json",
                 },
             ]
 
             for file_data in initial_files:
-                file_data["project_id"] = project_id
                 db_file = ProjectFile(**file_data)
                 db.add(db_file)
 
