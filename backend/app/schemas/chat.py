@@ -7,7 +7,7 @@ class ChatMessageBase(BaseModel):
     role: MessageRole
     content: str
     agent_name: Optional[str] = None
-    metadata: Optional[str] = None
+    message_metadata: Optional[str] = None
 
 class ChatMessageCreate(ChatMessageBase):
     session_id: int

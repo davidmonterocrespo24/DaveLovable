@@ -29,7 +29,7 @@ export interface ChatMessage {
   session_id: number;
   role: 'user' | 'assistant';
   content: string;
-  metadata?: string;
+  message_metadata?: string;
   created_at: string;
 }
 

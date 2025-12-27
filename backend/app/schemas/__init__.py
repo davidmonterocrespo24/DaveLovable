@@ -1,6 +1,6 @@
 from .user import User, UserCreate, UserUpdate, UserInDB
-from .project import Project, ProjectCreate, ProjectUpdate, ProjectWithFiles
 from .file import ProjectFile, ProjectFileCreate, ProjectFileUpdate
+from .project import Project, ProjectCreate, ProjectUpdate, ProjectWithFiles
 from .chat import (
     ChatMessage,
     ChatMessageCreate,
@@ -10,6 +10,9 @@ from .chat import (
     ChatRequest,
     ChatResponse,
 )
+
+# Rebuild ProjectWithFiles model to resolve forward references
+ProjectWithFiles.model_rebuild()
 
 __all__ = [
     "User",

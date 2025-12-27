@@ -1,7 +1,12 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from app.models.project import ProjectStatus
+
+if TYPE_CHECKING:
+    from app.schemas.file import ProjectFile as ProjectFileType
+else:
+    ProjectFileType = 'ProjectFile'
 
 class ProjectBase(BaseModel):
     name: str
@@ -33,5 +38,4 @@ class Project(ProjectInDB):
     pass
 
 class ProjectWithFiles(Project):
-    from app.schemas.file import ProjectFile
-    files: List[ProjectFile] = []
+    files: List[ProjectFileType] = []
