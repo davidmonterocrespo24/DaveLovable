@@ -1,6 +1,6 @@
 """
-Terminal operation tools for AutoGen agents.
-Provides tools to execute terminal commands.
+Terminal command tool for AutoGen agents.
+Execute terminal commands with approval and timeout.
 """
 
 import subprocess

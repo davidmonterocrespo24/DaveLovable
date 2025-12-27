@@ -1,30 +1,26 @@
 """
 Tools package for AutoGen agents.
-Each module contains related tools for specific operations.
+Each tool is in its own file for better organization.
 """
 
-from .file_operations import (
-    read_file,
-    write_file,
-    edit_file,
-    delete_file,
-    list_dir,
-)
+# File operations
+from .read_file import read_file
+from .write_file import write_file
+from .edit_file import edit_file
+from .delete_file import delete_file
+from .list_dir import list_dir
 
-from .search_operations import (
-    glob_search,
-    grep_search,
-    file_search,
-)
+# Search operations
+from .glob_search import glob_search
+from .grep_search import grep_search
+from .file_search import file_search
 
-from .terminal_operations import (
-    run_terminal_cmd,
-)
+# Terminal operations
+from .run_terminal_cmd import run_terminal_cmd
 
-from .json_operations import (
-    read_json,
-    write_json,
-)
+# JSON operations
+from .read_json import read_json
+from .write_json import write_json
 
 __all__ = [
     # File operations

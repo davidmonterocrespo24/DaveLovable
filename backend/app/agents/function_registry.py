@@ -4,25 +4,25 @@ Defines functions that agents can call with proper schemas for AutoGen.
 """
 
 from typing import Annotated, Literal
-from app.agents.tools.file_operations import (
-    read_file,
-    write_file,
-    edit_file,
-    delete_file,
-    list_dir,
-)
-from app.agents.tools.search_operations import (
-    glob_search,
-    grep_search,
-    file_search,
-)
-from app.agents.tools.terminal_operations import (
-    run_terminal_cmd,
-)
-from app.agents.tools.json_operations import (
-    read_json,
-    write_json,
-)
+
+# File operations
+from app.agents.tools.read_file import read_file
+from app.agents.tools.write_file import write_file
+from app.agents.tools.edit_file import edit_file
+from app.agents.tools.delete_file import delete_file
+from app.agents.tools.list_dir import list_dir
+
+# Search operations
+from app.agents.tools.glob_search import glob_search
+from app.agents.tools.grep_search import grep_search
+from app.agents.tools.file_search import file_search
+
+# Terminal operations
+from app.agents.tools.run_terminal_cmd import run_terminal_cmd
+
+# JSON operations
+from app.agents.tools.read_json import read_json
+from app.agents.tools.write_json import write_json
 
 
 # =============================================================================
