@@ -1,4 +1,5 @@
 from app.core.config import settings
+from app.agents.prompts import AGENT_SYSTEM_PROMPT, CODER_AGENT_DESCRIPTION
 
 # AutoGen LLM configuration
 llm_config = {
@@ -12,22 +13,8 @@ llm_config = {
     "temperature": 0.7,
 }
 
-# Agent configurations
-CODING_AGENT_SYSTEM_MESSAGE = """You are an expert full-stack developer specialized in React, TypeScript, and modern web development.
-Your role is to generate high-quality, production-ready code based on user requirements.
-You should:
-- Write clean, maintainable, and well-documented code
-- Follow best practices and modern patterns
-- Use TypeScript for type safety
-- Create responsive and accessible UI components
-- Consider performance and user experience
-
-When generating code:
-1. Analyze the user's request carefully
-2. Plan the implementation approach
-3. Generate complete, working code
-4. Provide explanations for complex logic
-"""
+# Use the comprehensive coding agent prompt with tools
+CODING_AGENT_SYSTEM_MESSAGE = AGENT_SYSTEM_PROMPT
 
 UI_DESIGNER_AGENT_SYSTEM_MESSAGE = """You are an expert UI/UX designer specialized in modern web design.
 Your role is to:
