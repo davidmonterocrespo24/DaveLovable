@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   Sparkles,
@@ -45,6 +45,7 @@ const Editor = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [tabs, setTabs] = useState<Array<{ id: string; name: string; isActive: boolean; fileId?: number }>>([]);
+  const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
 
   useEffect(() => {
     if (!projectId || isNaN(Number(projectId))) {
@@ -143,6 +144,12 @@ const Editor = () => {
     setTimeout(() => {
       setIsPreviewLoading(false);
     }, 1000);
+  };
+
+  const handleReportError = (errorMessage: string) => {
+    if (chatPanelRef.current) {
+      chatPanelRef.current.sendMessage(errorMessage);
+    }
   };
 
   if (projectLoading) {
@@ -246,6 +253,7 @@ const Editor = () => {
           <>
             <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
               <ChatPanel
+                ref={chatPanelRef}
                 projectId={Number(projectId)}
                 onCodeChange={handleCodeChange}
               />
@@ -325,6 +333,7 @@ const Editor = () => {
                           projectId={Number(projectId)}
                           isLoading={isPreviewLoading}
                           onReload={handleCodeChange}
+                          onReportError={handleReportError}
                         />
                       </ResizablePanel>
                     )}

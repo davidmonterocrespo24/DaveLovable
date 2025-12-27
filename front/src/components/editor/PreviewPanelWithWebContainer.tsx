@@ -10,7 +10,8 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Send
 } from 'lucide-react';
 import { loadProject } from '@/services/webcontainer';
 
@@ -18,6 +19,7 @@ interface PreviewPanelProps {
   projectId: number;
   isLoading?: boolean;
   onReload?: () => void;
+  onReportError?: (errorMessage: string) => void;
 }
 
 interface ConsoleLog {
@@ -27,7 +29,7 @@ interface ConsoleLog {
 }
 
 export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
-  ({ projectId, isLoading: externalLoading, onReload }, ref) => {
+  ({ projectId, isLoading: externalLoading, onReload, onReportError }, ref) => {
     const [device, setDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const [showConsole, setShowConsole] = useState(true);
     const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -111,6 +113,20 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
           return <CheckCircle2 className="w-3 h-3 text-blue-400" />;
         default:
           return <span className="text-muted-foreground">›</span>;
+      }
+    };
+
+    const handleReportErrors = () => {
+      const errors = consoleLogs.filter(log => log.type === 'error');
+      if (errors.length === 0) {
+        return;
+      }
+
+      const errorReport = errors.map(err => `[${err.timestamp}] ${err.message}`).join('\n');
+      const fullReport = `I found ${errors.length} error(s) in the console:\n\n${errorReport}\n\nPlease help me fix these errors.`;
+
+      if (onReportError) {
+        onReportError(fullReport);
       }
     };
 
@@ -275,6 +291,16 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {consoleLogs.filter(l => l.type === 'error').length > 0 && (
+                  <button
+                    onClick={handleReportErrors}
+                    className="text-xs px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded transition-colors text-red-400 flex items-center gap-1.5 border border-red-500/30"
+                    title="Send errors to AI for fixing"
+                  >
+                    <Send className="w-3 h-3" />
+                    Report to AI
+                  </button>
+                )}
                 <button
                   onClick={() => setConsoleLogs([])}
                   className="text-xs px-2 py-1 hover:bg-muted/20 rounded transition-colors text-muted-foreground"

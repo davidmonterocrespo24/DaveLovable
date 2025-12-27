@@ -1,7 +1,11 @@
-import { useState, useRef, useEffect, forwardRef } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Send, Sparkles, User, Bot, Paperclip, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSendChatMessage, useChatSession } from '@/hooks/useChat';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface Message {
   id: string;
@@ -25,13 +29,18 @@ interface ChatPanelProps {
   onCodeChange?: () => void;
 }
 
-export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
+export interface ChatPanelRef {
+  sendMessage: (message: string) => void;
+}
+
+export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
   ({ projectId, sessionId, onCodeChange }, ref) => {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     // Get chat session if sessionId is provided
     const { data: session } = useChatSession(
@@ -42,6 +51,17 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
 
     // Send message mutation
     const sendMessageMutation = useSendChatMessage();
+
+    // Expose sendMessage method to parent
+    useImperativeHandle(ref, () => ({
+      sendMessage: (message: string) => {
+        setInput(message);
+        // Trigger send automatically after a brief delay to ensure state is updated
+        setTimeout(() => {
+          handleSend();
+        }, 100);
+      },
+    }));
 
     const scrollToBottom = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -137,7 +157,7 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
     };
 
     return (
-      <div ref={ref} className="h-full flex flex-col bg-background/80">
+      <div ref={containerRef} className="h-full flex flex-col bg-background/80">
         {/* Header */}
         <div className="p-4 border-b border-border/50 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20">
@@ -177,7 +197,48 @@ export const ChatPanel = forwardRef<HTMLDivElement, ChatPanelProps>(
                       : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
                   }`}
                 >
-                  {message.content}
+                  {message.role === 'assistant' ? (
+                    <div className="prose prose-sm prose-invert max-w-none markdown-content">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeHighlight]}
+                        components={{
+                          code: ({node, inline, className, children, ...props}: any) => {
+                            return !inline ? (
+                              <code className={className} {...props}>
+                                {children}
+                              </code>
+                            ) : (
+                              <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                {children}
+                              </code>
+                            );
+                          },
+                          pre: ({children, ...props}: any) => (
+                            <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
+                              {children}
+                            </pre>
+                          ),
+                          p: ({children, ...props}: any) => (
+                            <p className="mb-2 last:mb-0" {...props}>{children}</p>
+                          ),
+                          ul: ({children, ...props}: any) => (
+                            <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
+                          ),
+                          ol: ({children, ...props}: any) => (
+                            <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
+                          ),
+                          li: ({children, ...props}: any) => (
+                            <li className="mb-1" {...props}>{children}</li>
+                          ),
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    message.content
+                  )}
                 </div>
                 <span className="text-[10px] text-muted-foreground/60 px-1">
                   {formatTime(message.timestamp)}
