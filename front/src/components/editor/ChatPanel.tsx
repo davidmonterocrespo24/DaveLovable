@@ -6,12 +6,23 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
+import { AgentInteraction } from './AgentInteraction';
+
+interface AgentInteractionData {
+  agent_name: string;
+  message_type: 'thought' | 'tool_call' | 'tool_response';
+  content: string;
+  tool_name?: string;
+  tool_arguments?: Record<string, any>;
+  timestamp: string;
+}
 
 interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  agent_interactions?: AgentInteractionData[];
 }
 
 const initialMessages: Message[] = [
@@ -120,12 +131,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
           setCurrentSessionId(response.session_id);
         }
 
-        // Add AI response to messages
+        // Add AI response to messages with agent interactions
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
           content: response.message.content,
           timestamp: new Date(),
+          agent_interactions: response.agent_interactions || [],
         };
         setMessages((prev) => [...prev, aiResponse]);
 
@@ -198,44 +210,67 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   }`}
                 >
                   {message.role === 'assistant' ? (
-                    <div className="prose prose-sm prose-invert max-w-none markdown-content">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeHighlight]}
-                        components={{
-                          code: ({node, inline, className, children, ...props}: any) => {
-                            return !inline ? (
-                              <code className={className} {...props}>
+                    <>
+                      {/* Agent Interactions */}
+                      {message.agent_interactions && message.agent_interactions.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          <div className="text-xs font-semibold text-muted-foreground mb-2">
+                            Agent Activity:
+                          </div>
+                          {message.agent_interactions.map((interaction, idx) => (
+                            <AgentInteraction
+                              key={`${message.id}-interaction-${idx}`}
+                              agentName={interaction.agent_name}
+                              messageType={interaction.message_type}
+                              content={interaction.content}
+                              toolName={interaction.tool_name}
+                              toolArguments={interaction.tool_arguments}
+                              timestamp={interaction.timestamp}
+                            />
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Final Response */}
+                      <div className="prose prose-sm prose-invert max-w-none markdown-content">
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          rehypePlugins={[rehypeHighlight]}
+                          components={{
+                            code: ({node, inline, className, children, ...props}: any) => {
+                              return !inline ? (
+                                <code className={className} {...props}>
+                                  {children}
+                                </code>
+                              ) : (
+                                <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                  {children}
+                                </code>
+                              );
+                            },
+                            pre: ({children, ...props}: any) => (
+                              <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
                                 {children}
-                              </code>
-                            ) : (
-                              <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
-                                {children}
-                              </code>
-                            );
-                          },
-                          pre: ({children, ...props}: any) => (
-                            <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
-                              {children}
-                            </pre>
-                          ),
-                          p: ({children, ...props}: any) => (
-                            <p className="mb-2 last:mb-0" {...props}>{children}</p>
-                          ),
-                          ul: ({children, ...props}: any) => (
-                            <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
-                          ),
-                          ol: ({children, ...props}: any) => (
-                            <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
-                          ),
-                          li: ({children, ...props}: any) => (
-                            <li className="mb-1" {...props}>{children}</li>
-                          ),
-                        }}
-                      >
-                        {message.content}
-                      </ReactMarkdown>
-                    </div>
+                              </pre>
+                            ),
+                            p: ({children, ...props}: any) => (
+                              <p className="mb-2 last:mb-0" {...props}>{children}</p>
+                            ),
+                            ul: ({children, ...props}: any) => (
+                              <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
+                            ),
+                            ol: ({children, ...props}: any) => (
+                              <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
+                            ),
+                            li: ({children, ...props}: any) => (
+                              <li className="mb-1" {...props}>{children}</li>
+                            ),
+                          }}
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      </div>
+                    </>
                   ) : (
                     message.content
                   )}

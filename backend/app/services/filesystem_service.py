@@ -294,10 +294,46 @@ code {
         if not project_dir.exists():
             return []
 
+        # Directories to exclude from bundle (node_modules, .git, build artifacts, etc.)
+        excluded_dirs = {
+            'node_modules',
+            '.git',
+            'dist',
+            'build',
+            '.vite',
+            'coverage',
+            '.turbo',
+            '.next',
+            '.cache',
+            '__pycache__',
+            '.pytest_cache',
+            '.mypy_cache',
+        }
+
+        # File patterns to exclude
+        excluded_files = {
+            '.DS_Store',
+            'Thumbs.db',
+            '.env',
+            '.env.local',
+            'package-lock.json',
+            'yarn.lock',
+            'pnpm-lock.yaml',
+        }
+
         files = []
         for file_path in project_dir.rglob("*"):
             if file_path.is_file():
                 relative_path = file_path.relative_to(project_dir)
+
+                # Check if file is in an excluded directory
+                if any(excluded_dir in relative_path.parts for excluded_dir in excluded_dirs):
+                    continue
+
+                # Check if file name is excluded
+                if file_path.name in excluded_files:
+                    continue
+
                 try:
                     content = file_path.read_text(encoding='utf-8')
                     files.append({

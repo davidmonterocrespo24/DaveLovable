@@ -48,7 +48,16 @@ class ChatRequest(BaseModel):
     message: str
     session_id: Optional[int] = None
 
+class AgentInteraction(BaseModel):
+    agent_name: str
+    message_type: str  # "thought", "tool_call", "tool_response"
+    content: str
+    tool_name: Optional[str] = None
+    tool_arguments: Optional[dict] = None
+    timestamp: datetime
+
 class ChatResponse(BaseModel):
     session_id: int
     message: ChatMessage
     code_changes: Optional[List[dict]] = None
+    agent_interactions: Optional[List[AgentInteraction]] = None

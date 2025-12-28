@@ -14,6 +14,14 @@ export interface WebContainerFiles {
 }
 
 /**
+ * Strip ANSI escape codes from terminal output
+ */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '').replace(/\[[\d]+[GK]/g, '').trim();
+}
+
+/**
  * Get or create WebContainer instance (singleton)
  */
 export async function getWebContainer(): Promise<WebContainer> {
@@ -105,11 +113,24 @@ export async function loadProject(
     log('[WebContainer] Installing dependencies...');
     const installProcess = await container.spawn('npm', ['install']);
 
+    let lastLogWasSpinner = false;
+
     // Stream install output
     installProcess.output.pipeTo(
       new WritableStream({
         write(data) {
-          log(`[npm] ${data}`);
+          const cleaned = stripAnsi(data);
+          if (cleaned) {
+            // Only log meaningful messages, skip spinner lines
+            if (cleaned.length > 1 || !/^[\\|/\-]$/.test(cleaned)) {
+              log(`[npm] ${cleaned}`);
+              lastLogWasSpinner = false;
+            } else if (!lastLogWasSpinner) {
+              // Show one spinner indicator
+              log(`[npm] Installing packages...`);
+              lastLogWasSpinner = true;
+            }
+          }
         },
       })
     );
@@ -128,7 +149,10 @@ export async function loadProject(
     devProcess.output.pipeTo(
       new WritableStream({
         write(data) {
-          log(`[dev] ${data}`);
+          const cleaned = stripAnsi(data);
+          if (cleaned) {
+            log(`[dev] ${cleaned}`);
+          }
         },
       })
     );
@@ -189,7 +213,10 @@ export async function restartDevServer(): Promise<void> {
   devProcess.output.pipeTo(
     new WritableStream({
       write(data) {
-        console.log(`[dev] ${data}`);
+        const cleaned = stripAnsi(data);
+        if (cleaned) {
+          console.log(`[dev] ${cleaned}`);
+        }
       },
     })
   );
