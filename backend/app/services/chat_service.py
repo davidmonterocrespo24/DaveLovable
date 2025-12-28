@@ -191,35 +191,132 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 os.chdir(original_cwd)
                 logger.info(f"📂 Restored working directory to: {original_cwd}")
 
-            # Extract the final response from the team's messages
-            # The last message should contain the summary or completion status
+            # Extract the final response and agent interactions from the team's messages
             response_content = ""
             agent_name = "Team"
+            agent_interactions = []
 
             logger.info(f"\n📨 Processing {len(result.messages)} messages from agents...")
 
-            # Log all messages from the conversation
+            # Process both regular messages and inner_messages (events)
             for i, msg in enumerate(result.messages, 1):
                 msg_source = msg.source if hasattr(msg, 'source') else "Unknown"
                 msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+                # Ensure timestamp is a datetime object for Pydantic
+                if hasattr(msg, 'created_at'):
+                    msg_timestamp = msg.created_at if isinstance(msg.created_at, datetime) else datetime.now()
+                else:
+                    msg_timestamp = datetime.now()
 
                 logger.info("─" * 80)
                 logger.info(f"💬 Message {i}/{len(result.messages)} - From: {msg_source}")
                 logger.info("─" * 80)
+
+                # Process inner_messages (events) if they exist
+                if hasattr(msg, 'inner_messages') and msg.inner_messages:
+                    logger.info(f"📦 Processing {len(msg.inner_messages)} inner events...")
+                    for event in msg.inner_messages:
+                        event_type = type(event).__name__
+                        event_source = event.source if hasattr(event, 'source') else msg_source
+                        event_timestamp = event.created_at if hasattr(event, 'created_at') else msg_timestamp
+
+                        # ThoughtEvent
+                        if event_type == "ThoughtEvent":
+                            logger.info(f"💭 THOUGHT from {event_source}: {event.content[:200]}")
+                            agent_interactions.append({
+                                "agent_name": event_source,
+                                "message_type": "thought",
+                                "content": event.content,
+                                "tool_name": None,
+                                "tool_arguments": None,
+                                "timestamp": event_timestamp
+                            })
+
+                        # ToolCallRequestEvent
+                        elif event_type == "ToolCallRequestEvent":
+                            for tool_call in event.content:
+                                logger.info(f"🔧 TOOL CALL: {tool_call.name}")
+                                tool_args = {}
+                                try:
+                                    import json
+                                    tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
+                                except:
+                                    tool_args = {"raw": str(tool_call.arguments)}
+
+                                agent_interactions.append({
+                                    "agent_name": event_source,
+                                    "message_type": "tool_call",
+                                    "content": f"Calling tool: {tool_call.name}",
+                                    "tool_name": tool_call.name,
+                                    "tool_arguments": tool_args,
+                                    "timestamp": event_timestamp
+                                })
+
+                        # ToolCallExecutionEvent
+                        elif event_type == "ToolCallExecutionEvent":
+                            for tool_result in event.content:
+                                result_preview = str(tool_result.content)[:200]
+                                logger.info(f"✅ TOOL RESULT ({tool_result.name}): {result_preview}")
+                                agent_interactions.append({
+                                    "agent_name": "System",
+                                    "message_type": "tool_response",
+                                    "content": tool_result.content,
+                                    "tool_name": tool_result.name,
+                                    "tool_arguments": None,
+                                    "timestamp": event_timestamp
+                                })
 
                 # Check if this is a tool call message
                 if hasattr(msg, 'content') and isinstance(msg.content, list):
                     for item in msg.content:
                         if hasattr(item, 'name'):  # Tool call
                             logger.info(f"🔧 TOOL CALL: {item.name}")
+                            tool_args = {}
                             if hasattr(item, 'arguments'):
                                 logger.info(f"   Arguments: {item.arguments}")
+                                try:
+                                    import json
+                                    tool_args = json.loads(item.arguments) if isinstance(item.arguments, str) else item.arguments
+                                except:
+                                    tool_args = {"raw": str(item.arguments)}
+
+                            # Add tool call to interactions
+                            agent_interactions.append({
+                                "agent_name": msg_source,
+                                "message_type": "tool_call",
+                                "content": f"Calling tool: {item.name}",
+                                "tool_name": item.name,
+                                "tool_arguments": tool_args,
+                                "timestamp": msg_timestamp
+                            })
                         else:
-                            logger.info(f"   Content: {str(item)[:200]}")
+                            content_str = str(item)[:200]
+                            logger.info(f"   Content: {content_str}")
+                            # Check if this looks like a tool response
+                            if "Successfully" in content_str or "Error" in content_str:
+                                agent_interactions.append({
+                                    "agent_name": "System",
+                                    "message_type": "tool_response",
+                                    "content": content_str,
+                                    "tool_name": None,
+                                    "tool_arguments": None,
+                                    "timestamp": msg_timestamp
+                                })
                 else:
-                    # Regular text message
+                    # Regular text message (thought)
                     content_preview = msg_content[:500] + "..." if len(msg_content) > 500 else msg_content
                     logger.info(f"   {content_preview}")
+
+                    # Add thought to interactions (skip if it's a task completion marker)
+                    if "TASK_COMPLETED" not in msg_content and msg_content.strip():
+                        agent_interactions.append({
+                            "agent_name": msg_source,
+                            "message_type": "thought",
+                            "content": msg_content,
+                            "tool_name": None,
+                            "tool_arguments": None,
+                            "timestamp": msg_timestamp
+                        })
 
                 logger.info("")
 
@@ -257,6 +354,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 "session_id": session.id,
                 "message": assistant_message,
                 "code_changes": [],  # Changes are handled by agent tools, not tracked here
+                "agent_interactions": agent_interactions,
             }
 
         except Exception as e:

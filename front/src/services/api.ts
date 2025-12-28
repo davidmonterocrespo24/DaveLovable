@@ -66,6 +66,15 @@ export interface SendChatMessageRequest {
   session_id?: number;
 }
 
+export interface AgentInteraction {
+  agent_name: string;
+  message_type: 'thought' | 'tool_call' | 'tool_response';
+  content: string;
+  tool_name?: string;
+  tool_arguments?: Record<string, any>;
+  timestamp: string;
+}
+
 export interface SendChatMessageResponse {
   message: {
     role: string;
@@ -82,6 +91,7 @@ export interface SendChatMessageResponse {
     content: string;
     language: string;
   }>;
+  agent_interactions?: AgentInteraction[];
 }
 
 // Error handling
@@ -202,10 +212,25 @@ export const chatApi = {
     projectId: number,
     data: SendChatMessageRequest
   ): Promise<SendChatMessageResponse> => {
-    return fetchApi<SendChatMessageResponse>(`/chat/${projectId}`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    // Use AbortController for timeout (5 minutes for AI processing)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000); // 5 minutes
+
+    try {
+      const response = await fetchApi<SendChatMessageResponse>(`/chat/${projectId}`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new ApiError(408, 'Request timeout - AI is taking too long to respond');
+      }
+      throw error;
+    }
   },
 
   // List chat sessions
