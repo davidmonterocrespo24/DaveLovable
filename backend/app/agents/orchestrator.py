@@ -42,10 +42,9 @@ from app.agents.tools import (
     wiki_set_language,
 )
 from app.core.config import settings
+from app.agents.tools.csv_tools import merge_csv_files
 import json
 import re
-
-from backend.app.agents.tools.csv_tools import merge_csv_files
 
 
 class AgentOrchestrator:
