@@ -1,51 +1,249 @@
+from src.utils.linter import lint_code_check
+from src.utils.llm_edit_fixer import _llm_fix_edit
+
 """
-Edit file tool for AutoGen agents.
-Surgically edit specific text blocks in files.
+File System Operations - Smart Edit v2 (With Auto-Correction)
 """
+import hashlib
+import os
+import re
+from pathlib import Path
 
-from typing import Dict, Any
+# --- Helper Functions ---
 
 
-def edit_file(
-    target_file: str,
-    old_string: str,
-    new_string: str,
-    instructions: str = ""
-) -> Dict[str, Any]:
+def _normalize_line_endings(text: str) -> str:
+    return text.replace("\r\n", "\n")
+
+
+def _detect_line_ending(content: str) -> str:
+    return "\r\n" if "\r\n" in content else "\n"
+
+
+def _restore_line_endings(content: str, original_ending: str) -> str:
+    if original_ending == "\n":
+        return content
+    return content.replace("\n", "\r\n")
+
+
+def _escape_regex(s: str) -> str:
+    return re.escape(s)
+
+
+def _hash_content(content: str) -> str:
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+# --- Replacement Strategies ---
+
+
+def _calculate_exact_replacement(current_content: str, old_string: str, new_string: str):
+    occurrences = current_content.count(old_string)
+    if occurrences > 0:
+        new_content = current_content.replace(old_string, new_string)
+        return new_content, occurrences
+    return None, 0
+
+
+def _calculate_flexible_replacement(current_content: str, old_string: str, new_string: str):
+    source_lines = current_content.splitlines(keepends=True)
+    search_lines = old_string.splitlines()
+    replace_lines = new_string.splitlines()
+    search_lines_stripped = [line.strip() for line in search_lines if line.strip()]
+
+    if not search_lines_stripped:
+        return None, 0
+
+    flexible_occurrences = 0
+    new_source_lines = []
+    i = 0
+
+    while i < len(source_lines):
+        potential_match = True
+        search_idx = 0
+        temp_idx = i
+
+        while search_idx < len(search_lines_stripped) and temp_idx < len(source_lines):
+            src_line = source_lines[temp_idx].strip()
+            if not src_line:
+                temp_idx += 1
+                continue
+            if src_line != search_lines_stripped[search_idx]:
+                potential_match = False
+                break
+            search_idx += 1
+            temp_idx += 1
+
+        if potential_match and search_idx == len(search_lines_stripped):
+            flexible_occurrences += 1
+            first_line_match = source_lines[i]
+            match = re.match(r"^(\s*)", first_line_match)
+            indentation = match.group(1) if match else ""
+            for r_line in replace_lines:
+                new_source_lines.append(f"{indentation}{r_line}\n")
+            i = temp_idx
+        else:
+            new_source_lines.append(source_lines[i])
+            i += 1
+
+    if flexible_occurrences > 0:
+        return "".join(new_source_lines), flexible_occurrences
+    return None, 0
+
+
+def _calculate_regex_replacement(current_content: str, old_string: str, new_string: str):
+    delimiters = [r"\(", r"\)", r":", r"\[", r"\]", r"\{", r"\}", r">", r"<", r"="]
+    processed = old_string
+    for d in delimiters:
+        processed = re.sub(f"({d})", r" \1 ", processed)
+    tokens = [t for t in processed.split() if t.strip()]
+
+    if not tokens:
+        return None, 0
+
+    escaped_tokens = [re.escape(t) for t in tokens]
+    pattern_str = r"\s*".join(escaped_tokens)
+    final_pattern = f"(?m)^(\\s*){pattern_str}"
+
+    try:
+        regex = re.compile(final_pattern, re.DOTALL)
+    except re.error:
+        return None, 0
+
+    match = regex.search(current_content)
+    if not match:
+        return None, 0
+
+    indentation = match.group(1) or ""
+    new_lines = new_string.splitlines()
+    new_block = "\n".join([f"{indentation}{line}" for line in new_lines])
+
+    new_content = current_content[: match.start()] + new_block + current_content[match.end() :]
+    return new_content, 1
+
+
+# --- Main Tool Function ---
+
+
+async def edit_file(
+    target_file: str, old_string: str, new_string: str, instructions: str = ""
+) -> str:
     """
-    Replace a specific block of text in a file using surgical search-and-replace.
+    Replaces a specific string in a file with a new string using smart matching strategies.
+
+    This tool attempts to locate and replace text using the following strategies in order:
+    1. Exact Match: strict literal string replacement.
+    2. Flexible Match: ignores whitespace differences (indentation/newlines).
+    3. Token-based Fuzzy Match: uses regex to match tokens regardless of formatting.
+    4. LLM Auto-Correction: if enabled, asks an LLM to fix the search string based on the error.
 
     Args:
-        target_file: Path to the file to modify
-        old_string: Exact block of code to replace
-        new_string: New block of code to insert
-        instructions: Explanation of why this change is being made
+        target_file: Path to the file to be edited.
+        old_string: The exact string to be replaced.
+        new_string: The new string to replace the old string with.
+        instructions: Optional description of the change (used for LLM auto-correction context).
 
     Returns:
-        Dictionary with success status
+        Success message with strategy used, or error message if replacement failed.
     """
+    from src.utils.interaction import ask_for_approval
+
+    # approval context
+    diff_preview = f"FILE: {target_file}\n\nRunning edit_file:\n<<<<<< OLD\n{old_string}\n======\n{new_string}\n>>>>>> NEW"
+
+    approval_result = await ask_for_approval(
+        action_description=f"EDIT FILE: {target_file}", context=f"```diff\n{diff_preview}\n```"
+    )
+    if approval_result:
+        return approval_result
+
     try:
-        with open(target_file, 'r', encoding='utf-8') as f:
-            content = f.read()
+        workspace = Path(os.getcwd()).resolve()
+        target = (
+            workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
+        )
 
-        if old_string not in content:
-            return {
-                "success": False,
-                "error": f"String not found in file. Make sure old_string matches exactly."
-            }
+        if not target.exists():
+            # Support creating new file if old_string is empty
+            if not old_string:
+                with open(target, "w", encoding="utf-8") as f:
+                    f.write(new_string)
+                return f"Successfully created new file: {target_file}"
+            return f"Error: File '{target_file}' not found."
 
-        # Replace only the first occurrence
-        new_content = content.replace(old_string, new_string, 1)
+        with open(target, encoding="utf-8") as f:
+            raw_content = f.read()
 
-        with open(target_file, 'w', encoding='utf-8') as f:
-            f.write(new_content)
+        original_line_ending = _detect_line_ending(raw_content)
+        current_content = _normalize_line_endings(raw_content)
+        norm_old = _normalize_line_endings(old_string)
+        norm_new = _normalize_line_endings(new_string)
 
-        return {
-            "success": True,
-            "file_path": target_file,
-            "changes_made": instructions or "Text replaced"
-        }
-    except FileNotFoundError:
-        return {"success": False, "error": f"File not found: {target_file}"}
+        # Strategy Execution Loop
+        strategies = [
+            ("Exact Match", _calculate_exact_replacement),
+            ("Flexible Match", _calculate_flexible_replacement),
+            ("Token-based Fuzzy Match", _calculate_regex_replacement),
+        ]
+
+        new_content = None
+        count = 0
+        strategy_used = ""
+
+        for name, strategy in strategies:
+            res, cnt = strategy(current_content, norm_old, norm_new)
+            if res and cnt > 0:
+                new_content = res
+                count = cnt
+                strategy_used = name
+                break
+
+        # --- AUTO-CORRECTION ATTEMPT ---
+        if count == 0:
+            error_msg = "Could not find the 'old_string' using exact, flexible, or regex matching."
+
+            # Intentar arreglar con LLM
+            correction = await _llm_fix_edit(
+                instructions, norm_old, norm_new, error_msg, current_content
+            )
+
+            if correction:
+                fixed_old, fixed_new = correction
+                # Reintentar solo Exact Match con los strings corregidos
+                res, cnt = _calculate_exact_replacement(current_content, fixed_old, fixed_new)
+                if res and cnt > 0:
+                    new_content = res
+                    count = cnt
+                    strategy_used = "LLM Auto-Correction"
+
+            if count == 0:  # Si aún falla
+                return (
+                    f"Error: {error_msg}\n"
+                    f"1. Check exact indentation and whitespace.\n"
+                    f"2. Use read_file to verify current content.\n"
+                    f"3. Do NOT escape characters manually."
+                )
+
+        # --- GUARDRAILS ---
+        # 1. Ensure we have content (should never be None at this point due to earlier checks)
+        if new_content is None:
+            return "Error: Failed to generate replacement content."
+
+        # 2. No changes check
+        if new_content == current_content:
+            return "Error: The 'new_string' is identical to the found 'old_string'. No changes applied."
+
+        # 3. Syntax Check (Modular Linter)
+        lint_error = lint_code_check(str(target), new_content)
+        if lint_error:
+            return f"Error: Your edit caused a syntax error. Edit rejected.\n{lint_error}"
+
+        # Save
+        final_content = _restore_line_endings(new_content, original_line_ending)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(final_content)
+
+        return f"Successfully edited {target_file} using {strategy_used} strategy. ({count} replacements)"
+
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return f"System Error during edit: {str(e)}"

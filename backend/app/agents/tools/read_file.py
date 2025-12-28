@@ -1,53 +1,94 @@
-"""
-Read file tool for AutoGen agents.
-Read the contents of files with line range support.
-"""
+from pathlib import Path
 
-from typing import Dict, Optional, Any
+from src.tools.common import get_workspace
+from src.utils.file_utils import process_single_file_content
 
 
-def read_file(
+async def read_file(
     target_file: str,
     should_read_entire_file: bool = True,
     start_line_one_indexed: int = 1,
-    end_line_one_indexed_inclusive: Optional[int] = None,
-    explanation: str = ""
-) -> Dict[str, Any]:
+    end_line_one_indexed_inclusive: int = -1,
+) -> str:
     """
-    Read the contents of a file with support for reading specific line ranges.
+    Read the contents of a file with line range support.
+    Uses advanced file processing to handle large files, binary files, and different encodings.
 
     Args:
-        target_file: Path to the file to read
-        should_read_entire_file: Whether to read the entire file
-        start_line_one_indexed: Starting line number (1-indexed)
-        end_line_one_indexed_inclusive: Ending line number (1-indexed, inclusive)
-        explanation: Explanation for why this tool is being used
+        target_file: Path to the file to be read
+        should_read_entire_file: Whether to read the entire file or use line range
+        start_line_one_indexed: Starting line number (1-based indexing)
+        end_line_one_indexed_inclusive: Ending line number (1-based, inclusive). Use -1 for end of file.
 
     Returns:
-        Dictionary with file contents and metadata
+        File contents with line range information, or error message if file not found
     """
     try:
-        with open(target_file, 'r', encoding='utf-8') as f:
-            lines = f.readlines()
+        workspace = get_workspace()
 
-        if should_read_entire_file:
-            content = ''.join(lines)
-            num_lines = len(lines)
+        # Resolve path
+        if Path(target_file).is_absolute():
+            resolved_path = Path(target_file)
         else:
-            start_idx = start_line_one_indexed - 1
-            end_idx = end_line_one_indexed_inclusive if end_line_one_indexed_inclusive else len(lines)
-            selected_lines = lines[start_idx:end_idx]
-            content = ''.join(selected_lines)
-            num_lines = len(selected_lines)
+            resolved_path = workspace / target_file
 
-        return {
-            "success": True,
-            "content": content,
-            "file_path": target_file,
-            "num_lines": num_lines,
-            "total_lines": len(lines)
-        }
-    except FileNotFoundError:
-        return {"success": False, "error": f"File not found: {target_file}"}
+        str_path = str(resolved_path)
+        str_workspace = str(workspace)
+
+        # Calculate offset and limit
+        offset = 0
+        limit = None
+
+        if not should_read_entire_file:
+            offset = max(0, start_line_one_indexed - 1)
+            if end_line_one_indexed_inclusive != -1:
+                limit = end_line_one_indexed_inclusive - start_line_one_indexed + 1
+                if limit < 0:
+                    limit = 0
+
+        # Call process_single_file_content
+        result = await process_single_file_content(
+            str_path, str_workspace, offset=offset, limit=limit
+        )
+
+        # Handle Error
+        if result.get("error"):
+            return f"Error: {result['error']}"
+
+        # Handle Binary/Image content
+        llm_content = result.get("llmContent")
+        if not isinstance(llm_content, str):
+            return_display = result.get("returnDisplay", "Binary or Media file")
+            return f"[Media File Content]\n{return_display}\n(Content cannot be displayed as text)"
+
+        # Handle Truncation
+        if result.get("isTruncated"):
+            lines_shown = result.get("linesShown", [0, 0])
+            start_shown = lines_shown[0]
+            end_shown = lines_shown[1]
+            total_lines = result.get("originalLineCount", 0)
+
+            next_start_line = end_shown + 1
+
+            header = (
+                f"IMPORTANT: The file content has been truncated.\n"
+                f"Status: Showing lines {start_shown}-{end_shown} of {total_lines} total lines.\n"
+                f"Action: To read more of the file, you can use the 'start_line_one_indexed' parameter in a subsequent 'read_file' call. "
+                f"For example, to read the next section of the file, use start_line_one_indexed={next_start_line}.\n\n"
+                f"--- FILE CONTENT (truncated) ---\n"
+            )
+            return header + llm_content
+
+        # Normal Text Content
+        header = f"File: {target_file}"
+        if not should_read_entire_file:
+            end_desc = (
+                end_line_one_indexed_inclusive if end_line_one_indexed_inclusive != -1 else "end"
+            )
+            header += f" (lines {start_line_one_indexed}-{end_desc})"
+        header += "\n"
+
+        return header + llm_content
+
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return f"Error reading file: {str(e)}"

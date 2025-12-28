@@ -1,41 +1,116 @@
 """
-Tools package for AutoGen agents.
-Each tool is in its own file for better organization.
+Agent tools - Organized by category
 """
 
-# File operations
-from .read_file import read_file
-from .write_file import write_file
-from .edit_file import edit_file
+# Analysis tools
+from .code_analyzer import (
+    analyze_python_file,
+    find_function_definition,
+    list_all_functions,
+)
+from .csv_tools import (
+    csv_info,
+    csv_to_json,
+    filter_csv,
+    merge_csv_files,
+    read_csv,
+    sort_csv,
+    write_csv,
+)
 from .delete_file import delete_file
-from .list_dir import list_dir
+from .directory_ops import list_dir
+from .edit_file import edit_file
 
-# Search operations
-from .glob_search import glob_search
-from .grep_search import grep_search
-from .file_search import file_search
+# Git tools
+from .git_operations import (
+    git_add,
+    git_branch,
+    git_commit,
+    git_diff,
+    git_log,
+    git_pull,
+    git_push,
+    git_status,
+)
+from .glob import glob_search
+from .grep import grep_search
 
-# Terminal operations
-from .run_terminal_cmd import run_terminal_cmd
+# Data tools
+from .json_tools import (
+    format_json,
+    json_get_value,
+    json_set_value,
+    json_to_text,
+    merge_json_files,
+    read_json,
+    validate_json,
+    write_json,
+)
 
-# JSON operations
-from .read_json import read_json
-from .write_json import write_json
+# Filesystem tools
+from .read_file import read_file
+from .search_file import file_search
+from .terminal import run_terminal_cmd
+from .web_search import web_search
+
+# Web tools
+from .wikipedia_tools import (
+    wiki_content,
+    wiki_page_info,
+    wiki_random,
+    wiki_search,
+    wiki_set_language,
+    wiki_summary,
+)
+from .write_file import write_file
 
 __all__ = [
-    # File operations
+    # Filesystem
     "read_file",
     "write_file",
+    "list_dir",
     "edit_file",
     "delete_file",
-    "list_dir",
-    # Search operations
-    "glob_search",
-    "grep_search",
     "file_search",
-    # Terminal operations
-    "run_terminal_cmd",
-    # JSON operations
+    "glob_search",
+    # Git
+    "git_status",
+    "git_add",
+    "git_commit",
+    "git_push",
+    "git_pull",
+    "git_log",
+    "git_branch",
+    "git_diff",
+    # JSON
     "read_json",
     "write_json",
+    "merge_json_files",
+    "validate_json",
+    "format_json",
+    "json_get_value",
+    "json_set_value",
+    "json_to_text",
+    # CSV
+    "read_csv",
+    "write_csv",
+    "csv_info",
+    "filter_csv",
+    "merge_csv",
+    "csv_to_json",
+    "sort_csv",
+    # Web
+    "wiki_search",
+    "wiki_summary",
+    "wiki_content",
+    "wiki_page_info",
+    "wiki_random",
+    "wiki_set_language",
+    "web_search",
+    # Analysis
+    "analyze_python_file",
+    "find_function_definition",
+    "list_all_functions",
+    "grep_search",
+    "run_terminal_cmd",
 ]

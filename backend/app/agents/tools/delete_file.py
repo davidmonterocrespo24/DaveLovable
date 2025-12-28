@@ -1,35 +1,22 @@
-"""
-Delete file tool for AutoGen agents.
-Delete files from the filesystem.
-"""
-
 import os
-from typing import Dict, Any
 
 
-def delete_file(target_file: str, explanation: str = "") -> Dict[str, Any]:
+async def delete_file(target_file: str, explanation: str = "") -> str:
     """
     Delete a file at the specified path.
 
-    Args:
-        target_file: Path to the file to delete
-        explanation: Explanation for why this file is being deleted
+    Parameters:
+        target_file (str): The path to the file to be deleted
+        explanation (str): Optional explanation for the deletion operation
 
     Returns:
-        Dictionary with success status
+        str: Success message if file deleted, error message if not found or failed
     """
     try:
         if os.path.exists(target_file):
             os.remove(target_file)
-            return {
-                "success": True,
-                "file_path": target_file,
-                "message": "File deleted successfully"
-            }
+            return f"Successfully deleted file: {target_file}"
         else:
-            return {
-                "success": False,
-                "error": f"File not found: {target_file}"
-            }
+            return f"File not found: {target_file}"
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        return f"Error deleting file: {str(e)}"
