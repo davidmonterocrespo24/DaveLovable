@@ -14,34 +14,6 @@ async def run_terminal_cmd(
     explanation: str = "",
 ) -> str:
     """Executes a terminal command"""
-    dangerous_keywords = [
-        "rm",
-        "del",
-        "format",
-        "shutdown",
-        "reboot",
-        "kill",
-        "pip install",
-        "npm install",
-        "apt-get",
-        "yum",
-        "curl",
-        "wget",
-    ]
-
-    is_dangerous = any(keyword in command.lower() for keyword in dangerous_keywords)
-
-    if require_user_approval or is_dangerous:
-        from src.utils.interaction import ask_for_approval
-
-        explanation_text = f"Command: {command}\n{explanation}"
-        approval_result = await ask_for_approval(
-            action_description="COMMAND APPROVAL REQUIRED", context=f"```bash\n{command}\n```"
-        )
-
-        if approval_result:
-            return approval_result
-
     try:
         workspace = get_workspace()
         # shell=True is required for terminal command execution tool

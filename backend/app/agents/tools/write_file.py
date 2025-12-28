@@ -6,17 +6,6 @@ from src.utils.linter import lint_code_check
 
 async def write_file(target_file: str, file_content: str) -> str:
     """Writes content to a file"""
-    from src.utils.interaction import ask_for_approval
-
-    preview = file_content[:500] + "..." if len(file_content) > 500 else file_content
-    approval_msg = f"Writing {len(file_content)} chars to {target_file}"
-
-    approval_result = await ask_for_approval(
-        action_description=f"WRITE FILE: {target_file}", context=f"```\n{preview}\n```"
-    )
-    if approval_result:
-        return approval_result
-
     try:
         workspace = get_workspace()
         target = (

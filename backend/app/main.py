@@ -3,6 +3,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.db import init_db
 from app.api import api_router
+import logging
+import sys
+
+# Configure logging to show agent interactions
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+# Set specific loggers to DEBUG level for detailed agent output
+logging.getLogger("app.services.chat_service").setLevel(logging.DEBUG)
+logging.getLogger("app.agents").setLevel(logging.DEBUG)
+logging.getLogger("autogen").setLevel(logging.INFO)
 
 # Create FastAPI app
 app = FastAPI(

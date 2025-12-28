@@ -51,6 +51,7 @@ class AgentOrchestrator:
     """Orchestrates multiple AI agents using Microsoft AutoGen 0.4"""
 
     def __init__(self):
+        # Terminate when agent says "TASK_COMPLETED" or after 50 messages
         termination_condition = TextMentionTermination(
             "TASK_COMPLETED"
         ) | MaxMessageTermination(50)

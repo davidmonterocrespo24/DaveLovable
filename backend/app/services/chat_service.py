@@ -7,6 +7,11 @@ from app.services.filesystem_service import FileSystemService
 from fastapi import HTTPException, status
 from autogen_core import CancellationToken
 from datetime import datetime
+import logging
+
+# Configure logging for agent interactions
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 
 class ChatService:
@@ -150,6 +155,7 @@ class ChatService:
 
             try:
                 os.chdir(project_dir)
+                logger.info(f"📂 Changed working directory to: {project_dir}")
 
                 # Build task description with context for the agents
                 task_description = f"""User Request: {chat_request.message}
@@ -161,8 +167,14 @@ Project Context:
 - Files: {', '.join([f['filepath'] for f in context['files']])}
 
 IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
-Please analyze the request, create a plan if needed, and implement the solution.
-When done, respond with "TASK_COMPLETED" to end the conversation."""
+Please analyze the request, create a plan if needed, and implement the solution."""
+
+                logger.info("="*80)
+                logger.info("🤖 STARTING MULTI-AGENT TEAM EXECUTION")
+                logger.info("="*80)
+                logger.info(f"📝 User Request: {chat_request.message}")
+                logger.info(f"📁 Project Files: {len(context['files'])}")
+                logger.info("="*80)
 
                 # Run the agent team (Planner + Coder)
                 # The Coder agent will use tools to create/modify files directly
@@ -170,22 +182,61 @@ When done, respond with "TASK_COMPLETED" to end the conversation."""
                     task=task_description,
                     cancellation_token=CancellationToken()
                 )
+
+                logger.info("="*80)
+                logger.info("✅ MULTI-AGENT TEAM EXECUTION COMPLETED")
+                logger.info("="*80)
             finally:
                 # Always restore original working directory
                 os.chdir(original_cwd)
+                logger.info(f"📂 Restored working directory to: {original_cwd}")
 
             # Extract the final response from the team's messages
             # The last message should contain the summary or completion status
             response_content = ""
             agent_name = "Team"
 
+            logger.info(f"\n📨 Processing {len(result.messages)} messages from agents...")
+
+            # Log all messages from the conversation
+            for i, msg in enumerate(result.messages, 1):
+                msg_source = msg.source if hasattr(msg, 'source') else "Unknown"
+                msg_content = msg.content if hasattr(msg, 'content') else str(msg)
+
+                logger.info("─" * 80)
+                logger.info(f"💬 Message {i}/{len(result.messages)} - From: {msg_source}")
+                logger.info("─" * 80)
+
+                # Check if this is a tool call message
+                if hasattr(msg, 'content') and isinstance(msg.content, list):
+                    for item in msg.content:
+                        if hasattr(item, 'name'):  # Tool call
+                            logger.info(f"🔧 TOOL CALL: {item.name}")
+                            if hasattr(item, 'arguments'):
+                                logger.info(f"   Arguments: {item.arguments}")
+                        else:
+                            logger.info(f"   Content: {str(item)[:200]}")
+                else:
+                    # Regular text message
+                    content_preview = msg_content[:500] + "..." if len(msg_content) > 500 else msg_content
+                    logger.info(f"   {content_preview}")
+
+                logger.info("")
+
             if result.messages:
                 # Get the last message from the team
                 last_message = result.messages[-1]
                 response_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
                 agent_name = last_message.source if hasattr(last_message, 'source') else "Team"
+
+                logger.info("="*80)
+                logger.info(f"📤 FINAL RESPONSE (from {agent_name}):")
+                logger.info("="*80)
+                logger.info(response_content[:1000])
+                logger.info("="*80)
             else:
                 response_content = "I processed your request successfully."
+                logger.warning("⚠️  No messages in result, using default response")
 
             # Note: File changes are now handled by the Coder agent's tools
             # We don't need to manually create/update files anymore
@@ -209,6 +260,18 @@ When done, respond with "TASK_COMPLETED" to end the conversation."""
             }
 
         except Exception as e:
+            logger.error("="*80)
+            logger.error("❌ ERROR DURING AGENT EXECUTION")
+            logger.error("="*80)
+            logger.error(f"Error type: {type(e).__name__}")
+            logger.error(f"Error message: {str(e)}")
+            logger.error("="*80)
+
+            # Log full traceback
+            import traceback
+            logger.error("Full traceback:")
+            logger.error(traceback.format_exc())
+
             # Save error message
             error_message = ChatService.add_message(
                 db,
