@@ -4,9 +4,9 @@ from app.models import ChatSession, ChatMessage, MessageRole, ProjectFile
 from app.schemas import ChatSessionCreate, ChatMessageCreate, ChatRequest
 from app.agents import get_orchestrator
 from app.services.filesystem_service import FileSystemService
-from app.services.git_service import GitService
 from fastapi import HTTPException, status
-import json
+from autogen_core import CancellationToken
+from datetime import datetime
 
 
 class ChatService:
@@ -125,97 +125,87 @@ class ChatService:
             orchestrator = get_orchestrator()
         except ValueError as e:
             # API key not configured
-            assistant_message = ChatMessage(
-                id=0,  # Will be set by DB
-                session_id=session.id,
-                role=MessageRole.ASSISTANT,
-                content=str(e),
-                created_at=datetime.utcnow()
+            error_message = ChatService.add_message(
+                db,
+                ChatMessageCreate(
+                    session_id=session.id,
+                    role=MessageRole.ASSISTANT,
+                    content=str(e)
+                )
             )
-            assistant_message_db = ChatMessageCreate(
-                session_id=session.id,
-                role=MessageRole.ASSISTANT,
-                content=str(e)
-            )
-            db_assistant_message = db_message_create(db, assistant_message_db)
-            return ChatResponse(
-                session_id=session.id,
-                message=ChatMessage.model_validate(db_assistant_message),
-                code_changes=None
-            )
+            return {
+                "session_id": session.id,
+                "message": error_message,
+                "code_changes": [],
+            }
 
         try:
-            # Use CodingAgent to generate code
-            result = await orchestrator.generate_code(chat_request.message, context)
+            # Set working directory to the project directory so agent tools work correctly
+            import os
+            from pathlib import Path
+            from app.core.config import settings
 
-            # Get the actual response text from the agent
-            response_content = result.get("response_text", "I processed your request.")
-            code_changes = result.get("code", [])
+            project_dir = Path(settings.PROJECTS_BASE_DIR) / f"project_{project_id}"
+            original_cwd = os.getcwd()
 
-            # Update or create files in the project if code was generated
-            changed_files = []
-            if code_changes:
-                for code_block in code_changes:
-                    filename = code_block.get("filename")
-                    content = code_block.get("content")
-                    language = code_block.get("language")
+            try:
+                os.chdir(project_dir)
 
-                    if not filename or not content:
-                        continue
+                # Build task description with context for the agents
+                task_description = f"""User Request: {chat_request.message}
 
-                    # Check if file exists in database
-                    existing_file = db.query(ProjectFile).filter(
-                        ProjectFile.project_id == project_id,
-                        ProjectFile.filename == filename
-                    ).first()
+Project Context:
+- Project ID: {project_id}
+- Working Directory: {project_dir}
+- Existing Files: {len(context['files'])} files
+- Files: {', '.join([f['filepath'] for f in context['files']])}
 
-                    filepath = f"src/components/{filename}" if not filename.startswith("src/") else filename
+IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
+Please analyze the request, create a plan if needed, and implement the solution.
+When done, respond with "TASK_COMPLETED" to end the conversation."""
 
-                    if existing_file:
-                        # Update file in filesystem
-                        FileSystemService.write_file(project_id, existing_file.filepath, content)
-                        # Update metadata in database
-                        if language:
-                            existing_file.language = language
-                        from datetime import datetime
-                        existing_file.updated_at = datetime.utcnow()
-                        changed_files.append(existing_file.filepath)
-                    else:
-                        # Create new file in filesystem
-                        FileSystemService.write_file(project_id, filepath, content)
-                        # Create metadata in database
-                        new_file = ProjectFile(
-                            project_id=project_id,
-                            filename=filename,
-                            filepath=filepath,
-                            language=language
-                        )
-                        db.add(new_file)
-                        changed_files.append(filepath)
+                # Run the agent team (Planner + Coder)
+                # The Coder agent will use tools to create/modify files directly
+                result = await orchestrator.main_team.run(
+                    task=task_description,
+                    cancellation_token=CancellationToken()
+                )
+            finally:
+                # Always restore original working directory
+                os.chdir(original_cwd)
 
-                db.commit()
+            # Extract the final response from the team's messages
+            # The last message should contain the summary or completion status
+            response_content = ""
+            agent_name = "Team"
 
-                # Commit all changes to Git
-                if changed_files:
-                    commit_message = f"AI generated code: {chat_request.message[:50]}"
-                    GitService.commit_changes(project_id, commit_message, changed_files)
+            if result.messages:
+                # Get the last message from the team
+                last_message = result.messages[-1]
+                response_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
+                agent_name = last_message.source if hasattr(last_message, 'source') else "Team"
+            else:
+                response_content = "I processed your request successfully."
 
-            # Save assistant message with the actual agent response
+            # Note: File changes are now handled by the Coder agent's tools
+            # We don't need to manually create/update files anymore
+            # The agent uses write_file, edit_file tools directly
+
+            # Save assistant message with the team's response
             assistant_message = ChatService.add_message(
                 db,
                 ChatMessageCreate(
                     session_id=session.id,
                     role=MessageRole.ASSISTANT,
                     content=response_content,
-                    agent_name="CodingAgent",
-                    metadata=json.dumps({"code_changes": code_changes})
+                    agent_name=agent_name
                 )
             )
 
             return {
                 "session_id": session.id,
                 "message": assistant_message,
-                "code_changes": code_changes,
+                "code_changes": [],  # Changes are handled by agent tools, not tracked here
             }
 
         except Exception as e:
