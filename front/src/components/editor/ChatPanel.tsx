@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Send, Sparkles, User, Bot, Paperclip, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useSendChatMessage, useChatSession } from '@/hooks/useChat';
+import { useChatSession } from '@/hooks/useChat';
+import { chatApi } from '@/services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -49,6 +50,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
+    const [isStreaming, setIsStreaming] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -59,9 +61,6 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       currentSessionId || 0,
       !!currentSessionId
     );
-
-    // Send message mutation
-    const sendMessageMutation = useSendChatMessage();
 
     // Expose sendMessage method to parent
     useImperativeHandle(ref, () => ({
@@ -104,7 +103,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     }, [input]);
 
     const handleSend = async () => {
-      if (!input.trim() || sendMessageMutation.isPending) return;
+      if (!input.trim() || isStreaming) return;
 
       const userMessage: Message = {
         id: Date.now().toString(),
@@ -116,45 +115,107 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       setMessages((prev) => [...prev, userMessage]);
       const messageContent = input;
       setInput('');
+      setIsStreaming(true);
+
+      // Add a placeholder message for streaming
+      const streamingMessageId = (Date.now() + 1).toString();
+      const streamingMessage: Message = {
+        id: streamingMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        agent_interactions: [],
+      };
+      setMessages((prev) => [...prev, streamingMessage]);
 
       try {
-        const response = await sendMessageMutation.mutateAsync({
+        await chatApi.sendMessageStream(
           projectId,
-          data: {
+          {
             message: messageContent,
             session_id: currentSessionId,
           },
-        });
+          {
+            onStart: (data) => {
+              // Update session ID if it's a new session
+              if (data.session_id && !currentSessionId) {
+                setCurrentSessionId(data.session_id);
+              }
+            },
+            onAgentInteraction: (interaction) => {
+              console.log('[ChatPanel] Received agent interaction:', interaction);
+              // Add interaction to the streaming message in real-time
+              setMessages((prev) => {
+                console.log('[ChatPanel] Current messages:', prev.length);
+                console.log('[ChatPanel] Looking for message:', streamingMessageId);
+                const updated = prev.map((msg) => {
+                  if (msg.id === streamingMessageId) {
+                    console.log('[ChatPanel] Found streaming message, adding interaction');
+                    return {
+                      ...msg,
+                      agent_interactions: [
+                        ...(msg.agent_interactions || []),
+                        interaction,
+                      ],
+                    };
+                  }
+                  return msg;
+                });
+                console.log('[ChatPanel] Updated messages:', updated);
+                return updated;
+              });
+            },
+            onComplete: (data) => {
+              // Update the streaming message with the final response
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        content: data.message.content,
+                      }
+                    : msg
+                )
+              );
 
-        // Update session ID if it's a new session
-        if (response.session_id && !currentSessionId) {
-          setCurrentSessionId(response.session_id);
-        }
+              // Notify parent if code changes were made
+              if (data.code_changes && data.code_changes.length > 0 && onCodeChange) {
+                onCodeChange();
+              }
 
-        // Add AI response to messages with agent interactions
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: response.message.content,
-          timestamp: new Date(),
-          agent_interactions: response.agent_interactions || [],
-        };
-        setMessages((prev) => [...prev, aiResponse]);
-
-        // Notify parent if code changes were made
-        if (response.code_changes && response.code_changes.length > 0 && onCodeChange) {
-          onCodeChange();
-        }
+              setIsStreaming(false);
+            },
+            onError: (error) => {
+              console.error('Streaming error:', error);
+              // Update the streaming message with error
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === streamingMessageId
+                    ? {
+                        ...msg,
+                        content: `Sorry, I encountered an error: ${error}. Please try again.`,
+                      }
+                    : msg
+                )
+              );
+              setIsStreaming(false);
+            },
+          }
+        );
       } catch (error) {
         console.error('Failed to send message:', error);
-        // Add error message
-        const errorMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'Sorry, I encountered an error processing your request. Please try again.',
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, errorMessage]);
+        // Update the streaming message with error
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === streamingMessageId
+              ? {
+                  ...msg,
+                  content: 'Sorry, I encountered an error processing your request. Please try again.',
+                }
+              : msg
+          )
+        );
+        setIsStreaming(false);
       }
     };
 
@@ -281,8 +342,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               </div>
             </div>
           ))}
-          
-          {sendMessageMutation.isPending && (
+
+          {isStreaming && (
             <div className="flex gap-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
                 <Bot className="w-4 h-4 text-primary-foreground" />
@@ -290,17 +351,17 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               <div className="bg-muted/30 p-3 rounded-2xl rounded-tl-sm border border-border/30">
                 <div className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">Generating code...</span>
+                  <span className="text-xs text-muted-foreground">AI is thinking...</span>
                 </div>
               </div>
             </div>
           )}
-          
+
           <div ref={messagesEndRef} />
         </div>
 
         {/* Suggestions */}
-        {messages.length <= 2 && !sendMessageMutation.isPending && (
+        {messages.length <= 2 && !isStreaming && (
           <div className="px-4 pb-2 flex flex-wrap gap-2">
             {suggestions.map((suggestion) => (
               <button
@@ -334,7 +395,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                            text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50
                            placeholder:text-muted-foreground min-h-[48px] max-h-32 transition-all"
                 rows={1}
-                disabled={sendMessageMutation.isPending}
+                disabled={isStreaming}
               />
               <div className="absolute right-2 bottom-2 flex items-center gap-1">
                 <button 
@@ -353,10 +414,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             </div>
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || sendMessageMutation.isPending}
+              disabled={!input.trim() || isStreaming}
               className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 p-0 shrink-0"
             >
-              {sendMessageMutation.isPending ? (
+              {isStreaming ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
                 <Send className="w-5 h-5" />

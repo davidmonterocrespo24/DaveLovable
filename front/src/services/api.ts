@@ -205,9 +205,116 @@ export const fileApi = {
   },
 };
 
+// SSE Event types
+export interface SSEEvent {
+  type: 'start' | 'agent_interaction' | 'complete' | 'error';
+  data: any;
+}
+
 // Chat API
 export const chatApi = {
-  // Send a message to AI
+  // Send a message to AI with streaming (SSE)
+  sendMessageStream: async (
+    projectId: number,
+    data: SendChatMessageRequest,
+    callbacks: {
+      onStart?: (data: { session_id: number; user_message_id: number }) => void;
+      onAgentInteraction?: (interaction: AgentInteraction) => void;
+      onComplete?: (data: SendChatMessageResponse) => void;
+      onError?: (error: string) => void;
+    }
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      // We can't use EventSource for POST requests, so we'll use fetch with streaming
+      const url = `${API_URL}/chat/${projectId}/stream`;
+
+      console.log('[SSE] Starting stream to:', url);
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+        .then(async (response) => {
+          console.log('[SSE] Response received:', response.status, response.statusText);
+
+          if (!response.ok) {
+            throw new ApiError(response.status, `HTTP ${response.status}`);
+          }
+
+          const reader = response.body?.getReader();
+          if (!reader) {
+            throw new Error('No response body');
+          }
+
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          console.log('[SSE] Starting to read stream...');
+
+          while (true) {
+            const { done, value } = await reader.read();
+
+            if (done) {
+              console.log('[SSE] Stream complete');
+              resolve();
+              break;
+            }
+
+            // Decode chunk and add to buffer
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            console.log('[SSE] Received chunk:', chunk.substring(0, 100));
+
+            // Process complete SSE messages (separated by \n\n)
+            const lines = buffer.split('\n\n');
+            buffer = lines.pop() || ''; // Keep incomplete message in buffer
+
+            for (const line of lines) {
+              if (line.trim().startsWith('data: ')) {
+                try {
+                  const jsonStr = line.replace(/^data: /, '').trim();
+                  console.log('[SSE] Parsing event:', jsonStr.substring(0, 100));
+                  const event: SSEEvent = JSON.parse(jsonStr);
+                  console.log('[SSE] Event type:', event.type);
+
+                  switch (event.type) {
+                    case 'start':
+                      console.log('[SSE] Start event:', event.data);
+                      callbacks.onStart?.(event.data);
+                      break;
+                    case 'agent_interaction':
+                      console.log('[SSE] Agent interaction:', event.data.message_type, event.data.agent_name);
+                      callbacks.onAgentInteraction?.(event.data);
+                      break;
+                    case 'complete':
+                      console.log('[SSE] Complete event');
+                      callbacks.onComplete?.(event.data);
+                      break;
+                    case 'error':
+                      console.error('[SSE] Error event:', event.data.message);
+                      callbacks.onError?.(event.data.message);
+                      reject(new ApiError(500, event.data.message));
+                      return;
+                  }
+                } catch (err) {
+                  console.error('[SSE] Failed to parse event:', err, line);
+                }
+              }
+            }
+          }
+        })
+        .catch((error) => {
+          console.error('[SSE] Stream error:', error);
+          callbacks.onError?.(error.message || 'Unknown error');
+          reject(error);
+        });
+    });
+  },
+
+  // Send a message to AI (non-streaming, backward compatible)
   sendMessage: async (
     projectId: number,
     data: SendChatMessageRequest

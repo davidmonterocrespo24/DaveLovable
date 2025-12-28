@@ -1,6 +1,8 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+import json
 
 from app.db import get_db
 from app.schemas import (
@@ -16,6 +18,45 @@ from app.services import ChatService
 router = APIRouter()
 
 
+@router.post("/{project_id}/stream")
+async def send_chat_message_stream(
+    project_id: int,
+    chat_request: ChatRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Send a chat message and stream AI response with real-time agent interactions
+
+    This endpoint uses Server-Sent Events (SSE) to stream:
+    - Agent thoughts and decisions
+    - Tool calls and their arguments
+    - Tool execution results
+    - Final response with code changes
+    """
+    async def event_generator():
+        try:
+            async for event in ChatService.process_chat_message_stream(db, project_id, chat_request):
+                # Format as SSE event
+                yield f"data: {json.dumps(event)}\n\n"
+        except Exception as e:
+            # Send error event
+            error_event = {
+                "type": "error",
+                "data": {"message": str(e)}
+            }
+            yield f"data: {json.dumps(error_event)}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+        }
+    )
+
+
 @router.post("/{project_id}", response_model=ChatResponse)
 async def send_chat_message(
     project_id: int,
@@ -23,7 +64,7 @@ async def send_chat_message(
     db: Session = Depends(get_db)
 ):
     """
-    Send a chat message and get AI response
+    Send a chat message and get AI response (non-streaming, backward compatible)
 
     This endpoint:
     - Creates a new session if session_id is not provided

@@ -176,150 +176,87 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 logger.info(f"📁 Project Files: {len(context['files'])}")
                 logger.info("="*80)
 
-                # Run the agent team (Planner + Coder)
-                # The Coder agent will use tools to create/modify files directly
-                result = await orchestrator.main_team.run(
+                # List to collect agent interactions as events stream in
+                agent_interactions = []
+
+                # Run the agent team using run_stream to capture events in real-time
+                async for message in orchestrator.main_team.run_stream(
                     task=task_description,
                     cancellation_token=CancellationToken()
-                )
+                ):
+                    # Get event type
+                    event_type = type(message).__name__
+                    msg_source = message.source if hasattr(message, 'source') else "Unknown"
+                    msg_timestamp = message.created_at if hasattr(message, 'created_at') else datetime.now()
 
-                logger.info("="*80)
-                logger.info("✅ MULTI-AGENT TEAM EXECUTION COMPLETED")
-                logger.info("="*80)
+                    logger.info(f"📨 Event: {event_type} from {msg_source}")
+
+                    # TextMessage - Agent thoughts/responses
+                    if event_type == "TextMessage":
+                        content_preview = message.content[:200] if len(message.content) > 200 else message.content
+                        logger.info(f"💭 {msg_source}: {content_preview}")
+
+                        if msg_source != "user" and "TASK_COMPLETED" not in message.content:
+                            agent_interactions.append({
+                                "agent_name": msg_source,
+                                "message_type": "thought",
+                                "content": message.content,
+                                "tool_name": None,
+                                "tool_arguments": None,
+                                "timestamp": msg_timestamp
+                            })
+
+                    # ToolCallRequestEvent - Tool calls
+                    elif event_type == "ToolCallRequestEvent":
+                        for tool_call in message.content:
+                            logger.info(f"🔧 Tool: {tool_call.name}")
+                            tool_args = {}
+                            try:
+                                import json
+                                tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
+                            except:
+                                tool_args = {"raw": str(tool_call.arguments)}
+
+                            agent_interactions.append({
+                                "agent_name": msg_source,
+                                "message_type": "tool_call",
+                                "content": f"Calling: {tool_call.name}",
+                                "tool_name": tool_call.name,
+                                "tool_arguments": tool_args,
+                                "timestamp": msg_timestamp
+                            })
+
+                    # ToolCallExecutionEvent - Tool results
+                    elif event_type == "ToolCallExecutionEvent":
+                        for tool_result in message.content:
+                            result_preview = str(tool_result.content)[:200]
+                            logger.info(f"✅ Result ({tool_result.name}): {result_preview}")
+
+                            agent_interactions.append({
+                                "agent_name": "System",
+                                "message_type": "tool_response",
+                                "content": tool_result.content,
+                                "tool_name": tool_result.name,
+                                "tool_arguments": None,
+                                "timestamp": msg_timestamp
+                            })
+
+                    # TaskResult - Final
+                    elif event_type == "TaskResult":
+                        result = message
+                        logger.info("="*80)
+                        logger.info("✅ EXECUTION COMPLETED")
+                        logger.info("="*80)
             finally:
                 # Always restore original working directory
                 os.chdir(original_cwd)
                 logger.info(f"📂 Restored working directory to: {original_cwd}")
 
-            # Extract the final response and agent interactions from the team's messages
+            # Extract the final response from the result
             response_content = ""
             agent_name = "Team"
-            agent_interactions = []
 
-            logger.info(f"\n📨 Processing {len(result.messages)} messages from agents...")
-
-            # Process both regular messages and inner_messages (events)
-            for i, msg in enumerate(result.messages, 1):
-                msg_source = msg.source if hasattr(msg, 'source') else "Unknown"
-                msg_content = msg.content if hasattr(msg, 'content') else str(msg)
-                # Ensure timestamp is a datetime object for Pydantic
-                if hasattr(msg, 'created_at'):
-                    msg_timestamp = msg.created_at if isinstance(msg.created_at, datetime) else datetime.now()
-                else:
-                    msg_timestamp = datetime.now()
-
-                logger.info("─" * 80)
-                logger.info(f"💬 Message {i}/{len(result.messages)} - From: {msg_source}")
-                logger.info("─" * 80)
-
-                # Process inner_messages (events) if they exist
-                if hasattr(msg, 'inner_messages') and msg.inner_messages:
-                    logger.info(f"📦 Processing {len(msg.inner_messages)} inner events...")
-                    for event in msg.inner_messages:
-                        event_type = type(event).__name__
-                        event_source = event.source if hasattr(event, 'source') else msg_source
-                        event_timestamp = event.created_at if hasattr(event, 'created_at') else msg_timestamp
-
-                        # ThoughtEvent
-                        if event_type == "ThoughtEvent":
-                            logger.info(f"💭 THOUGHT from {event_source}: {event.content[:200]}")
-                            agent_interactions.append({
-                                "agent_name": event_source,
-                                "message_type": "thought",
-                                "content": event.content,
-                                "tool_name": None,
-                                "tool_arguments": None,
-                                "timestamp": event_timestamp
-                            })
-
-                        # ToolCallRequestEvent
-                        elif event_type == "ToolCallRequestEvent":
-                            for tool_call in event.content:
-                                logger.info(f"🔧 TOOL CALL: {tool_call.name}")
-                                tool_args = {}
-                                try:
-                                    import json
-                                    tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
-                                except:
-                                    tool_args = {"raw": str(tool_call.arguments)}
-
-                                agent_interactions.append({
-                                    "agent_name": event_source,
-                                    "message_type": "tool_call",
-                                    "content": f"Calling tool: {tool_call.name}",
-                                    "tool_name": tool_call.name,
-                                    "tool_arguments": tool_args,
-                                    "timestamp": event_timestamp
-                                })
-
-                        # ToolCallExecutionEvent
-                        elif event_type == "ToolCallExecutionEvent":
-                            for tool_result in event.content:
-                                result_preview = str(tool_result.content)[:200]
-                                logger.info(f"✅ TOOL RESULT ({tool_result.name}): {result_preview}")
-                                agent_interactions.append({
-                                    "agent_name": "System",
-                                    "message_type": "tool_response",
-                                    "content": tool_result.content,
-                                    "tool_name": tool_result.name,
-                                    "tool_arguments": None,
-                                    "timestamp": event_timestamp
-                                })
-
-                # Check if this is a tool call message
-                if hasattr(msg, 'content') and isinstance(msg.content, list):
-                    for item in msg.content:
-                        if hasattr(item, 'name'):  # Tool call
-                            logger.info(f"🔧 TOOL CALL: {item.name}")
-                            tool_args = {}
-                            if hasattr(item, 'arguments'):
-                                logger.info(f"   Arguments: {item.arguments}")
-                                try:
-                                    import json
-                                    tool_args = json.loads(item.arguments) if isinstance(item.arguments, str) else item.arguments
-                                except:
-                                    tool_args = {"raw": str(item.arguments)}
-
-                            # Add tool call to interactions
-                            agent_interactions.append({
-                                "agent_name": msg_source,
-                                "message_type": "tool_call",
-                                "content": f"Calling tool: {item.name}",
-                                "tool_name": item.name,
-                                "tool_arguments": tool_args,
-                                "timestamp": msg_timestamp
-                            })
-                        else:
-                            content_str = str(item)[:200]
-                            logger.info(f"   Content: {content_str}")
-                            # Check if this looks like a tool response
-                            if "Successfully" in content_str or "Error" in content_str:
-                                agent_interactions.append({
-                                    "agent_name": "System",
-                                    "message_type": "tool_response",
-                                    "content": content_str,
-                                    "tool_name": None,
-                                    "tool_arguments": None,
-                                    "timestamp": msg_timestamp
-                                })
-                else:
-                    # Regular text message (thought)
-                    content_preview = msg_content[:500] + "..." if len(msg_content) > 500 else msg_content
-                    logger.info(f"   {content_preview}")
-
-                    # Add thought to interactions (skip if it's a task completion marker)
-                    if "TASK_COMPLETED" not in msg_content and msg_content.strip():
-                        agent_interactions.append({
-                            "agent_name": msg_source,
-                            "message_type": "thought",
-                            "content": msg_content,
-                            "tool_name": None,
-                            "tool_arguments": None,
-                            "timestamp": msg_timestamp
-                        })
-
-                logger.info("")
-
+            # Get the final response from the last message
             if result.messages:
                 # Get the last message from the team
                 last_message = result.messages[-1]
@@ -385,6 +322,235 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 "session_id": session.id,
                 "message": error_message,
                 "code_changes": [],
+            }
+
+    @staticmethod
+    async def process_chat_message_stream(
+        db: Session,
+        project_id: int,
+        chat_request: ChatRequest
+    ):
+        """
+        Process a chat message and stream AI response events in real-time
+
+        Yields events for:
+        - Agent thoughts (thought)
+        - Tool calls (tool_call)
+        - Tool execution results (tool_response)
+        - Final response (complete)
+        """
+
+        # Get or create chat session
+        if chat_request.session_id:
+            session = ChatService.get_session(db, chat_request.session_id, project_id)
+        else:
+            session = ChatService.create_session(
+                db,
+                ChatSessionCreate(project_id=project_id)
+            )
+
+        # Save user message
+        user_message = ChatService.add_message(
+            db,
+            ChatMessageCreate(
+                session_id=session.id,
+                role=MessageRole.USER,
+                content=chat_request.message
+            )
+        )
+
+        # Yield initial event
+        yield {
+            "type": "start",
+            "data": {
+                "session_id": session.id,
+                "user_message_id": user_message.id
+            }
+        }
+
+        # Get project context
+        project_files = db.query(ProjectFile).filter(
+            ProjectFile.project_id == project_id
+        ).all()
+
+        context = {
+            "project_id": project_id,
+            "files": [
+                {
+                    "filename": f.filename,
+                    "filepath": f.filepath,
+                    "language": f.language,
+                    "content": (FileSystemService.read_file(project_id, f.filepath) or "")[:500],
+                }
+                for f in project_files
+            ]
+        }
+
+        # Generate AI response using agents
+        try:
+            orchestrator = get_orchestrator()
+        except ValueError as e:
+            # API key not configured
+            yield {
+                "type": "error",
+                "data": {"message": str(e)}
+            }
+            return
+
+        try:
+            import os
+            from pathlib import Path
+            from app.core.config import settings
+
+            project_dir = Path(settings.PROJECTS_BASE_DIR) / f"project_{project_id}"
+            original_cwd = os.getcwd()
+
+            try:
+                os.chdir(project_dir)
+                logger.info(f"📂 Changed working directory to: {project_dir}")
+
+                # Build task description
+                task_description = f"""User Request: {chat_request.message}
+
+Project Context:
+- Project ID: {project_id}
+- Working Directory: {project_dir}
+- Existing Files: {len(context['files'])} files
+- Files: {', '.join([f['filepath'] for f in context['files']])}
+
+IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
+Please analyze the request, create a plan if needed, and implement the solution."""
+
+                logger.info("="*80)
+                logger.info("🤖 STARTING MULTI-AGENT TEAM EXECUTION (STREAMING)")
+                logger.info("="*80)
+
+                # Stream agent events in real-time
+                async for message in orchestrator.main_team.run_stream(
+                    task=task_description,
+                    cancellation_token=CancellationToken()
+                ):
+                    event_type = type(message).__name__
+                    msg_source = message.source if hasattr(message, 'source') else "Unknown"
+                    msg_timestamp = message.created_at if hasattr(message, 'created_at') else datetime.now()
+
+                    logger.info(f"📨 Event: {event_type} from {msg_source}")
+
+                    # TextMessage - Agent thoughts/responses
+                    if event_type == "TextMessage":
+                        if msg_source != "user" and "TASK_COMPLETED" not in message.content:
+                            yield {
+                                "type": "agent_interaction",
+                                "data": {
+                                    "agent_name": msg_source,
+                                    "message_type": "thought",
+                                    "content": message.content,
+                                    "tool_name": None,
+                                    "tool_arguments": None,
+                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                                }
+                            }
+
+                    # ToolCallRequestEvent - Tool calls
+                    elif event_type == "ToolCallRequestEvent":
+                        for tool_call in message.content:
+                            tool_args = {}
+                            try:
+                                import json
+                                tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
+                            except:
+                                tool_args = {"raw": str(tool_call.arguments)}
+
+                            yield {
+                                "type": "agent_interaction",
+                                "data": {
+                                    "agent_name": msg_source,
+                                    "message_type": "tool_call",
+                                    "content": f"Calling: {tool_call.name}",
+                                    "tool_name": tool_call.name,
+                                    "tool_arguments": tool_args,
+                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                                }
+                            }
+
+                    # ToolCallExecutionEvent - Tool results
+                    elif event_type == "ToolCallExecutionEvent":
+                        for tool_result in message.content:
+                            yield {
+                                "type": "agent_interaction",
+                                "data": {
+                                    "agent_name": "System",
+                                    "message_type": "tool_response",
+                                    "content": str(tool_result.content),
+                                    "tool_name": tool_result.name,
+                                    "tool_arguments": None,
+                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                                }
+                            }
+
+                    # TaskResult - Final
+                    elif event_type == "TaskResult":
+                        result = message
+                        logger.info("="*80)
+                        logger.info("✅ EXECUTION COMPLETED")
+                        logger.info("="*80)
+
+            finally:
+                os.chdir(original_cwd)
+                logger.info(f"📂 Restored working directory to: {original_cwd}")
+
+            # Extract final response
+            response_content = ""
+            agent_name = "Team"
+
+            if result.messages:
+                last_message = result.messages[-1]
+                response_content = last_message.content if hasattr(last_message, 'content') else str(last_message)
+                agent_name = last_message.source if hasattr(last_message, 'source') else "Team"
+            else:
+                response_content = "I processed your request successfully."
+
+            # Save assistant message
+            assistant_message = ChatService.add_message(
+                db,
+                ChatMessageCreate(
+                    session_id=session.id,
+                    role=MessageRole.ASSISTANT,
+                    content=response_content,
+                    agent_name=agent_name
+                )
+            )
+
+            # Yield final completion event
+            yield {
+                "type": "complete",
+                "data": {
+                    "session_id": session.id,
+                    "message": {
+                        "id": assistant_message.id,
+                        "session_id": assistant_message.session_id,
+                        "role": assistant_message.role.value,
+                        "content": assistant_message.content,
+                        "agent_name": assistant_message.agent_name,
+                        "created_at": assistant_message.created_at.isoformat()
+                    },
+                    "code_changes": []
+                }
+            }
+
+        except Exception as e:
+            logger.error("="*80)
+            logger.error("❌ ERROR DURING AGENT EXECUTION")
+            logger.error("="*80)
+            logger.error(f"Error: {str(e)}")
+            logger.error("="*80)
+
+            import traceback
+            logger.error(traceback.format_exc())
+
+            yield {
+                "type": "error",
+                "data": {"message": str(e)}
             }
 
     @staticmethod
