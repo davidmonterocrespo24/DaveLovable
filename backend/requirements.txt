@@ -25,3 +25,4 @@ autogen-ext[openai]==0.7.5
 # Utils
 requests==2.32.3
 aiohttp==3.11.11
+yaml

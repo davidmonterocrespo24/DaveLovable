@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from src.tools.common import HIDDEN_DIRS, get_workspace
+from app.agents.tools.common import HIDDEN_DIRS, get_workspace
 
 
 async def list_dir(target_dir: str = ".") -> str:

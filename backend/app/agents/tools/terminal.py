@@ -3,8 +3,9 @@ Tool for executing terminal commands safely
 """
 
 import subprocess
+import os
 
-from src.tools.common import get_workspace
+from app.agents.tools.common import get_workspace
 
 
 async def run_terminal_cmd(

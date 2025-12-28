@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from src.tools.common import EXCLUDED_DIRS, get_workspace
+from app.agents.tools.common import EXCLUDED_DIRS, get_workspace
 
 # Configure logging
 logger = logging.getLogger(__name__)

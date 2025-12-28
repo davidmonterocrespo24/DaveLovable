@@ -1,6 +1,6 @@
 import os
 
-from src.tools.common import EXCLUDED_DIRS
+from app.agents.tools.common import EXCLUDED_DIRS
 
 
 async def file_search(query: str, explanation: str = "") -> str:

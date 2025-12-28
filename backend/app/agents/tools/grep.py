@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from src.tools.common import EXCLUDED_DIRS, get_workspace
+from app.agents.tools.common import EXCLUDED_DIRS, get_workspace
 
 EXCLUDED_EXTS = {
     ".pyc",
