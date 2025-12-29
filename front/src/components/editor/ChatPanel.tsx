@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Send, Sparkles, User, Bot, Paperclip, Image, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useChatSession } from '@/hooks/useChat';
+import { useChatSession, useChatSessions } from '@/hooks/useChat';
 import { chatApi } from '@/services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -55,6 +55,20 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    // Get all chat sessions for this project
+    const { data: sessions } = useChatSessions(projectId);
+
+    // Load the most recent session if no sessionId is provided
+    useEffect(() => {
+      if (!currentSessionId && sessions && sessions.length > 0) {
+        // Sort by ID to get the most recent session
+        const mostRecentSession = sessions.reduce((latest, current) =>
+          current.id > latest.id ? current : latest
+        );
+        setCurrentSessionId(mostRecentSession.id);
+      }
+    }, [sessions, currentSessionId]);
 
     // Get chat session if sessionId is provided
     const { data: session } = useChatSession(

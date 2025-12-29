@@ -91,6 +91,8 @@ You have tools to search the codebase and read files. Follow these rules regardi
 <function>{"description": "List all functions defined in a Python file with their signatures and docstrings.", "name": "list_all_functions", "parameters": {"properties": {"filepath": {"description": "Path to the Python file", "type": "string"}}, "required": ["filepath"], "type": "object"}}</function>
 </functions>
 
+Once you have completed the task and explained your actions, respond with TASK_COMPLETED.
+When everything is finished, reply only with TASK_COMPLETED.
 """
 
 
@@ -255,5 +257,8 @@ IMPORTANT RULES:
 - Keep plans concise (5-10 tasks ideal) - break down only when necessary
 - Each task should be clear and actionable for Coder
 - When all tasks are complete, say "TASK_COMPLETED" (not DELEGATE_TO_SUMMARY)
+
+Once you have completed the task and explained your actions, respond with TASK_COMPLETED.
+When everything is finished, reply only with TASK_COMPLETED.
 
 Respond in English."""

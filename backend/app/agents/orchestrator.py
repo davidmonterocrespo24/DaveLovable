@@ -119,11 +119,11 @@ class AgentOrchestrator:
             tools=[],  # Planner has no tools, only plans
             # NO memory parameter
         )
-        self.main_team = SelectorGroupChat(
+        # Use RoundRobinGroupChat for alternating turns between Planner and Coder
+        # This ensures Planner reviews progress after each Coder action
+        self.main_team = RoundRobinGroupChat(
             participants=[self.planning_agent, self.coder_agent],
-            model_client=self.model_client,
             termination_condition=termination_condition,
-            allow_repeated_speaker=True,  # Allows the same agent to speak multiple times
         )
 
     async def close(self):
