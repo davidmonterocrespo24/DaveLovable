@@ -425,6 +425,11 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 logger.info("🤖 STARTING MULTI-AGENT TEAM EXECUTION (STREAMING)")
                 logger.info("="*80)
 
+                # Load saved agent state if it exists
+                state_loaded = await orchestrator.load_state(project_id)
+                if state_loaded:
+                    logger.info(f"♻️  Restored agent state from previous session")
+
                 # List to collect all agent interactions for database storage
                 agent_interactions = []
 
@@ -537,6 +542,9 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     message_metadata=json.dumps({"agent_interactions": agent_interactions})
                 )
             )
+
+            # Save agent state to disk for future sessions
+            await orchestrator.save_state(project_id)
 
             # Yield final completion event
             yield {

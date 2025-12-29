@@ -11,12 +11,22 @@ from app.agents.tools.common import get_workspace
 async def run_terminal_cmd(
     command: str,
     is_background: bool = False,
-    require_user_approval: bool = False,
     explanation: str = "",
 ) -> str:
     """Executes a terminal command"""
     try:
         workspace = get_workspace()
+
+        # Fix common Unix commands for Windows compatibility
+        import platform
+        if platform.system() == 'Windows':
+            # Replace pwd with cd (shows current directory on Windows)
+            if command.strip() == 'pwd':
+                command = 'cd'
+            # Replace ls with dir
+            elif command.strip().startswith('ls'):
+                command = command.replace('ls', 'dir', 1)
+
         # shell=True is required for terminal command execution tool
         result = subprocess.run(  # nosec B602
             command, shell=True, capture_output=True, text=True, timeout=60, cwd=workspace
