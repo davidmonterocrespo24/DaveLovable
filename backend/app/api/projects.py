@@ -1,6 +1,10 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
+import zipfile
+import io
+from pathlib import Path
 
 from app.db import get_db
 from app.schemas import (
@@ -408,3 +412,61 @@ def update_project_thumbnail(
         "message": "Thumbnail updated successfully",
         "project_id": project_id
     }
+
+
+@router.get("/{project_id}/download")
+def download_project(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Download project as ZIP file
+
+    Args:
+        project_id: The project ID
+
+    Returns:
+        ZIP file containing all project files
+    """
+    # Verify project exists
+    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Get project directory path
+    project_dir = Path(__file__).parent.parent.parent / "projects" / f"project_{project_id}"
+
+    if not project_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Project files not found on disk"
+        )
+
+    # Create ZIP file in memory
+    zip_buffer = io.BytesIO()
+
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Walk through project directory and add all files
+        for file_path in project_dir.rglob('*'):
+            if file_path.is_file():
+                # Skip .git directory and node_modules
+                if '.git' in file_path.parts or 'node_modules' in file_path.parts:
+                    continue
+
+                # Add file to ZIP with relative path
+                arcname = file_path.relative_to(project_dir)
+                zip_file.write(file_path, arcname)
+
+    # Reset buffer position to beginning
+    zip_buffer.seek(0)
+
+    # Create safe filename
+    safe_project_name = "".join(c for c in project.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    filename = f"{safe_project_name or 'project'}.zip"
+
+    # Return ZIP file as streaming response
+    return StreamingResponse(
+        zip_buffer,
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"'
+        }
+    )

@@ -10,7 +10,8 @@ import {
   Cloud,
   Zap,
   FileText,
-  Camera
+  Camera,
+  Download
 } from 'lucide-react';
 import { useProject } from '@/hooks/useProjects';
 import { useUpdateFile } from '@/hooks/useFiles';
@@ -297,6 +298,54 @@ const Editor = () => {
     captureScreenshot(true);
   };
 
+  const handleDownloadProject = async () => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/download`);
+
+      if (!response.ok) {
+        throw new Error('Failed to download project');
+      }
+
+      // Get the filename from Content-Disposition header or use default
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'project.zip';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="(.+)"/);
+        if (filenameMatch) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      // Create blob from response
+      const blob = await response.blob();
+
+      // Create download link and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast({
+        title: "Download started",
+        description: `${filename} is being downloaded`,
+        duration: 3000,
+      });
+    } catch (error) {
+      console.error('[Download] Failed:', error);
+      toast({
+        title: "Download failed",
+        description: "There was an error downloading the project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
     // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
     if (!data.success || !previewUrl) return;
@@ -374,6 +423,17 @@ const Editor = () => {
             </TooltipTrigger>
             <TooltipContent>
               Capture project thumbnail
+            </TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleDownloadProject}>
+                <Download className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Download project as ZIP
             </TooltipContent>
           </Tooltip>
 
