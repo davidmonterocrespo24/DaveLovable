@@ -303,23 +303,48 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                     <>
                       {/* Agent Interactions */}
                       {message.agent_interactions && message.agent_interactions.length > 0 && (() => {
-                        // Group tool calls and responses together
-                        const thoughts: typeof message.agent_interactions = [];
-                        const toolExecutions: Array<{
-                          toolName: string;
-                          agentName: string;
-                          arguments: Record<string, any>;
-                          response: string;
-                          timestamp: string;
-                          hasError?: boolean;
-                        }> = [];
-
+                        // Process interactions in order, grouping consecutive tool calls by agent
+                        const elements: JSX.Element[] = [];
+                        let currentToolCalls: any[] = [];
+                        let currentAgent: string | null = null;
                         let currentToolCall: any = null;
 
-                        message.agent_interactions.forEach((interaction) => {
+                        const flushToolCalls = () => {
+                          if (currentToolCalls.length > 0) {
+                            elements.push(
+                              <ToolExecutionBlock
+                                key={`${message.id}-tools-${elements.length}`}
+                                executions={currentToolCalls}
+                              />
+                            );
+                            currentToolCalls = [];
+                            currentAgent = null;
+                          }
+                        };
+
+                        message.agent_interactions.forEach((interaction, idx) => {
                           if (interaction.message_type === 'thought') {
-                            thoughts.push(interaction);
+                            // Flush any pending tool calls before showing thought
+                            flushToolCalls();
+
+                            elements.push(
+                              <AgentInteraction
+                                key={`${message.id}-thought-${idx}`}
+                                agentName={interaction.agent_name}
+                                messageType={interaction.message_type}
+                                content={interaction.content}
+                                toolName={interaction.tool_name}
+                                toolArguments={interaction.tool_arguments}
+                                timestamp={interaction.timestamp}
+                              />
+                            );
                           } else if (interaction.message_type === 'tool_call') {
+                            // If agent changed, flush previous tool calls
+                            if (currentAgent && currentAgent !== interaction.agent_name) {
+                              flushToolCalls();
+                            }
+
+                            currentAgent = interaction.agent_name;
                             currentToolCall = {
                               toolName: interaction.tool_name || 'unknown',
                               agentName: interaction.agent_name,
@@ -330,34 +355,20 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                           } else if (interaction.message_type === 'tool_response' && currentToolCall) {
                             currentToolCall.response = interaction.content;
                             currentToolCall.hasError = interaction.content.toLowerCase().includes('error');
-                            toolExecutions.push(currentToolCall);
+                            currentToolCalls.push(currentToolCall);
                             currentToolCall = null;
                           }
                         });
+
+                        // Flush any remaining tool calls
+                        flushToolCalls();
 
                         return (
                           <div className="space-y-2 mb-3">
                             <div className="text-xs font-semibold text-muted-foreground mb-2">
                               Agent Activity:
                             </div>
-
-                            {/* Render thoughts */}
-                            {thoughts.map((interaction, idx) => (
-                              <AgentInteraction
-                                key={`${message.id}-thought-${idx}`}
-                                agentName={interaction.agent_name}
-                                messageType={interaction.message_type}
-                                content={interaction.content}
-                                toolName={interaction.tool_name}
-                                toolArguments={interaction.tool_arguments}
-                                timestamp={interaction.timestamp}
-                              />
-                            ))}
-
-                            {/* Render grouped tool executions */}
-                            {toolExecutions.length > 0 && (
-                              <ToolExecutionBlock executions={toolExecutions} />
-                            )}
+                            {elements}
                           </div>
                         );
                       })()}

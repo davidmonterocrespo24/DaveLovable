@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Wrench, Brain, CheckCircle, XCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface AgentInteractionProps {
   agentName: string;
@@ -51,6 +55,10 @@ export const AgentInteraction: React.FC<AgentInteractionProps> = ({
   const getBgColor = () => {
     switch (messageType) {
       case 'thought':
+        // Different colors for Planner vs Coder
+        if (agentName === 'Planner') {
+          return 'bg-indigo-500/10 border-indigo-500/30';
+        }
         return 'bg-blue-500/10 border-blue-500/30';
       case 'tool_call':
         return 'bg-purple-500/10 border-purple-500/30';
@@ -96,10 +104,23 @@ export const AgentInteraction: React.FC<AgentInteractionProps> = ({
       </button>
 
       {isExpanded && (
-        <div className="px-4 py-3 border-t border-border/30 bg-background/50">
-          <div className="space-y-2">
-            <div className="text-sm text-foreground whitespace-pre-wrap break-words">
-              {content}
+        <div className="px-4 py-2 border-t border-border/30 bg-background/50">
+          <div className="space-y-1">
+            <div className="text-xs prose prose-xs prose-invert max-w-none
+                          prose-headings:text-gray-100 prose-headings:text-xs prose-headings:my-1
+                          prose-p:text-gray-200 prose-p:text-xs prose-p:my-0.5 prose-p:leading-tight
+                          prose-strong:text-gray-100
+                          prose-code:text-gray-200 prose-code:text-[10px]
+                          prose-pre:bg-gray-800 prose-pre:text-gray-100 prose-pre:text-[10px] prose-pre:my-1
+                          prose-li:text-gray-200 prose-li:text-xs prose-li:my-0
+                          prose-ul:my-1 prose-ol:my-1
+                          prose-a:text-blue-400">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+              >
+                {content}
+              </ReactMarkdown>
             </div>
 
             {toolName && (

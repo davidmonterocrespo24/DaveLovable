@@ -252,11 +252,29 @@ const Editor = () => {
         {showChat && (
           <>
             <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-              <ChatPanel
-                ref={chatPanelRef}
-                projectId={Number(projectId)}
-                onCodeChange={handleCodeChange}
-              />
+              <div className="h-full relative">
+                <ChatPanel
+                  ref={chatPanelRef}
+                  projectId={Number(projectId)}
+                  onCodeChange={handleCodeChange}
+                />
+                {/* Toggle Chat Button - positioned at right edge of chat panel */}
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full z-10">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setShowChat(false)}
+                        className="p-1.5 bg-background border border-border/50 rounded-r-lg hover:bg-muted/20 transition-colors shadow-sm"
+                      >
+                        <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      Hide chat
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
           </>
@@ -265,26 +283,24 @@ const Editor = () => {
         {/* File Explorer + Editor + Preview */}
         <ResizablePanel defaultSize={showChat ? 75 : 100}>
           <div className="h-full flex flex-col">
-            {/* Toggle Chat Button */}
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10" style={{ left: showChat ? 'calc(25% - 12px)' : '0' }}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => setShowChat(!showChat)}
-                    className="p-1.5 bg-background border border-border/50 rounded-r-lg hover:bg-muted/20 transition-colors shadow-sm"
-                  >
-                    {showChat ? (
-                      <PanelLeftClose className="w-4 h-4 text-muted-foreground" />
-                    ) : (
+            {/* Toggle Chat Button - Show when chat is hidden */}
+            {!showChat && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 z-10">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => setShowChat(true)}
+                      className="p-1.5 bg-background border border-border/50 rounded-r-lg hover:bg-muted/20 transition-colors shadow-sm"
+                    >
                       <PanelLeft className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  {showChat ? 'Hide chat' : 'Show chat'}
-                </TooltipContent>
-              </Tooltip>
-            </div>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    Show chat
+                  </TooltipContent>
+                </Tooltip>
+              </div>
+            )}
 
             <ResizablePanelGroup direction="horizontal" className="flex-1">
               {/* File Explorer */}

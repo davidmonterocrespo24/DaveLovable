@@ -1,8 +1,8 @@
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Sequence
 from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.teams import RoundRobinGroupChat
+from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
-from autogen_agentchat.messages import TextMessage
+from autogen_agentchat.messages import TextMessage, BaseAgentEvent, BaseChatMessage
 from autogen_core import CancellationToken
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 from app.agents.prompts import (
@@ -12,10 +12,6 @@ from app.agents.prompts import (
     PLANNING_AGENT_SYSTEM_MESSAGE,
 )
 
-from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
-
-# Imports added for the new flow
-from autogen_agentchat.teams import SelectorGroupChat
 from app.agents.tools import (
     read_file,
     write_file,
@@ -55,10 +51,11 @@ class AgentOrchestrator:
     """Orchestrates multiple AI agents using Microsoft AutoGen 0.4"""
 
     def __init__(self):
-        # Terminate when agent says "TASK_COMPLETED" or after 50 messages
+        # Terminate when Planner says "TERMINATE" or after 50 messages
         termination_condition = TextMentionTermination(
-            "TASK_COMPLETED"
-        ) | MaxMessageTermination(25)
+            "TERMINATE"
+        ) | MaxMessageTermination(50)
+        
         self.coder_tools = [
             write_file,
             edit_file,
@@ -115,15 +112,38 @@ class AgentOrchestrator:
             name="Planner",
             description=PLANNING_AGENT_DESCRIPTION,
             system_message=PLANNING_AGENT_SYSTEM_MESSAGE,
-            model_client=self.model_client ,
+            model_client=self.model_client,
             tools=[],  # Planner has no tools, only plans
             # NO memory parameter
         )
-        # Use RoundRobinGroupChat for alternating turns between Planner and Coder
-        # This ensures Planner reviews progress after each Coder action
-        self.main_team = RoundRobinGroupChat(
+
+        def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str | None:
+            # If no messages, start with Planner
+            if not messages:
+                return "Planner"
+            
+            last_message = messages[-1]
+            
+            # If Planner just spoke, it's Coder's turn to execute the task
+            if last_message.source == "Planner":
+                return "Coder"
+                
+            # If Coder just spoke
+            if last_message.source == "Coder":
+                # Check if Coder checked off the task with SUBTASK_DONE
+                if isinstance(last_message, TextMessage) and "SUBTASK_DONE" in last_message.content:
+                    return "Planner"
+                # If just tool usage or partial response, Coder keeps going
+                return "Coder"
+                
+            return None
+
+        # Use SelectorGroupChat with custom selector
+        self.main_team = SelectorGroupChat(
             participants=[self.planning_agent, self.coder_agent],
+            model_client=self.model_client, # Required for SelectorGroupChat
             termination_condition=termination_condition,
+            selector_func=selector_func,
         )
 
     async def close(self):
