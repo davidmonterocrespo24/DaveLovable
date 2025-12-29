@@ -118,30 +118,34 @@ class AgentOrchestrator:
         )
 
         def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str | None:
-            # If no messages, start with Planner
+            # If no messages, start with Coder (Dynamic decision maker)
             if not messages:
-                return "Planner"
+                return "Coder"
             
             last_message = messages[-1]
             
-            # If Planner just spoke, it's Coder's turn to execute the task
-            if last_message.source == "Planner":
-                return "Coder"
-                
             # If Coder just spoke
             if last_message.source == "Coder":
-                # Check if Coder checked off the task with SUBTASK_DONE
+                # Check if Coder wants to delegate to Planner
+                if isinstance(last_message, TextMessage) and "DELEGATE_TO_PLANNER" in last_message.content:
+                    return "Planner"
+                # Check if Coder finished a subtask assigned by Planner
                 if isinstance(last_message, TextMessage) and "SUBTASK_DONE" in last_message.content:
                     return "Planner"
-                # If just tool usage or partial response, Coder keeps going
+                # Otherwise, Coder continues (completing simple task or multi-step execution)
+                return "Coder"
+                
+            # If Planner just spoke, it's Coder's turn to execute
+            if last_message.source == "Planner":
                 return "Coder"
                 
             return None
 
         # Use SelectorGroupChat with custom selector
+        # Participants order: Coder first (optional but good for clarity)
         self.main_team = SelectorGroupChat(
-            participants=[self.planning_agent, self.coder_agent],
-            model_client=self.model_client, # Required for SelectorGroupChat
+            participants=[self.coder_agent, self.planning_agent],
+            model_client=self.model_client,
             termination_condition=termination_condition,
             selector_func=selector_func,
         )

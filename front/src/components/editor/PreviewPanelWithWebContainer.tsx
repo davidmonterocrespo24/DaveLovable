@@ -11,7 +11,9 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Send
+  Send,
+  Copy,
+  Check
 } from 'lucide-react';
 import { loadProject } from '@/services/webcontainer';
 
@@ -36,6 +38,7 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
     const [isInitializing, setIsInitializing] = useState(true);
     const [initError, setInitError] = useState<string>('');
     const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
+    const [urlCopied, setUrlCopied] = useState(false);
 
     const deviceWidths = {
       mobile: 'max-w-[375px]',
@@ -130,6 +133,33 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
       }
     };
 
+    const handleCopyUrl = async () => {
+      if (!previewUrl) return;
+
+      try {
+        await navigator.clipboard.writeText(previewUrl);
+        setUrlCopied(true);
+        setTimeout(() => setUrlCopied(false), 2000);
+      } catch (err) {
+        console.error('Failed to copy URL:', err);
+      }
+    };
+
+    const handleFullscreen = () => {
+      if (!ref || typeof ref === 'function') return;
+
+      const element = ref.current;
+      if (!element) return;
+
+      if (!document.fullscreenElement) {
+        element.requestFullscreen().catch(err => {
+          console.error('Error attempting to enable fullscreen:', err);
+        });
+      } else {
+        document.exitFullscreen();
+      }
+    };
+
     const isLoading = externalLoading || isInitializing;
 
     return (
@@ -204,15 +234,20 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
             </button>
             <button
               disabled={!previewUrl}
-              onClick={() => previewUrl && window.open(previewUrl, '_blank')}
-              className="p-1.5 hover:bg-muted/20 rounded transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
-              title="Open in new tab"
+              onClick={handleCopyUrl}
+              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
+                urlCopied
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'hover:bg-muted/20 text-muted-foreground hover:text-foreground'
+              }`}
+              title={urlCopied ? "URL copied!" : "Copy preview URL"}
             >
-              <ExternalLink className="w-4 h-4" />
+              {urlCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
             </button>
             <button
+              onClick={handleFullscreen}
               className="p-1.5 hover:bg-muted/20 rounded transition-colors text-muted-foreground hover:text-foreground"
-              title="Fullscreen"
+              title="Toggle fullscreen"
             >
               <Maximize2 className="w-4 h-4" />
             </button>

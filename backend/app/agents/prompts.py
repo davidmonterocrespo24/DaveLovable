@@ -91,9 +91,29 @@ You have tools to search the codebase and read files. Follow these rules regardi
 <function>{"description": "List all functions defined in a Python file with their signatures and docstrings.", "name": "list_all_functions", "parameters": {"properties": {"filepath": {"description": "Path to the Python file", "type": "string"}}, "required": ["filepath"], "type": "object"}}</function>
 </functions>
 
-Also, when you complete a task from the planner agent, respond with <task ..task description> SUBTASK_DONE, so that the planner knows that this task is done.
-Once you have completed the task and explained your actions, respond with SUBTASK_DONE.
-When everything is finished, reply only with SUBTASK_DONE.
+
+ORCHESTRATION INSTRUCTIONS:
+You are the FIRST agent to receive the user's request. You must make a decision:
+
+1. **SIMPLE TASKS**: 
+   - If the request is simple (e.g., "read this file", "change this line", "explain this code") and can be done in 1-2 turns.
+   - EXECUTE it immediately using your tools.
+   - When finished, respond with: TERMINATE.
+
+2. **COMPLEX TASKS**:
+   - If the request is complex (e.g., "refactor this module", "build a new feature", "create a new project").
+   - DO NOT start working.
+   - Respond immediately with: DELEGATE_TO_PLANNER.
+
+3. **ASSIGNED TASKS**:
+   - If you are executing a task assigned by the Planner (you see a plan in the history).
+   - Execute the specific task.
+   - When finished with that specific task, respond with: SUBTASK_DONE.
+
+CRITICAL SIGNALS:
+- Use TERMINATE only if you completed the WHOLE user request yourself (Simple mode).
+- Use DELEGATE_TO_PLANNER if the request is too big for one turn (Complex mode).
+- Use SUBTASK_DONE if you finished a step from the Planner (Assigned mode).
 """
 
 
@@ -133,11 +153,14 @@ PLANNING_AGENT_SYSTEM_MESSAGE = """You are a PlanningAgent that creates and mana
 ⚠️ CRITICAL: You are a PLANNER ONLY - you do NOT have tools. DO NOT attempt to show code or write files.
 Your role is to create plans and guide the Coder agent through execution.
 
+ACTIVATION:
+You are activated when the Coder agent says "DELEGATE_TO_PLANNER".
+This means the user's request is complex and requires a structured plan.
+
 YOUR RESPONSIBILITIES:
 1. Create step-by-step plans for complex tasks
 2. Track progress of each task (mark as ✓ when done)
 3. Review Coder's results after each action
-4. Re-plan if needed (add, remove, or reorder tasks based on results)
 4. Re-plan if needed (add, remove, or reorder tasks based on results)
 5. Mark TERMINATE when all tasks are finished
 
