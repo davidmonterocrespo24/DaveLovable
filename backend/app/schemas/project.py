@@ -30,6 +30,7 @@ class ProjectInDB(ProjectBase):
     owner_id: int
     created_at: datetime
     updated_at: datetime
+    thumbnail: Optional[str] = None
 
     class Config:
         from_attributes = True

@@ -26,3 +26,6 @@ autogen-ext[openai]==0.7.5
 requests==2.32.3
 aiohttp==3.11.11
 yaml
+
+# Screenshot capture
+playwright==1.48.0

@@ -12,9 +12,9 @@ import {
   FileText,
   Camera
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { useProject } from '@/hooks/useProjects';
 import { useUpdateFile } from '@/hooks/useFiles';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -35,6 +35,7 @@ const Editor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: project, isLoading: projectLoading } = useProject(Number(projectId));
   const updateFileMutation = useUpdateFile();
 
@@ -51,6 +52,7 @@ const Editor = () => {
   const [showGitConfig, setShowGitConfig] = useState(false);
   const [currentBranch, setCurrentBranch] = useState('main');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string>('');
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
   const previewPanelRef = useRef<HTMLDivElement>(null);
 
@@ -238,8 +240,13 @@ const Editor = () => {
     setShowGitConfig(true);
   };
 
+  const handlePreviewReady = (url: string) => {
+    console.log('[Editor] Preview ready with URL:', url);
+    setPreviewUrl(url);
+  };
+
   const captureScreenshot = async (showToastOnSuccess = true) => {
-    if (!previewPanelRef.current) {
+    if (!previewUrl) {
       toast({
         title: "Preview not ready",
         description: "Please wait for the preview to load before capturing screenshot",
@@ -249,41 +256,22 @@ const Editor = () => {
     }
 
     try {
-      // Find the iframe preview element
-      const previewContainer = previewPanelRef.current;
-      const iframeWrapper = previewContainer.querySelector('.bg-white.rounded-lg');
+      console.log('[Screenshot] Sending URL to backend:', previewUrl);
 
-      if (!iframeWrapper) {
-        console.log('[Screenshot] Preview wrapper not found');
-        toast({
-          title: "Preview not found",
-          description: "Unable to capture screenshot at this time",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // Capture screenshot
-      const canvas = await html2canvas(iframeWrapper as HTMLElement, {
-        backgroundColor: '#ffffff',
-        scale: 0.5,
-        logging: false,
-        useCORS: true,
-        allowTaint: true,
-      });
-
-      // Convert to base64
-      const thumbnailData = canvas.toDataURL('image/png');
-
-      // Send to backend
+      // Send preview URL to backend for screenshot capture
       const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/thumbnail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ thumbnail: thumbnailData }),
+        body: JSON.stringify({ url: previewUrl }),
       });
 
       if (response.ok) {
         console.log('[Screenshot] Thumbnail saved successfully');
+
+        // Invalidate queries to refresh the project data
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+        queryClient.invalidateQueries({ queryKey: ['projects', 'detail', Number(projectId)] });
+
         if (showToastOnSuccess) {
           toast({
             title: "📸 Screenshot saved",
@@ -291,12 +279,15 @@ const Editor = () => {
             duration: 3000,
           });
         }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Failed to capture screenshot');
       }
     } catch (error) {
       console.error('[Screenshot] Failed to capture:', error);
       toast({
         title: "Screenshot failed",
-        description: "There was an error capturing the screenshot",
+        description: error instanceof Error ? error.message : "There was an error capturing the screenshot. Please try again.",
         variant: "destructive",
       });
     }
@@ -308,7 +299,7 @@ const Editor = () => {
 
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
     // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
-    if (!data.success || !previewPanelRef.current) return;
+    if (!data.success || !previewUrl) return;
 
     // Check if project already has a thumbnail
     if (project?.thumbnail) return;
@@ -316,7 +307,7 @@ const Editor = () => {
     try {
       // Wait a bit for the preview to be fully rendered
       await new Promise(resolve => setTimeout(resolve, 2000));
-      await captureScreenshot(true);
+      await captureScreenshot(false);
     } catch (error) {
       console.error('[Screenshot] Failed to capture:', error);
     }
@@ -512,6 +503,7 @@ const Editor = () => {
                           isLoading={isPreviewLoading}
                           onReload={handleCodeChange}
                           onReportError={handleReportError}
+                          onPreviewReady={handlePreviewReady}
                         />
                       </ResizablePanel>
                     )}

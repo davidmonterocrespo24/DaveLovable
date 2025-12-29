@@ -22,6 +22,7 @@ interface PreviewPanelProps {
   isLoading?: boolean;
   onReload?: () => void;
   onReportError?: (errorMessage: string) => void;
+  onPreviewReady?: (url: string) => void;
 }
 
 interface ConsoleLog {
@@ -31,7 +32,7 @@ interface ConsoleLog {
 }
 
 export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
-  ({ projectId, isLoading: externalLoading, onReload, onReportError }, ref) => {
+  ({ projectId, isLoading: externalLoading, onReload, onReportError, onPreviewReady }, ref) => {
     const [device, setDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const [showConsole, setShowConsole] = useState(true);
     const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -87,6 +88,11 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
         setPreviewUrl(result.url);
         addLog('log', `✓ Application ready at ${result.url}`);
         setIsInitializing(false);
+
+        // Notify parent component that preview is ready
+        if (onPreviewReady) {
+          onPreviewReady(result.url);
+        }
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setInitError(errorMsg);

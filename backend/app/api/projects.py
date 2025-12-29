@@ -15,6 +15,7 @@ from app.schemas import (
 from app.services import ProjectService
 from app.services.filesystem_service import FileSystemService
 from app.services.git_service import GitService
+from app.services.screenshot_service import ScreenshotService
 
 router = APIRouter()
 
@@ -370,14 +371,32 @@ def update_project_thumbnail(
     data: dict = Body(...),
     db: Session = Depends(get_db)
 ):
-    """Update project thumbnail/screenshot"""
+    """
+    Update project thumbnail by capturing screenshot of preview URL
+
+    Args:
+        project_id: The project ID
+        data: JSON body with 'url' field containing the preview URL to capture
+
+    Returns:
+        Success status and project_id
+    """
     # Verify project exists
     project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
 
-    thumbnail_data = data.get("thumbnail", "")
+    preview_url = data.get("url", "")
+
+    if not preview_url:
+        raise HTTPException(status_code=400, detail="Preview URL is required")
+
+    # Capture screenshot using Playwright
+    thumbnail_data = ScreenshotService.capture_screenshot_sync(preview_url)
 
     if not thumbnail_data:
-        raise HTTPException(status_code=400, detail="thumbnail data is required")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to capture screenshot. Please ensure the preview URL is accessible."
+        )
 
     # Update project thumbnail
     project.thumbnail = thumbnail_data
