@@ -1,8 +1,9 @@
 import { forwardRef, useState, useMemo } from 'react';
-import { ChevronRight, ChevronDown, File, Folder, Search, MoreHorizontal, Plus, Trash2, FilePlus } from 'lucide-react';
+import { ChevronRight, ChevronDown, File, Folder, Search, MoreHorizontal, Plus, Trash2, FilePlus, Save } from 'lucide-react';
 import { useFiles, useCreateFile, useDeleteFile } from '@/hooks/useFiles';
 import type { ProjectFile } from '@/services/api';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -201,10 +202,13 @@ interface FileExplorerProps {
   projectId: number;
   selectedFile: string;
   onSelectFile: (file: { name: string; id: number; content: string }) => void;
+  hasUnsavedChanges?: boolean;
+  onSaveFile?: () => void;
+  isSaving?: boolean;
 }
 
 export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
-  ({ projectId, selectedFile, onSelectFile }, ref) => {
+  ({ projectId, selectedFile, onSelectFile, hasUnsavedChanges = false, onSaveFile, isSaving = false }, ref) => {
     const [searchQuery, setSearchQuery] = useState('');
     const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['src', 'src/components']));
     const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -344,14 +348,40 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Explorer
           </span>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setShowCreateDialog(true)}
-          >
-            <FilePlus className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={hasUnsavedChanges ? "default" : "ghost"}
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={onSaveFile}
+                  disabled={!hasUnsavedChanges || isSaving}
+                >
+                  <Save className="w-3.5 h-3.5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {hasUnsavedChanges ? 'Save file (Ctrl+S)' : 'No changes to save'}
+              </TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setShowCreateDialog(true)}
+                >
+                  <FilePlus className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                Create new file
+              </TooltipContent>
+            </Tooltip>
+          </div>
         </div>
         
         {/* Search */}

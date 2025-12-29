@@ -9,7 +9,6 @@ import {
   PanelLeft,
   Cloud,
   Zap,
-  Save,
   FileText
 } from 'lucide-react';
 import { useProject } from '@/hooks/useProjects';
@@ -25,6 +24,7 @@ import { ChatPanel } from '@/components/editor/ChatPanel';
 import { PreviewPanel } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
 import { GitHistoryModal } from '@/components/editor/GitHistoryModal';
+import { GitConfigModal } from '@/components/editor/GitConfigModal';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -46,6 +46,9 @@ const Editor = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [tabs, setTabs] = useState<Array<{ id: string; name: string; isActive: boolean; fileId?: number }>>([]);
   const [showGitHistory, setShowGitHistory] = useState(false);
+  const [showGitConfig, setShowGitConfig] = useState(false);
+  const [currentBranch, setCurrentBranch] = useState('main');
+  const [isSyncing, setIsSyncing] = useState(false);
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
   const previewPanelRef = useRef<HTMLDivElement>(null);
 
@@ -61,6 +64,23 @@ const Editor = () => {
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Fetch current branch on mount
+  useEffect(() => {
+    const fetchBranch = async () => {
+      if (!projectId) return;
+      try {
+        const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/branch`);
+        if (response.ok) {
+          const data = await response.json();
+          setCurrentBranch(data.branch);
+        }
+      } catch (error) {
+        console.error('Error fetching branch:', error);
+      }
+    };
+    fetchBranch();
+  }, [projectId]);
 
   // Keyboard shortcut for saving (Ctrl+S)
   useEffect(() => {
@@ -167,6 +187,55 @@ const Editor = () => {
     setShowGitHistory(true);
   };
 
+  const handleGitSync = async () => {
+    if (!projectId) return;
+
+    setIsSyncing(true);
+    try {
+      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/sync`, {
+        method: 'POST',
+      });
+
+      if (!response.ok) throw new Error('Sync failed');
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "✅ Sync completed",
+          description: (
+            <div className="text-xs space-y-1">
+              <div>{data.fetch}</div>
+              <div>{data.pull}</div>
+              <div>{data.commit}</div>
+              <div>{data.push}</div>
+            </div>
+          ),
+          duration: 5000,
+        });
+      } else {
+        toast({
+          title: "⚠️ Sync incomplete",
+          description: data.message,
+          variant: "destructive",
+          duration: 5000,
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error syncing",
+        description: "Failed to sync with remote repository",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleGitConfig = () => {
+    setShowGitConfig(true);
+  };
+
   if (projectLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -215,26 +284,6 @@ const Editor = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant={hasUnsavedChanges ? "default" : "ghost"}
-                size="sm"
-                className="gap-2"
-                onClick={handleSaveFile}
-                disabled={!hasUnsavedChanges || updateFileMutation.isPending}
-              >
-                <Save className="w-4 h-4" />
-                <span className="hidden sm:inline">
-                  {updateFileMutation.isPending ? 'Saving...' : hasUnsavedChanges ? 'Save*' : 'Saved'}
-                </span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              {hasUnsavedChanges ? 'Save changes (Ctrl+S)' : 'No changes to save'}
-            </TooltipContent>
-          </Tooltip>
-
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/20 rounded-lg border border-border/30">
             <Cloud className="w-4 h-4 text-primary" />
             <span className="text-xs font-medium">Cloud</span>
@@ -316,6 +365,9 @@ const Editor = () => {
                       projectId={Number(projectId)}
                       selectedFile={selectedFile?.name || ''}
                       onSelectFile={handleFileSelect}
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      onSaveFile={handleSaveFile}
+                      isSaving={updateFileMutation.isPending}
                     />
                   </ResizablePanel>
                   <ResizableHandle />
@@ -333,6 +385,10 @@ const Editor = () => {
                     onTabSelect={handleTabSelect}
                     onRunProject={handleRunProject}
                     onShowGitHistory={handleShowGitHistory}
+                    currentBranch={currentBranch}
+                    onGitSync={handleGitSync}
+                    onGitConfig={handleGitConfig}
+                    isSyncing={isSyncing}
                   />
 
                   <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -391,6 +447,13 @@ const Editor = () => {
         projectId={Number(projectId)}
         isOpen={showGitHistory}
         onClose={() => setShowGitHistory(false)}
+      />
+
+      {/* Git Config Modal */}
+      <GitConfigModal
+        projectId={Number(projectId)}
+        isOpen={showGitConfig}
+        onClose={() => setShowGitConfig(false)}
       />
     </div>
   );
