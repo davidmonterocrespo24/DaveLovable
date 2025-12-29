@@ -425,6 +425,9 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 logger.info("🤖 STARTING MULTI-AGENT TEAM EXECUTION (STREAMING)")
                 logger.info("="*80)
 
+                # List to collect all agent interactions for database storage
+                agent_interactions = []
+
                 # Stream agent events in real-time
                 async for message in orchestrator.main_team.run_stream(
                     task=task_description,
@@ -439,16 +442,20 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     # TextMessage - Agent thoughts/responses
                     if event_type == "TextMessage":
                         if msg_source != "user" and "TASK_COMPLETED" not in message.content:
+                            interaction_data = {
+                                "agent_name": msg_source,
+                                "message_type": "thought",
+                                "content": message.content,
+                                "tool_name": None,
+                                "tool_arguments": None,
+                                "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                            }
+                            # Add to list for database storage
+                            agent_interactions.append(interaction_data)
+                            # Stream to frontend
                             yield {
                                 "type": "agent_interaction",
-                                "data": {
-                                    "agent_name": msg_source,
-                                    "message_type": "thought",
-                                    "content": message.content,
-                                    "tool_name": None,
-                                    "tool_arguments": None,
-                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
-                                }
+                                "data": interaction_data
                             }
 
                     # ToolCallRequestEvent - Tool calls
@@ -461,31 +468,39 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             except:
                                 tool_args = {"raw": str(tool_call.arguments)}
 
+                            interaction_data = {
+                                "agent_name": msg_source,
+                                "message_type": "tool_call",
+                                "content": f"Calling: {tool_call.name}",
+                                "tool_name": tool_call.name,
+                                "tool_arguments": tool_args,
+                                "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                            }
+                            # Add to list for database storage
+                            agent_interactions.append(interaction_data)
+                            # Stream to frontend
                             yield {
                                 "type": "agent_interaction",
-                                "data": {
-                                    "agent_name": msg_source,
-                                    "message_type": "tool_call",
-                                    "content": f"Calling: {tool_call.name}",
-                                    "tool_name": tool_call.name,
-                                    "tool_arguments": tool_args,
-                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
-                                }
+                                "data": interaction_data
                             }
 
                     # ToolCallExecutionEvent - Tool results
                     elif event_type == "ToolCallExecutionEvent":
                         for tool_result in message.content:
+                            interaction_data = {
+                                "agent_name": "System",
+                                "message_type": "tool_response",
+                                "content": str(tool_result.content),
+                                "tool_name": tool_result.name,
+                                "tool_arguments": None,
+                                "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
+                            }
+                            # Add to list for database storage
+                            agent_interactions.append(interaction_data)
+                            # Stream to frontend
                             yield {
                                 "type": "agent_interaction",
-                                "data": {
-                                    "agent_name": "System",
-                                    "message_type": "tool_response",
-                                    "content": str(tool_result.content),
-                                    "tool_name": tool_result.name,
-                                    "tool_arguments": None,
-                                    "timestamp": msg_timestamp.isoformat() if hasattr(msg_timestamp, 'isoformat') else str(msg_timestamp)
-                                }
+                                "data": interaction_data
                             }
 
                     # TaskResult - Final
@@ -510,14 +525,16 @@ Please analyze the request, create a plan if needed, and implement the solution.
             else:
                 response_content = "I processed your request successfully."
 
-            # Save assistant message
+            # Save assistant message with agent_interactions in metadata
+            import json
             assistant_message = ChatService.add_message(
                 db,
                 ChatMessageCreate(
                     session_id=session.id,
                     role=MessageRole.ASSISTANT,
                     content=response_content,
-                    agent_name=agent_name
+                    agent_name=agent_name,
+                    message_metadata=json.dumps({"agent_interactions": agent_interactions})
                 )
             )
 

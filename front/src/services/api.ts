@@ -24,12 +24,22 @@ export interface ProjectFile {
   updated_at: string;
 }
 
+export interface AgentInteraction {
+  agent_name: string;
+  message_type: 'thought' | 'tool_call' | 'tool_response';
+  content: string;
+  tool_name?: string;
+  tool_arguments?: Record<string, any>;
+  timestamp: string;
+}
+
 export interface ChatMessage {
   id: number;
   session_id: number;
   role: 'user' | 'assistant';
   content: string;
   message_metadata?: string;
+  agent_interactions?: AgentInteraction[];
   created_at: string;
 }
 
@@ -64,15 +74,6 @@ export interface UpdateFileRequest {
 export interface SendChatMessageRequest {
   message: string;
   session_id?: number;
-}
-
-export interface AgentInteraction {
-  agent_name: string;
-  message_type: 'thought' | 'tool_call' | 'tool_response';
-  content: string;
-  tool_name?: string;
-  tool_arguments?: Record<string, any>;
-  timestamp: string;
 }
 
 export interface SendChatMessageResponse {

@@ -81,18 +81,19 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       scrollToBottom();
     }, [messages]);
 
-    // Load messages from session
+    // Load messages from session (only on initial load, not during streaming)
     useEffect(() => {
-      if (session?.messages) {
+      if (session?.messages && !isStreaming) {
         const loadedMessages: Message[] = session.messages.map((msg) => ({
           id: msg.id.toString(),
           role: msg.role,
           content: msg.content,
           timestamp: new Date(msg.created_at),
+          agent_interactions: msg.agent_interactions || [],
         }));
         setMessages([...initialMessages, ...loadedMessages]);
       }
-    }, [session]);
+    }, [session, isStreaming]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -105,19 +106,18 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const handleSend = async () => {
       if (!input.trim() || isStreaming) return;
 
-      const userMessage: Message = {
-        id: Date.now().toString(),
-        role: 'user',
-        content: input,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, userMessage]);
       const messageContent = input;
       setInput('');
       setIsStreaming(true);
 
-      // Add a placeholder message for streaming
+      // Create both messages at once to avoid race conditions
+      const userMessage: Message = {
+        id: Date.now().toString(),
+        role: 'user',
+        content: messageContent,
+        timestamp: new Date(),
+      };
+
       const streamingMessageId = (Date.now() + 1).toString();
       const streamingMessage: Message = {
         id: streamingMessageId,
@@ -126,7 +126,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
         timestamp: new Date(),
         agent_interactions: [],
       };
-      setMessages((prev) => [...prev, streamingMessage]);
+
+      console.log('[ChatPanel] Creating messages:', {
+        userMessage,
+        streamingMessage,
+        streamingMessageId
+      });
+
+      // Add both messages in a single state update
+      setMessages((prev) => {
+        console.log('[ChatPanel] Before adding messages, count:', prev.length);
+        const updated = [...prev, userMessage, streamingMessage];
+        console.log('[ChatPanel] After adding messages, count:', updated.length);
+        console.log('[ChatPanel] New messages:', updated);
+        return updated;
+      });
 
       try {
         await chatApi.sendMessageStream(
@@ -293,44 +307,46 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                       )}
 
                       {/* Final Response */}
-                      <div className="prose prose-sm prose-invert max-w-none markdown-content">
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={[rehypeHighlight]}
-                          components={{
-                            code: ({node, inline, className, children, ...props}: any) => {
-                              return !inline ? (
-                                <code className={className} {...props}>
+                      {message.content && (
+                        <div className="prose prose-sm prose-invert max-w-none markdown-content">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              code: ({node, inline, className, children, ...props}: any) => {
+                                return !inline ? (
+                                  <code className={className} {...props}>
+                                    {children}
+                                  </code>
+                                ) : (
+                                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                    {children}
+                                  </code>
+                                );
+                              },
+                              pre: ({children, ...props}: any) => (
+                                <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
                                   {children}
-                                </code>
-                              ) : (
-                                <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
-                                  {children}
-                                </code>
-                              );
-                            },
-                            pre: ({children, ...props}: any) => (
-                              <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
-                                {children}
-                              </pre>
-                            ),
-                            p: ({children, ...props}: any) => (
-                              <p className="mb-2 last:mb-0" {...props}>{children}</p>
-                            ),
-                            ul: ({children, ...props}: any) => (
-                              <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
-                            ),
-                            ol: ({children, ...props}: any) => (
-                              <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
-                            ),
-                            li: ({children, ...props}: any) => (
-                              <li className="mb-1" {...props}>{children}</li>
-                            ),
-                          }}
-                        >
-                          {message.content}
-                        </ReactMarkdown>
-                      </div>
+                                </pre>
+                              ),
+                              p: ({children, ...props}: any) => (
+                                <p className="mb-2 last:mb-0" {...props}>{children}</p>
+                              ),
+                              ul: ({children, ...props}: any) => (
+                                <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
+                              ),
+                              ol: ({children, ...props}: any) => (
+                                <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
+                              ),
+                              li: ({children, ...props}: any) => (
+                                <li className="mb-1" {...props}>{children}</li>
+                              ),
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      )}
                     </>
                   ) : (
                     message.content

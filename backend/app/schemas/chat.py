@@ -21,7 +21,31 @@ class ChatMessageInDB(ChatMessageBase):
         from_attributes = True
 
 class ChatMessage(ChatMessageInDB):
-    pass
+    agent_interactions: Optional[List[dict]] = None
+
+    @classmethod
+    def from_db_message(cls, db_message):
+        """Convert database message to ChatMessage with parsed agent_interactions"""
+        import json
+        agent_interactions = None
+
+        if db_message.message_metadata:
+            try:
+                metadata = json.loads(db_message.message_metadata)
+                agent_interactions = metadata.get("agent_interactions", None)
+            except:
+                pass
+
+        return cls(
+            id=db_message.id,
+            session_id=db_message.session_id,
+            role=db_message.role,
+            content=db_message.content,
+            agent_name=db_message.agent_name,
+            message_metadata=db_message.message_metadata,
+            created_at=db_message.created_at,
+            agent_interactions=agent_interactions
+        )
 
 class ChatSessionBase(BaseModel):
     title: Optional[str] = "New Chat"

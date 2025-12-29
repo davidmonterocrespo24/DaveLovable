@@ -102,8 +102,13 @@ def get_chat_session(
     db: Session = Depends(get_db)
 ):
     """Get a specific chat session with all messages"""
+    from app.schemas.chat import ChatMessage as ChatMessageSchema
+
     session = ChatService.get_session(db, session_id, project_id)
-    messages = ChatService.get_messages(db, session_id)
+    db_messages = ChatService.get_messages(db, session_id)
+
+    # Parse agent_interactions from message_metadata for each message
+    messages = [ChatMessageSchema.from_db_message(msg) for msg in db_messages]
 
     return {
         "id": session.id,
