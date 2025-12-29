@@ -362,3 +362,30 @@ def sync_with_remote(
         "project_id": project_id,
         **result
     }
+
+
+@router.post("/{project_id}/thumbnail")
+def update_project_thumbnail(
+    project_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """Update project thumbnail/screenshot"""
+    # Verify project exists
+    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    thumbnail_data = data.get("thumbnail", "")
+
+    if not thumbnail_data:
+        raise HTTPException(status_code=400, detail="thumbnail data is required")
+
+    # Update project thumbnail
+    project.thumbnail = thumbnail_data
+    db.commit()
+    db.refresh(project)
+
+    return {
+        "success": True,
+        "message": "Thumbnail updated successfully",
+        "project_id": project_id
+    }

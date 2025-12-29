@@ -41,6 +41,7 @@ interface ChatPanelProps {
   projectId: number;
   sessionId?: number;
   onCodeChange?: () => void;
+  onGitCommit?: (data: { success: boolean; error?: string; message?: string }) => void;
 }
 
 export interface ChatPanelRef {
@@ -48,7 +49,7 @@ export interface ChatPanelRef {
 }
 
 export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
-  ({ projectId, sessionId, onCodeChange }, ref) => {
+  ({ projectId, sessionId, onCodeChange, onGitCommit }, ref) => {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
@@ -211,6 +212,11 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   variant: "destructive",
                   duration: 5000,
                 });
+              }
+
+              // Call parent callback for screenshot capture
+              if (onGitCommit) {
+                onGitCommit(data);
               }
             },
             onComplete: (data) => {
