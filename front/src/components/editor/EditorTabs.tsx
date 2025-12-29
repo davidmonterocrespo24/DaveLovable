@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { X, Code, Eye, GitBranch, Play } from 'lucide-react';
+import { X, Code, Eye, GitBranch, Play, RefreshCw, Settings } from 'lucide-react';
 
 interface Tab {
   id: string;
@@ -15,10 +15,14 @@ interface EditorTabsProps {
   onTabSelect: (id: string) => void;
   onRunProject?: () => void;
   onShowGitHistory?: () => void;
+  currentBranch?: string;
+  onGitSync?: () => void;
+  onGitConfig?: () => void;
+  isSyncing?: boolean;
 }
 
 export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
-  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect, onRunProject, onShowGitHistory }, ref) => {
+  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect, onRunProject, onShowGitHistory, currentBranch = 'main', onGitSync, onGitConfig, isSyncing = false }, ref) => {
     return (
       <div ref={ref} className="flex items-center justify-between bg-background/80 border-b border-border/50 px-2">
         {/* File Tabs */}
@@ -88,13 +92,41 @@ export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
 
           <div className="w-px h-6 bg-border/50" />
 
-          <button
-            onClick={onShowGitHistory}
-            className="p-1.5 hover:bg-muted/20 rounded transition-colors text-muted-foreground hover:text-foreground"
-            title="Git history"
-          >
-            <GitBranch className="w-4 h-4" />
-          </button>
+          {/* Git Section */}
+          <div className="flex items-center gap-1.5 bg-muted/20 rounded-lg px-2 py-1 border border-border/30">
+            <GitBranch className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-xs font-medium text-foreground">{currentBranch}</span>
+
+            <div className="w-px h-4 bg-border/50 mx-1" />
+
+            <button
+              onClick={onShowGitHistory}
+              className="p-1 hover:bg-muted/30 rounded transition-colors text-muted-foreground hover:text-foreground"
+              title="Git history"
+            >
+              <GitBranch className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              onClick={onGitSync}
+              disabled={isSyncing}
+              className="p-1 hover:bg-muted/30 rounded transition-colors text-muted-foreground hover:text-foreground disabled:opacity-50"
+              title="Sync with remote (fetch, pull, commit, push)"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+            </button>
+
+            <button
+              onClick={onGitConfig}
+              className="p-1 hover:bg-muted/30 rounded transition-colors text-muted-foreground hover:text-foreground"
+              title="Configure remote repository"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="w-px h-6 bg-border/50" />
+
           <button
             onClick={onRunProject}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700

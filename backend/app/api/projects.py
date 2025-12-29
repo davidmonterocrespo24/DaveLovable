@@ -281,3 +281,84 @@ def restore_to_commit(
         "project_id": project_id,
         "commit_hash": commit_hash
     }
+
+
+@router.get("/{project_id}/git/branch")
+def get_current_branch(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get current Git branch for a project"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    branch = GitService.get_current_branch(project_id)
+
+    return {
+        "project_id": project_id,
+        "branch": branch
+    }
+
+
+@router.get("/{project_id}/git/config")
+def get_git_config(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """Get Git remote configuration for a project"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    config = GitService.get_remote_config(project_id)
+
+    return {
+        "project_id": project_id,
+        **config
+    }
+
+
+@router.post("/{project_id}/git/config")
+def set_git_config(
+    project_id: int,
+    config: dict,
+    db: Session = Depends(get_db)
+):
+    """Set or update Git remote configuration for a project"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    remote_url = config.get("remote_url", "")
+    remote_name = config.get("remote_name", "origin")
+
+    if not remote_url:
+        raise HTTPException(status_code=400, detail="remote_url is required")
+
+    success = GitService.set_remote_config(project_id, remote_url, remote_name)
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to set remote configuration")
+
+    return {
+        "success": True,
+        "message": f"Remote '{remote_name}' configured successfully",
+        "project_id": project_id,
+        "remote_name": remote_name,
+        "remote_url": remote_url
+    }
+
+
+@router.post("/{project_id}/git/sync")
+def sync_with_remote(
+    project_id: int,
+    db: Session = Depends(get_db)
+):
+    """Sync project with remote repository (fetch, pull, commit, push)"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    result = GitService.sync_with_remote(project_id)
+
+    return {
+        "project_id": project_id,
+        **result
+    }

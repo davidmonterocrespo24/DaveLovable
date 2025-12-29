@@ -3,24 +3,45 @@ import { useProjects, useCreateProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Plus, Folder, Calendar } from 'lucide-react';
 import { useState } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const Projects = () => {
   const { data: projects, isLoading } = useProjects();
   const createProject = useCreateProject();
-  const [creating, setCreating] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [projectName, setProjectName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
 
   const handleCreateProject = async () => {
-    setCreating(true);
+    if (!projectName.trim()) {
+      return;
+    }
+
     try {
       await createProject.mutateAsync({
-        name: `New Project ${new Date().toLocaleDateString()}`,
-        description: 'A new project created from the dashboard',
+        name: projectName,
+        description: projectDescription || 'A new project',
       });
+      setShowCreateDialog(false);
+      setProjectName('');
+      setProjectDescription('');
     } catch (error) {
       console.error('Failed to create project:', error);
-    } finally {
-      setCreating(false);
     }
+  };
+
+  const openCreateDialog = () => {
+    setShowCreateDialog(true);
   };
 
   if (isLoading) {
