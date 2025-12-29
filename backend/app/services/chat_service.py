@@ -433,6 +433,43 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 # List to collect all agent interactions for database storage
                 agent_interactions = []
 
+                # Track assistant message for incremental updates
+                assistant_message_id = None
+
+                # Helper function to save state incrementally
+                async def save_incremental_state():
+                    """Save agent interactions and state to database incrementally"""
+                    nonlocal assistant_message_id
+                    try:
+                        # Update or create assistant message with current interactions
+                        if assistant_message_id:
+                            # Update existing message
+                            db_message = db.query(ChatMessage).filter(ChatMessage.id == assistant_message_id).first()
+                            if db_message:
+                                db_message.message_metadata = json.dumps({"agent_interactions": agent_interactions})
+                                db.commit()
+                                logger.info(f"💾 Updated message {assistant_message_id} with {len(agent_interactions)} interactions")
+                        else:
+                            # Create initial assistant message
+                            new_message = ChatService.add_message(
+                                db,
+                                ChatMessageCreate(
+                                    session_id=session.id,
+                                    role=MessageRole.ASSISTANT,
+                                    content="Processing...",
+                                    agent_name="Team",
+                                    message_metadata=json.dumps({"agent_interactions": agent_interactions})
+                                )
+                            )
+                            assistant_message_id = new_message.id
+                            logger.info(f"💾 Created assistant message {assistant_message_id}")
+
+                        # Save agent state
+                        await orchestrator.save_state(project_id)
+                        logger.info(f"💾 Saved agent state for project {project_id}")
+                    except Exception as e:
+                        logger.error(f"❌ Error saving incremental state: {e}")
+
                 # Stream agent events in real-time
                 async for message in orchestrator.main_team.run_stream(
                     task=task_description,
@@ -462,6 +499,9 @@ Please analyze the request, create a plan if needed, and implement the solution.
                                 "type": "agent_interaction",
                                 "data": interaction_data
                             }
+                            # Save state incrementally every 3 interactions
+                            if len(agent_interactions) % 3 == 0:
+                                await save_incremental_state()
 
                     # ToolCallRequestEvent - Tool calls
                     elif event_type == "ToolCallRequestEvent":
@@ -507,6 +547,8 @@ Please analyze the request, create a plan if needed, and implement the solution.
                                 "type": "agent_interaction",
                                 "data": interaction_data
                             }
+                        # Save state after every tool execution
+                        await save_incremental_state()
 
                     # TaskResult - Final
                     elif event_type == "TaskResult":
@@ -530,20 +572,33 @@ Please analyze the request, create a plan if needed, and implement the solution.
             else:
                 response_content = "I processed your request successfully."
 
-            # Save assistant message with agent_interactions in metadata
-            import json
-            assistant_message = ChatService.add_message(
-                db,
-                ChatMessageCreate(
-                    session_id=session.id,
-                    role=MessageRole.ASSISTANT,
-                    content=response_content,
-                    agent_name=agent_name,
-                    message_metadata=json.dumps({"agent_interactions": agent_interactions})
+            # Update final assistant message with completion status
+            if assistant_message_id:
+                # Update existing message with final content
+                db_message = db.query(ChatMessage).filter(ChatMessage.id == assistant_message_id).first()
+                if db_message:
+                    db_message.content = response_content
+                    db_message.agent_name = agent_name
+                    db_message.message_metadata = json.dumps({"agent_interactions": agent_interactions})
+                    db.commit()
+                    db.refresh(db_message)
+                    assistant_message = db_message
+                    logger.info(f"✅ Updated final message {assistant_message_id}")
+            else:
+                # Create message if it wasn't created incrementally
+                import json
+                assistant_message = ChatService.add_message(
+                    db,
+                    ChatMessageCreate(
+                        session_id=session.id,
+                        role=MessageRole.ASSISTANT,
+                        content=response_content,
+                        agent_name=agent_name,
+                        message_metadata=json.dumps({"agent_interactions": agent_interactions})
+                    )
                 )
-            )
 
-            # Save agent state to disk for future sessions
+            # Final save of agent state
             await orchestrator.save_state(project_id)
 
             # Yield final completion event
