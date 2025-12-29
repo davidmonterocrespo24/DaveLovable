@@ -23,6 +23,7 @@ class Project(Base):
     # Project configuration
     template = Column(String, default="react-vite")
     framework = Column(String, default="react")
+    thumbnail = Column(Text, nullable=True)  # Base64 encoded screenshot
 
     # Relationships
     owner = relationship("User", back_populates="projects")

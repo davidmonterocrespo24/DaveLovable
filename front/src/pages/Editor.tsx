@@ -9,8 +9,10 @@ import {
   PanelLeft,
   Cloud,
   Zap,
-  FileText
+  FileText,
+  Camera
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { useProject } from '@/hooks/useProjects';
 import { useUpdateFile } from '@/hooks/useFiles';
 import {
@@ -236,6 +238,90 @@ const Editor = () => {
     setShowGitConfig(true);
   };
 
+  const captureScreenshot = async (showToastOnSuccess = true) => {
+    if (!previewPanelRef.current) {
+      toast({
+        title: "Preview not ready",
+        description: "Please wait for the preview to load before capturing screenshot",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Find the iframe preview element
+      const previewContainer = previewPanelRef.current;
+      const iframeWrapper = previewContainer.querySelector('.bg-white.rounded-lg');
+
+      if (!iframeWrapper) {
+        console.log('[Screenshot] Preview wrapper not found');
+        toast({
+          title: "Preview not found",
+          description: "Unable to capture screenshot at this time",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Capture screenshot
+      const canvas = await html2canvas(iframeWrapper as HTMLElement, {
+        backgroundColor: '#ffffff',
+        scale: 0.5,
+        logging: false,
+        useCORS: true,
+        allowTaint: true,
+      });
+
+      // Convert to base64
+      const thumbnailData = canvas.toDataURL('image/png');
+
+      // Send to backend
+      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/thumbnail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ thumbnail: thumbnailData }),
+      });
+
+      if (response.ok) {
+        console.log('[Screenshot] Thumbnail saved successfully');
+        if (showToastOnSuccess) {
+          toast({
+            title: "📸 Screenshot saved",
+            description: "Project thumbnail has been captured",
+            duration: 3000,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('[Screenshot] Failed to capture:', error);
+      toast({
+        title: "Screenshot failed",
+        description: "There was an error capturing the screenshot",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleManualScreenshot = () => {
+    captureScreenshot(true);
+  };
+
+  const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
+    // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
+    if (!data.success || !previewPanelRef.current) return;
+
+    // Check if project already has a thumbnail
+    if (project?.thumbnail) return;
+
+    try {
+      // Wait a bit for the preview to be fully rendered
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      await captureScreenshot(true);
+    } catch (error) {
+      console.error('[Screenshot] Failed to capture:', error);
+    }
+  };
+
   if (projectLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -289,6 +375,17 @@ const Editor = () => {
             <span className="text-xs font-medium">Cloud</span>
           </div>
 
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={handleManualScreenshot}>
+                <Camera className="w-4 h-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Capture project thumbnail
+            </TooltipContent>
+          </Tooltip>
+
           <Button variant="ghost" size="icon">
             <Settings className="w-4 h-4" />
           </Button>
@@ -311,6 +408,7 @@ const Editor = () => {
                   ref={chatPanelRef}
                   projectId={Number(projectId)}
                   onCodeChange={handleCodeChange}
+                  onGitCommit={handleGitCommit}
                 />
                 {/* Toggle Chat Button - positioned at right edge of chat panel */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full z-10">
