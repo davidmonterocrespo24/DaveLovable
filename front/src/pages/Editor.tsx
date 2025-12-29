@@ -9,7 +9,6 @@ import {
   PanelLeft,
   Cloud,
   Zap,
-  History,
   Save,
   FileText
 } from 'lucide-react';
@@ -25,6 +24,7 @@ import { CodeEditor } from '@/components/editor/CodeEditor';
 import { ChatPanel } from '@/components/editor/ChatPanel';
 import { PreviewPanel } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
+import { GitHistoryModal } from '@/components/editor/GitHistoryModal';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
@@ -45,7 +45,9 @@ const Editor = () => {
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
   const [tabs, setTabs] = useState<Array<{ id: string; name: string; isActive: boolean; fileId?: number }>>([]);
+  const [showGitHistory, setShowGitHistory] = useState(false);
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
+  const previewPanelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!projectId || isNaN(Number(projectId))) {
@@ -152,6 +154,19 @@ const Editor = () => {
     }
   };
 
+  const handleRunProject = () => {
+    // Trigger a reload of the preview to run the project
+    handleCodeChange();
+    toast({
+      title: "Running project",
+      description: "Reloading preview to run the latest code...",
+    });
+  };
+
+  const handleShowGitHistory = () => {
+    setShowGitHistory(true);
+  };
+
   if (projectLoading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -218,16 +233,6 @@ const Editor = () => {
             <TooltipContent>
               {hasUnsavedChanges ? 'Save changes (Ctrl+S)' : 'No changes to save'}
             </TooltipContent>
-          </Tooltip>
-
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <History className="w-4 h-4" />
-                <span className="hidden sm:inline">History</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>View version history</TooltipContent>
           </Tooltip>
 
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/20 rounded-lg border border-border/30">
@@ -326,6 +331,8 @@ const Editor = () => {
                     tabs={tabs}
                     onTabClose={handleTabClose}
                     onTabSelect={handleTabSelect}
+                    onRunProject={handleRunProject}
+                    onShowGitHistory={handleShowGitHistory}
                   />
 
                   <ResizablePanelGroup direction="horizontal" className="flex-1">
@@ -346,6 +353,7 @@ const Editor = () => {
                     {(activeView === 'preview' || activeView === 'split') && (
                       <ResizablePanel defaultSize={activeView === 'split' ? 50 : 100}>
                         <PreviewPanel
+                          ref={previewPanelRef}
                           projectId={Number(projectId)}
                           isLoading={isPreviewLoading}
                           onReload={handleCodeChange}
@@ -377,6 +385,13 @@ const Editor = () => {
           <span>Spaces: 2</span>
         </div>
       </footer>
+
+      {/* Git History Modal */}
+      <GitHistoryModal
+        projectId={Number(projectId)}
+        isOpen={showGitHistory}
+        onClose={() => setShowGitHistory(false)}
+      />
     </div>
   );
 };

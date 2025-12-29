@@ -208,7 +208,7 @@ export const fileApi = {
 
 // SSE Event types
 export interface SSEEvent {
-  type: 'start' | 'agent_interaction' | 'complete' | 'error';
+  type: 'start' | 'agent_interaction' | 'complete' | 'error' | 'git_commit';
   data: any;
 }
 
@@ -221,6 +221,7 @@ export const chatApi = {
     callbacks: {
       onStart?: (data: { session_id: number; user_message_id: number }) => void;
       onAgentInteraction?: (interaction: AgentInteraction) => void;
+      onGitCommit?: (data: { success: boolean; message?: string; full_message?: string; error?: string }) => void;
       onComplete?: (data: SendChatMessageResponse) => void;
       onError?: (error: string) => void;
     }
@@ -289,6 +290,10 @@ export const chatApi = {
                     case 'agent_interaction':
                       console.log('[SSE] Agent interaction:', event.data.message_type, event.data.agent_name);
                       callbacks.onAgentInteraction?.(event.data);
+                      break;
+                    case 'git_commit':
+                      console.log('[SSE] Git commit event:', event.data);
+                      callbacks.onGitCommit?.(event.data);
                       break;
                     case 'complete':
                       console.log('[SSE] Complete event');

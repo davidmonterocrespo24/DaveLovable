@@ -13,10 +13,12 @@ interface EditorTabsProps {
   tabs: Tab[];
   onTabClose: (id: string) => void;
   onTabSelect: (id: string) => void;
+  onRunProject?: () => void;
+  onShowGitHistory?: () => void;
 }
 
 export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
-  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect }, ref) => {
+  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect, onRunProject, onShowGitHistory }, ref) => {
     return (
       <div ref={ref} className="flex items-center justify-between bg-background/80 border-b border-border/50 px-2">
         {/* File Tabs */}
@@ -86,11 +88,19 @@ export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
 
           <div className="w-px h-6 bg-border/50" />
 
-          <button className="p-1.5 hover:bg-muted/20 rounded transition-colors text-muted-foreground hover:text-foreground">
+          <button
+            onClick={onShowGitHistory}
+            className="p-1.5 hover:bg-muted/20 rounded transition-colors text-muted-foreground hover:text-foreground"
+            title="Git history"
+          >
             <GitBranch className="w-4 h-4" />
           </button>
-          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 
-                           text-white text-xs font-medium rounded-lg transition-colors">
+          <button
+            onClick={onRunProject}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700
+                           text-white text-xs font-medium rounded-lg transition-colors"
+            title="Run project"
+          >
             <Play className="w-3.5 h-3.5" />
             Run
           </button>

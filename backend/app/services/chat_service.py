@@ -4,6 +4,8 @@ from app.models import ChatSession, ChatMessage, MessageRole, ProjectFile
 from app.schemas import ChatSessionCreate, ChatMessageCreate, ChatRequest
 from app.agents import get_orchestrator
 from app.services.filesystem_service import FileSystemService
+from app.services.git_service import GitService
+from app.services.commit_message_service import CommitMessageService
 from fastapi import HTTPException, status
 from autogen_core import CancellationToken
 from datetime import datetime
@@ -600,6 +602,56 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
             # Final save of agent state
             await orchestrator.save_state(project_id)
+
+            # AUTO-COMMIT: Create Git commit with AI-generated message
+            try:
+                logger.info("🔄 Creating automatic Git commit...")
+
+                # Get the git diff to see what changed
+                diff_output = GitService.get_diff(project_id)
+
+                if diff_output and diff_output.strip():
+                    # Generate commit message using LLM
+                    commit_info = await CommitMessageService.generate_commit_message(
+                        diff=diff_output,
+                        user_request=chat_request.message
+                    )
+
+                    # Combine title and body for full commit message
+                    full_commit_message = f"{commit_info['title']}\n\n{commit_info['body']}"
+
+                    # Create the commit
+                    commit_success = GitService.commit_changes(
+                        project_id=project_id,
+                        message=full_commit_message,
+                        files=None  # Commit all changes
+                    )
+
+                    if commit_success:
+                        logger.info(f"✅ Git commit created: {commit_info['title']}")
+                        # Yield commit event to frontend
+                        yield {
+                            "type": "git_commit",
+                            "data": {
+                                "success": True,
+                                "message": commit_info['title'],
+                                "full_message": full_commit_message
+                            }
+                        }
+                    else:
+                        logger.warning("⚠️  Git commit failed or no changes to commit")
+                else:
+                    logger.info("ℹ️  No changes detected for Git commit")
+            except Exception as e:
+                logger.error(f"❌ Error creating auto-commit: {e}")
+                # Don't fail the whole request if commit fails
+                yield {
+                    "type": "git_commit",
+                    "data": {
+                        "success": False,
+                        "error": str(e)
+                    }
+                }
 
             # Yield final completion event
             yield {

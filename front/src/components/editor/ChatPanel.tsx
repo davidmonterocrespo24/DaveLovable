@@ -9,6 +9,7 @@ import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import { AgentInteraction } from './AgentInteraction';
 import { ToolExecutionBlock } from './ToolExecutionBlock';
+import { useToast } from '@/hooks/use-toast';
 
 interface AgentInteractionData {
   agent_name: string;
@@ -55,6 +56,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const { toast } = useToast();
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -193,6 +195,23 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 console.log('[ChatPanel] Updated messages:', updated);
                 return updated;
               });
+            },
+            onGitCommit: (data) => {
+              console.log('[ChatPanel] Git commit event:', data);
+              if (data.success) {
+                toast({
+                  title: "✅ Changes committed",
+                  description: data.message || "Your changes have been saved to Git history",
+                  duration: 5000,
+                });
+              } else if (data.error) {
+                toast({
+                  title: "⚠️ Commit failed",
+                  description: data.error,
+                  variant: "destructive",
+                  duration: 5000,
+                });
+              }
             },
             onComplete: (data) => {
               // Update the streaming message with the final response
