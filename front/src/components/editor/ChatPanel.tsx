@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import { AgentInteraction } from './AgentInteraction';
+import { ToolExecutionBlock } from './ToolExecutionBlock';
 
 interface AgentInteractionData {
   agent_name: string;
@@ -287,24 +288,65 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   {message.role === 'assistant' ? (
                     <>
                       {/* Agent Interactions */}
-                      {message.agent_interactions && message.agent_interactions.length > 0 && (
-                        <div className="space-y-2 mb-3">
-                          <div className="text-xs font-semibold text-muted-foreground mb-2">
-                            Agent Activity:
+                      {message.agent_interactions && message.agent_interactions.length > 0 && (() => {
+                        // Group tool calls and responses together
+                        const thoughts: typeof message.agent_interactions = [];
+                        const toolExecutions: Array<{
+                          toolName: string;
+                          agentName: string;
+                          arguments: Record<string, any>;
+                          response: string;
+                          timestamp: string;
+                          hasError?: boolean;
+                        }> = [];
+
+                        let currentToolCall: any = null;
+
+                        message.agent_interactions.forEach((interaction) => {
+                          if (interaction.message_type === 'thought') {
+                            thoughts.push(interaction);
+                          } else if (interaction.message_type === 'tool_call') {
+                            currentToolCall = {
+                              toolName: interaction.tool_name || 'unknown',
+                              agentName: interaction.agent_name,
+                              arguments: interaction.tool_arguments || {},
+                              response: '',
+                              timestamp: interaction.timestamp,
+                            };
+                          } else if (interaction.message_type === 'tool_response' && currentToolCall) {
+                            currentToolCall.response = interaction.content;
+                            currentToolCall.hasError = interaction.content.toLowerCase().includes('error');
+                            toolExecutions.push(currentToolCall);
+                            currentToolCall = null;
+                          }
+                        });
+
+                        return (
+                          <div className="space-y-2 mb-3">
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">
+                              Agent Activity:
+                            </div>
+
+                            {/* Render thoughts */}
+                            {thoughts.map((interaction, idx) => (
+                              <AgentInteraction
+                                key={`${message.id}-thought-${idx}`}
+                                agentName={interaction.agent_name}
+                                messageType={interaction.message_type}
+                                content={interaction.content}
+                                toolName={interaction.tool_name}
+                                toolArguments={interaction.tool_arguments}
+                                timestamp={interaction.timestamp}
+                              />
+                            ))}
+
+                            {/* Render grouped tool executions */}
+                            {toolExecutions.length > 0 && (
+                              <ToolExecutionBlock executions={toolExecutions} />
+                            )}
                           </div>
-                          {message.agent_interactions.map((interaction, idx) => (
-                            <AgentInteraction
-                              key={`${message.id}-interaction-${idx}`}
-                              agentName={interaction.agent_name}
-                              messageType={interaction.message_type}
-                              content={interaction.content}
-                              toolName={interaction.tool_name}
-                              toolArguments={interaction.tool_arguments}
-                              timestamp={interaction.timestamp}
-                            />
-                          ))}
-                        </div>
-                      )}
+                        );
+                      })()}
 
                       {/* Final Response */}
                       {message.content && (
