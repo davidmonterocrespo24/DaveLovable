@@ -1,12 +1,27 @@
 import os
 import json
 import shutil
+import stat
 from pathlib import Path
 from typing import Optional, Dict, List
 from app.core.config import settings
 
 class FileSystemService:
     """Service for managing physical project files on disk"""
+
+    @staticmethod
+    def _handle_remove_readonly(func, path, exc_info):
+        """
+        Error handler for Windows readonly file deletion.
+        Used with shutil.rmtree to handle permission errors.
+        """
+        # Check if it's a permission error
+        if not os.access(path, os.W_OK):
+            # Change the file to be writable and try again
+            os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+            func(path)
+        else:
+            raise
 
     @staticmethod
     def get_project_dir(project_id: int) -> Path:
@@ -48,7 +63,17 @@ class FileSystemService:
             },
             "dependencies": {
                 "react": "^18.3.1",
-                "react-dom": "^18.3.1"
+                "react-dom": "^18.3.1",
+                "lucide-react": "^0.263.1",
+                "date-fns": "^2.30.0",
+                "clsx": "^2.1.0",
+                "react-router-dom": "^6.26.0",
+                "axios": "^1.7.0",
+                "zustand": "^4.5.0",
+                "@tanstack/react-query": "^5.0.0",
+                "framer-motion": "^11.0.0",
+                "react-hook-form": "^7.51.0",
+                "zod": "^3.22.0"
             },
             "devDependencies": {
                 "@types/react": "^18.3.12",
@@ -283,7 +308,8 @@ code {
         if not project_dir.exists():
             return False
 
-        shutil.rmtree(project_dir)
+        # Use onerror callback to handle readonly files on Windows
+        shutil.rmtree(project_dir, onerror=FileSystemService._handle_remove_readonly)
         return True
 
     @staticmethod
