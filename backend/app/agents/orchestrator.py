@@ -118,31 +118,43 @@ class AgentOrchestrator:
         )
 
         def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str | None:
-            # If no messages, start with Coder (Dynamic decision maker)
+            # If no messages, start with Coder
             if not messages:
                 return "Coder"
             
             last_message = messages[-1]
             
-            # If Coder just spoke
-            if last_message.source == "Coder":
-                # Check if Coder wants to delegate to Planner
-                if isinstance(last_message, TextMessage) and "DELEGATE_TO_PLANNER" in last_message.content:
-                    return "Planner"
-                # Check if Coder finished a subtask assigned by Planner
-                if isinstance(last_message, TextMessage) and "SUBTASK_DONE" in last_message.content:
-                    return "Planner"
-                # Otherwise, Coder continues (completing simple task or multi-step execution)
-                return "Coder"
-                
-            # If Planner just spoke, it's Coder's turn to execute
+            # If Planner just spoke, it's Coder's turn
             if last_message.source == "Planner":
                 return "Coder"
+                
+            # If Coder just spoke
+            if last_message.source == "Coder":
+                # Check for explicit signals in TextMessage
+                if isinstance(last_message, TextMessage):
+                    if "DELEGATE_TO_PLANNER" in last_message.content:
+                        return "Planner"
+                    if "SUBTASK_DONE" in last_message.content:
+                        return "Planner"
+                    if "TERMINATE" in last_message.content:
+                        return None # Let termination condition handle it
+                
+                # If Coder just sent a tool call (AssistantMessage with tool calls)
+                # We usually want Coder to receive the result.
+                # But here we assume the runtime executes the tool and appends the result.
+                # We want to ensure Coder gets the next turn to read the result.
+                return "Coder"
+
+            # If the last message was a tool execution result
+            # (FunctionExecutionResultMessage usually has source='user' or the tool name, but definitely not 'Coder'/'Planner')
+            # We must verify the type to be sure.
+            if type(last_message).__name__ == "FunctionExecutionResultMessage":
+                 # Tool finished, give control back to Coder to handle the output
+                 return "Coder"
                 
             return None
 
         # Use SelectorGroupChat with custom selector
-        # Participants order: Coder first (optional but good for clarity)
         self.main_team = SelectorGroupChat(
             participants=[self.coder_agent, self.planning_agent],
             model_client=self.model_client,
