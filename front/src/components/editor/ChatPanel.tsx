@@ -225,16 +225,20 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 prev.map((msg) =>
                   msg.id === streamingMessageId
                     ? {
-                        ...msg,
-                        content: data.message.content,
-                      }
+                      ...msg,
+                      content: data.message.content,
+                    }
                     : msg
                 )
               );
 
-              // Notify parent if code changes were made
-              if (data.code_changes && data.code_changes.length > 0 && onCodeChange) {
-                onCodeChange();
+              // Notify parent if code changes were made OR if termination signal is present
+              const hasTerminationSignal = data.message.content.includes('TERMINATE') || data.message.content.includes('TASK_COMPLETED');
+
+              if ((data.code_changes && data.code_changes.length > 0) || hasTerminationSignal) {
+                if (onCodeChange) {
+                  onCodeChange();
+                }
               }
 
               setIsStreaming(false);
@@ -246,9 +250,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 prev.map((msg) =>
                   msg.id === streamingMessageId
                     ? {
-                        ...msg,
-                        content: `Sorry, I encountered an error: ${error}. Please try again.`,
-                      }
+                      ...msg,
+                      content: `Sorry, I encountered an error: ${error}. Please try again.`,
+                    }
                     : msg
                 )
               );
@@ -263,9 +267,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
           prev.map((msg) =>
             msg.id === streamingMessageId
               ? {
-                  ...msg,
-                  content: 'Sorry, I encountered an error processing your request. Please try again.',
-                }
+                ...msg,
+                content: 'Sorry, I encountered an error processing your request. Please try again.',
+              }
               : msg
           )
         );
@@ -304,11 +308,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
             >
               <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                  message.role === 'user'
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
                     ? 'bg-primary/20'
                     : 'bg-gradient-to-br from-primary to-purple-600'
-                }`}
+                  }`}
               >
                 {message.role === 'user' ? (
                   <User className="w-4 h-4 text-primary" />
@@ -318,11 +321,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               </div>
               <div className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${
-                    message.role === 'user'
+                  className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
                       ? 'bg-primary text-primary-foreground rounded-tr-sm'
                       : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
-                  }`}
+                    }`}
                 >
                   {message.role === 'assistant' ? (
                     <>
@@ -405,7 +407,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                             remarkPlugins={[remarkGfm]}
                             rehypePlugins={[rehypeHighlight]}
                             components={{
-                              code: ({node, inline, className, children, ...props}: any) => {
+                              code: ({ node, inline, className, children, ...props }: any) => {
                                 return !inline ? (
                                   <code className={className} {...props}>
                                     {children}
@@ -416,21 +418,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                                   </code>
                                 );
                               },
-                              pre: ({children, ...props}: any) => (
+                              pre: ({ children, ...props }: any) => (
                                 <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
                                   {children}
                                 </pre>
                               ),
-                              p: ({children, ...props}: any) => (
+                              p: ({ children, ...props }: any) => (
                                 <p className="mb-2 last:mb-0" {...props}>{children}</p>
                               ),
-                              ul: ({children, ...props}: any) => (
+                              ul: ({ children, ...props }: any) => (
                                 <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
                               ),
-                              ol: ({children, ...props}: any) => (
+                              ol: ({ children, ...props }: any) => (
                                 <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
                               ),
-                              li: ({children, ...props}: any) => (
+                              li: ({ children, ...props }: any) => (
                                 <li className="mb-1" {...props}>{children}</li>
                               ),
                             }}
@@ -506,13 +508,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 disabled={isStreaming}
               />
               <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                <button 
+                <button
                   className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
                   title="Attach file"
                 >
                   <Paperclip className="w-4 h-4" />
                 </button>
-                <button 
+                <button
                   className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
                   title="Add image"
                 >
