@@ -42,6 +42,7 @@ interface ChatPanelProps {
   sessionId?: number;
   onCodeChange?: () => void;
   onGitCommit?: (data: { success: boolean; error?: string; message?: string }) => void;
+  onReloadPreview?: (data: { tool_call_count: number; message: string }) => void;
 }
 
 export interface ChatPanelRef {
@@ -49,7 +50,7 @@ export interface ChatPanelRef {
 }
 
 export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
-  ({ projectId, sessionId, onCodeChange, onGitCommit }, ref) => {
+  ({ projectId, sessionId, onCodeChange, onGitCommit, onReloadPreview }, ref) => {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
@@ -329,6 +330,19 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               // Call parent callback for screenshot capture
               if (onGitCommit) {
                 onGitCommit(data);
+              }
+            },
+            onReloadPreview: (data) => {
+              console.log('[ChatPanel] Reload preview event:', data);
+              toast({
+                title: "🔄 Reloading preview",
+                description: data.message,
+                duration: 3000,
+              });
+
+              // Call parent callback to trigger WebContainer reload
+              if (onReloadPreview) {
+                onReloadPreview(data);
               }
             },
             onComplete: (data) => {

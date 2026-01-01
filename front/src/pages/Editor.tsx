@@ -55,7 +55,7 @@ const Editor = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
-  const previewPanelRef = useRef<HTMLDivElement>(null);
+  const previewPanelRef = useRef<{ reload: () => void }>(null);
 
   useEffect(() => {
     if (!projectId || isNaN(Number(projectId))) {
@@ -346,6 +346,15 @@ const Editor = () => {
     }
   };
 
+  const handleReloadPreview = (data: { tool_call_count: number; message: string }) => {
+    console.log('[Editor] Reload preview requested:', data);
+
+    // Trigger WebContainer reload via ref
+    if (previewPanelRef.current) {
+      previewPanelRef.current.reload();
+    }
+  };
+
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
     // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
     if (!data.success || !previewUrl) return;
@@ -460,6 +469,7 @@ const Editor = () => {
                   projectId={Number(projectId)}
                   onCodeChange={handleCodeChange}
                   onGitCommit={handleGitCommit}
+                  onReloadPreview={handleReloadPreview}
                 />
                 {/* Toggle Chat Button - positioned at right edge of chat panel */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full z-10">

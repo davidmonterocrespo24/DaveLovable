@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
 import {
   RefreshCw,
   Smartphone,
@@ -31,7 +31,11 @@ interface ConsoleLog {
   timestamp: string;
 }
 
-export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
+export interface PreviewPanelRef {
+  reload: () => void;
+}
+
+export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
   ({ projectId, isLoading: externalLoading, onReload, onReportError, onPreviewReady }, ref) => {
     const [device, setDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const [showConsole, setShowConsole] = useState(true);
@@ -104,6 +108,16 @@ export const PreviewPanel = forwardRef<HTMLDivElement, PreviewPanelProps>(
     useEffect(() => {
       initializeWebContainer();
     }, [projectId]);
+
+    // Expose reload method to parent via ref
+    useImperativeHandle(ref, () => ({
+      reload: () => {
+        if (onReload) {
+          onReload();
+        }
+        initializeWebContainer();
+      },
+    }));
 
     const handleRefresh = () => {
       if (onReload) {

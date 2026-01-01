@@ -92,9 +92,16 @@ The WebContainer handles all server processes automatically."""
             elif command.strip().startswith('ls'):
                 command = command.replace('ls', 'dir', 1)
 
+        # Detect commands that might take a long time
+        long_running_commands = ['tsc', 'npx tsc', 'npm audit', 'npm outdated']
+        is_long_running = any(cmd in command_lower for cmd in long_running_commands)
+
+        # Set timeout: 15 seconds for normal commands, 30 for potentially long ones
+        timeout_seconds = 30 if is_long_running else 15
+
         # shell=True is required for terminal command execution tool
         result = subprocess.run(  # nosec B602
-            command, shell=True, capture_output=True, text=True, timeout=60, cwd=workspace
+            command, shell=True, capture_output=True, text=True, timeout=timeout_seconds, cwd=workspace
         )
 
         output = f"Command: {command}\n"
@@ -109,6 +116,24 @@ The WebContainer handles all server processes automatically."""
         return output
 
     except subprocess.TimeoutExpired:
-        return "Error: Command timed out after 60 seconds"
+        return f"""⏱️ COMMAND TIMEOUT ⏱️
+
+Command: {command}
+
+This command took longer than {timeout_seconds} seconds and was automatically terminated.
+
+REASON: Long-running commands are not suitable for this environment.
+
+WHAT THIS MEANS:
+• The command was processing for too long
+• It may be checking too many files or doing complex analysis
+• The WebContainer environment is better suited for development
+
+ALTERNATIVES:
+• For TypeScript checking: The editor already shows TypeScript errors in real-time
+• For linting: Use specific file targets instead of the whole project
+• For builds: The WebContainer handles builds automatically
+
+The preview panel already provides real-time feedback on your code."""
     except Exception as e:
         return f"Error executing command: {str(e)}"

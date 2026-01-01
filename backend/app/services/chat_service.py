@@ -438,6 +438,9 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 # Track assistant message for incremental updates
                 assistant_message_id = None
 
+                # Track tool call count for WebContainer reload trigger
+                tool_call_count = 0
+
                 # Helper function to save state incrementally
                 async def save_incremental_state():
                     """Save agent interactions and state to database incrementally"""
@@ -530,6 +533,21 @@ Please analyze the request, create a plan if needed, and implement the solution.
                                 "type": "agent_interaction",
                                 "data": interaction_data
                             }
+
+                            # Increment tool call counter
+                            tool_call_count += 1
+                            logger.info(f"🔢 Tool call count: {tool_call_count}")
+
+                            # Every 10 tool calls, emit a reload signal to refresh WebContainer
+                            if tool_call_count % 10 == 0:
+                                logger.info(f"🔄 Triggering WebContainer reload (after {tool_call_count} tool calls)")
+                                yield {
+                                    "type": "reload_preview",
+                                    "data": {
+                                        "tool_call_count": tool_call_count,
+                                        "message": f"Reloading preview to show progress ({tool_call_count} operations)"
+                                    }
+                                }
 
                     # ToolCallExecutionEvent - Tool results
                     elif event_type == "ToolCallExecutionEvent":
