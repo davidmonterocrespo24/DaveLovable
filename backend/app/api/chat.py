@@ -34,10 +34,29 @@ async def send_chat_message_stream(
     - Final response with code changes
     """
     async def event_generator():
+        import asyncio
+        from datetime import datetime as dt
+
+        last_heartbeat = dt.now()
+
         try:
             async for event in ChatService.process_chat_message_stream(db, project_id, chat_request):
+                # Send keep-alive comment if it's been more than 15 seconds since last event
+                now = dt.now()
+                if (now - last_heartbeat).total_seconds() > 15:
+                    # Send SSE comment to keep connection alive (starts with :)
+                    yield ": keep-alive\n\n"
+                    last_heartbeat = now
+
                 # Format as SSE event
                 yield f"data: {json.dumps(event)}\n\n"
+
+                # Update heartbeat time after sending event
+                last_heartbeat = dt.now()
+
+                # Small delay to prevent overwhelming the client
+                await asyncio.sleep(0.01)
+
         except Exception as e:
             # Send error event
             error_event = {
@@ -131,6 +150,44 @@ def get_session_messages(
     # Verify session belongs to project
     ChatService.get_session(db, session_id, project_id)
     return ChatService.get_messages(db, session_id, limit)
+
+
+@router.get("/{project_id}/sessions/{session_id}/reconnect")
+async def reconnect_to_session(
+    project_id: int,
+    session_id: int,
+    since_message_id: int = 0,
+    db: Session = Depends(get_db)
+):
+    """
+    Reconnect to a session and get any new messages since the last known message
+
+    This endpoint helps recover from interrupted streams:
+    - Returns messages created after since_message_id
+    - Includes partial/ongoing AI responses
+    - Allows frontend to catch up after refresh/disconnection
+    """
+    from app.schemas.chat import ChatMessage as ChatMessageSchema
+
+    # Verify session belongs to project
+    session = ChatService.get_session(db, session_id, project_id)
+
+    # Get all messages after the specified message_id
+    all_messages = ChatService.get_messages(db, session_id, limit=1000)
+
+    # Filter messages that come after since_message_id
+    new_messages = [msg for msg in all_messages if msg.id > since_message_id]
+
+    # Parse agent_interactions from message_metadata
+    messages = [ChatMessageSchema.from_db_message(msg) for msg in new_messages]
+
+    return {
+        "session_id": session_id,
+        "project_id": project_id,
+        "new_messages": messages,
+        "total_messages": len(all_messages),
+        "has_more": len(new_messages) > 0
+    }
 
 
 @router.delete("/{project_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)

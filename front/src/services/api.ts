@@ -238,8 +238,11 @@ export const chatApi = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'text/event-stream',
         },
         body: JSON.stringify(data),
+        // Prevent any timeout - let the stream run as long as needed
+        keepalive: true,
       })
         .then(async (response) => {
           console.log('[SSE] Response received:', response.status, response.statusText);
@@ -277,6 +280,12 @@ export const chatApi = {
             buffer = lines.pop() || ''; // Keep incomplete message in buffer
 
             for (const line of lines) {
+              // Ignore keep-alive comments (lines starting with :)
+              if (line.trim().startsWith(':')) {
+                console.log('[SSE] Keep-alive heartbeat received');
+                continue;
+              }
+
               if (line.trim().startsWith('data: ')) {
                 try {
                   const jsonStr = line.replace(/^data: /, '').trim();
@@ -363,6 +372,27 @@ export const chatApi = {
     return fetchApi<void>(`/chat/${projectId}/sessions/${sessionId}`, {
       method: 'DELETE',
     });
+  },
+
+  // Reconnect to a session and get new messages since last known message
+  reconnectToSession: async (
+    projectId: number,
+    sessionId: number,
+    sinceMessageId: number = 0
+  ): Promise<{
+    session_id: number;
+    project_id: number;
+    new_messages: any[];
+    total_messages: number;
+    has_more: boolean;
+  }> => {
+    return fetchApi<{
+      session_id: number;
+      project_id: number;
+      new_messages: any[];
+      total_messages: number;
+      has_more: boolean;
+    }>(`/chat/${projectId}/sessions/${sessionId}/reconnect?since_message_id=${sinceMessageId}`);
   },
 };
 

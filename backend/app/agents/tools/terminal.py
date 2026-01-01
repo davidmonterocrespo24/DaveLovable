@@ -17,6 +17,71 @@ async def run_terminal_cmd(
     try:
         workspace = get_workspace()
 
+        # GUARDRAIL: Block forbidden development server commands
+        # These commands interfere with WebContainer's automatic dev server
+        forbidden_patterns = [
+            'npm run dev',
+            'npm start',
+            'npm run build',
+            'yarn dev',
+            'yarn start',
+            'yarn build',
+            'pnpm dev',
+            'pnpm start',
+            'pnpm build',
+            'vite',
+            'vite dev',
+            'vite build',
+            'react-scripts start',
+            'next dev',
+            'next start',
+        ]
+
+        command_lower = command.lower().strip()
+
+        # Check for forbidden commands
+        for forbidden in forbidden_patterns:
+            if forbidden in command_lower:
+                return f"""🚨 COMMAND BLOCKED 🚨
+
+Command: {command}
+
+This command is FORBIDDEN because the WebContainer preview environment automatically handles running the development server.
+
+BLOCKED COMMANDS:
+• npm run dev, npm start, npm run build
+• yarn dev, yarn start, yarn build
+• pnpm dev, pnpm start, pnpm build
+• vite, vite dev, vite build
+• react-scripts start
+• next dev, next start
+
+WHY: Running these commands will:
+✗ Cause the process to hang indefinitely
+✗ Interfere with WebContainer's automatic server
+✗ Waste time and resources
+
+WHAT YOU CAN DO INSTEAD:
+✓ The preview panel already shows your app running
+✓ Changes are automatically hot-reloaded
+✓ Just edit files and see changes instantly
+
+ALLOWED COMMANDS:
+✓ npm install <package> - Install dependencies
+✓ npm ci - Clean install
+
+If you need to test the application, it's already running in the WebContainer preview panel on the right side of the screen."""
+
+        # Check for background process attempts (commands with &)
+        if '&' in command and not command.strip().endswith('&&'):
+            return f"""🚨 BACKGROUND COMMAND BLOCKED 🚨
+
+Command: {command}
+
+Background commands (with &) are FORBIDDEN because they cause processes to hang indefinitely.
+
+The WebContainer handles all server processes automatically."""
+
         # Fix common Unix commands for Windows compatibility
         import platform
         if platform.system() == 'Windows':
