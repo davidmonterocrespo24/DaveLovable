@@ -54,10 +54,12 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
     const [isStreaming, setIsStreaming] = useState(false);
+    const [streamInterrupted, setStreamInterrupted] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -121,12 +123,122 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       }
     }, [input]);
 
+    // Check for interrupted stream on mount and attempt to reconnect
+    useEffect(() => {
+      const streamStateKey = `streaming_project_${projectId}`;
+      const savedStreamState = sessionStorage.getItem(streamStateKey);
+
+      if (savedStreamState) {
+        const { wasStreaming, sessionId, lastMessageId } = JSON.parse(savedStreamState);
+        if (wasStreaming && sessionId) {
+          setStreamInterrupted(true);
+          toast({
+            title: "⚠️ Stream interrupted",
+            description: "Checking for new messages from the AI...",
+            duration: 5000,
+          });
+
+          // Attempt to reconnect and get new messages
+          const attemptReconnect = async () => {
+            try {
+              const result = await chatApi.reconnectToSession(projectId, sessionId, lastMessageId || 0);
+
+              if (result.has_more && result.new_messages.length > 0) {
+                // We have new messages! Update the UI
+                const newMessages = result.new_messages.map((msg: any) => ({
+                  id: msg.id.toString(),
+                  role: msg.role,
+                  content: msg.content,
+                  timestamp: new Date(msg.created_at),
+                  agent_interactions: msg.agent_interactions || [],
+                }));
+
+                setMessages(prev => [...prev, ...newMessages]);
+
+                toast({
+                  title: "✅ Reconnected successfully",
+                  description: `Received ${result.new_messages.length} new message(s) from AI`,
+                  duration: 5000,
+                });
+
+                setStreamInterrupted(false);
+
+                // Update session ID
+                if (currentSessionId !== sessionId) {
+                  setCurrentSessionId(sessionId);
+                }
+
+                // Notify parent of code changes
+                if (onCodeChange) {
+                  onCodeChange();
+                }
+              } else {
+                // No new messages yet, backend might still be processing
+                toast({
+                  title: "ℹ️ No new messages yet",
+                  description: "The backend may still be processing. You can send a new message or wait.",
+                  duration: 6000,
+                });
+              }
+            } catch (error) {
+              console.error('[Reconnect] Failed:', error);
+              toast({
+                title: "⚠️ Reconnection failed",
+                description: "Could not retrieve new messages. The stream was interrupted.",
+                variant: "destructive",
+                duration: 8000,
+              });
+            }
+          };
+
+          attemptReconnect();
+        }
+        // Clear the saved state
+        sessionStorage.removeItem(streamStateKey);
+      }
+    }, [projectId, toast, currentSessionId, onCodeChange]);
+
+    // Save streaming state before page unload
+    useEffect(() => {
+      const handleBeforeUnload = () => {
+        if (isStreaming && currentSessionId) {
+          const streamStateKey = `streaming_project_${projectId}`;
+
+          // Find the last message ID
+          const lastMessageId = messages.length > 0
+            ? parseInt(messages[messages.length - 1].id) || 0
+            : 0;
+
+          sessionStorage.setItem(streamStateKey, JSON.stringify({
+            wasStreaming: true,
+            sessionId: currentSessionId,
+            lastMessageId: lastMessageId,
+            timestamp: new Date().toISOString()
+          }));
+
+          // Abort the fetch request if it exists
+          if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+          }
+        }
+      };
+
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }, [isStreaming, messages, projectId, currentSessionId]);
+
     const handleSend = async () => {
       if (!input.trim() || isStreaming) return;
 
       const messageContent = input;
       setInput('');
       setIsStreaming(true);
+      setStreamInterrupted(false); // Clear any previous interruption flag
+
+      // Create AbortController for this request
+      abortControllerRef.current = new AbortController();
 
       // Create both messages at once to avoid race conditions
       const userMessage: Message = {
@@ -299,6 +411,28 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             <p className="text-xs text-muted-foreground">Your development assistant</p>
           </div>
         </div>
+
+        {/* Stream Interrupted Warning Banner */}
+        {streamInterrupted && (
+          <div className="mx-4 mt-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-2">
+            <div className="text-yellow-500 mt-0.5">⚠️</div>
+            <div className="flex-1 text-xs">
+              <p className="font-medium text-yellow-500">Connection was interrupted</p>
+              <p className="text-muted-foreground mt-1">
+                The AI response was interrupted when you refreshed the page. The backend may still be processing your request.
+                You can continue with a new message or wait for any file changes to appear.
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 px-2 text-xs"
+              onClick={() => setStreamInterrupted(false)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
