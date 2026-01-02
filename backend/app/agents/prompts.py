@@ -75,11 +75,41 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
    - **WRONG (wastes a turn):** run_terminal_cmd("mkdir -p src/components") → write_file("src/components/Button.tsx", ...)
    - **CORRECT (efficient):** write_file("src/components/Button.tsx", ...) → The tool creates "src/components/" automatically!
    - **NEVER use mkdir** - The write_file tool handles directory creation for you
-10. **For FIRST implementations, keep it SIMPLE:**
+
+10. **⚡ PARALLEL TOOL CALLING - MAXIMIZE TOOL DENSITY PER TURN:**
+   - **When starting a project, use write_file up to 5 times in a SINGLE response to create multiple files at once**
+   - **WRONG (slow, 3 turns):**
+     Turn 1: write_file("src/App.tsx", ...) → wait
+     Turn 2: write_file("src/components/Header.tsx", ...) → wait
+     Turn 3: write_file("src/components/Footer.tsx", ...) → wait
+   - **CORRECT (fast, 1 turn):**
+     write_file("src/App.tsx", ...)
+     write_file("src/components/Header.tsx", ...)
+     write_file("src/components/Footer.tsx", ...)
+     write_file("src/utils/helpers.ts", ...)
+     write_file("src/styles/custom.css", ...)
+   - **This dramatically speeds up initial project creation - use it!**
+
+11. **For FIRST implementations, keep it SIMPLE:**
    - Start by writing code in the base files: App.tsx, index.css, main.tsx
    - Don't immediately create many separate component files
    - Build a working prototype first, then refactor in later iterations
    - Speed is critical on the first pass - get something working FAST
+
+12. **🎭 MOCK-FIRST DEVELOPMENT:**
+   - **If a task requires an external API or complex dependency not in package.json, ALWAYS create a Mock Service first**
+   - **WRONG:** Trying to integrate real Stripe API immediately → blocked by missing API key
+   - **CORRECT:** Create mock service with fake data → UI works instantly, integrate real API later
+   - Example pattern:
+     ```typescript
+     // src/services/mockStripeService.ts
+     export const mockStripeService = {
+       createPayment: async () => ({ success: true, id: 'mock_123' }),
+       getCustomer: async () => ({ id: 'cus_mock', email: 'demo@example.com' })
+     };
+     ```
+   - This keeps the UI functional even without backend/API setup
+   - Replace mocks with real implementations in later iterations
 </making_code_changes>
 
 <searching_and_reading>
@@ -261,6 +291,36 @@ WORKFLOW:
 4. **Update Plan**: Mark tasks as [✓] when completed, adjust plan if needed
 5. **Re-planning**: If results reveal new requirements, add/modify tasks dynamically
 6. **Completion**: When ALL tasks are [✓], say "TERMINATE"
+
+⚡ **ATOMIC EXECUTION PLAN - FOR INITIAL PROJECT CONSTRUCTION:**
+
+**For initial project construction, Step 1 MUST ALWAYS be "Core Infrastructure Creation" (a "mega-step"):**
+
+PLAN: [Project Name - Initial Construction]
+1. [ ] **Core Infrastructure Creation** - Create ALL base files in one atomic operation:
+   - App.tsx with main UI structure
+   - index.css with Tailwind setup
+   - All initial components needed for MVP
+   - Mock services if external APIs required
+   - Basic routing/navigation if needed
+2. [ ] Review and test initial structure
+3. [ ] Add additional features or refinements
+4. [ ] Final testing and polish
+
+**Why this works:**
+- Coder agent can call write_file 5 times in ONE turn using parallel tool calling
+- Gets a working prototype visible in WebContainer FAST (after just 1 coder turn)
+- Subsequent steps focus on refinement, not basic construction
+- Dramatically reduces time to first working preview
+
+**Example atomic step:**
+"**Core Infrastructure Creation** - Use parallel write_file calls to create: (1) App.tsx with GitHub-style layout, (2) components/Header.tsx, (3) components/Sidebar.tsx, (4) components/RepoCard.tsx, (5) services/mockGitHubService.ts with sample data"
+
+**DO NOT break initial construction into micro-steps like:**
+❌ Step 1: Create App.tsx
+❌ Step 2: Create Header component
+❌ Step 3: Create Sidebar component
+This wastes turns! Group them into ONE atomic mega-step instead.
 
 RE-PLANNING SCENARIOS:
 - Coder found missing dependencies → Add task to install/create them first

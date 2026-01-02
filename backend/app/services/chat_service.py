@@ -433,19 +433,24 @@ Please analyze the request, create a plan if needed, and implement the solution.
                         for f in context['files']
                     ])
 
+                    # Build file tree
+                    file_tree = "\n".join([f"  {f['filepath']}" for f in context['files']])
+
                     task_description = f"""User Request: {chat_request.message}
 
-🚀 FIRST MESSAGE OPTIMIZATION - Quick Prototype Strategy:
+⚡ FIRST MESSAGE OPTIMIZATION - ATOMIC EXECUTION STRATEGY:
 - This is the FIRST user request for this project
-- Build a FAST, WORKING prototype in the EXISTING base files (App.tsx, index.css, main.tsx)
-- DO NOT create many separate component files initially - keep it simple and fast
-- You can refactor and create components in subsequent iterations
-- Focus on getting a working UI quickly, then iterate
+- Your goal: Get a working prototype visible in the preview panel as FAST as possible
+- Use PARALLEL TOOL CALLING: Call write_file up to 5 times in ONE response to create multiple files at once
+- Build a simple but WORKING UI first, then refactor in subsequent iterations
 
 Project Context:
 - Project ID: {project_id}
 - Working Directory: {project_dir}
 - Existing Files: {len(context['files'])} files
+
+📂 COMPLETE FILE TREE (provided in context - NEVER use list_dir):
+{file_tree}
 
 📁 COMPLETE FILE STRUCTURE AND CONTENT (no need to use list_dir or read_file):
 
@@ -457,15 +462,19 @@ Project Context:
 - All dependencies in package.json are installed (lucide-react, date-fns, clsx, react-router-dom, axios, zustand, @tanstack/react-query, framer-motion, react-hook-form, zod)
 - Entry point: index.html → main.tsx → App.tsx
 - Base styles: index.css with Tailwind directives
+- Dev server runs automatically in WebContainer - NEVER run npm run dev or npm start
 
 ⚡ CRITICAL OPTIMIZATION RULES:
-1. **write_file AUTOMATICALLY creates parent directories** - NEVER use mkdir or run_terminal_cmd to create folders
-2. **For FIRST implementation**: Write code in App.tsx, index.css, main.tsx - keep it simple!
-3. **Avoid unnecessary tool calls**: You already have ALL file contents above, don't read them again
-4. **Think before acting**: Plan your edits, then execute efficiently
+1. 🚫 **NEVER use list_dir** - The file tree is provided above in your context
+2. 🚫 **NEVER use read_file** - All file contents are provided above
+3. 🚫 **NEVER use mkdir** - write_file automatically creates parent directories
+4. ⚡ **USE PARALLEL TOOL CALLING**: Call write_file up to 5 times in ONE response to create multiple files
+5. 🎭 **MOCK-FIRST**: If task needs external API/backend, create mock service with fake data first
+6. 🎯 **KEEP IT SIMPLE**: Start with code in base files (App.tsx, index.css), add components only if needed
+7. 🚀 **SPEED IS CRITICAL**: Fewer turns = faster results. Batch file creation into one response!
 
 IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
-Please implement the solution QUICKLY and EFFICIENTLY."""
+Please implement the solution QUICKLY and EFFICIENTLY using parallel write_file calls."""
                 else:
                     # SUBSEQUENT MESSAGES: Standard prompt with file previews
                     task_description = f"""User Request: {chat_request.message}
