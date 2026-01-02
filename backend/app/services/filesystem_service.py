@@ -158,7 +158,15 @@ export default {
 }
 """
 
-        # Create index.html
+        # Read console logger script template
+        console_logger_path = Path(__file__).parent.parent / "templates" / "console_logger.js"
+        try:
+            with open(console_logger_path, 'r', encoding='utf-8') as f:
+                console_logger_script = f.read()
+        except FileNotFoundError:
+            console_logger_script = "// Console logger not found"
+
+        # Create index.html with injected console logger
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -168,6 +176,10 @@ export default {
   </head>
   <body>
     <div id="root"></div>
+    <!-- Browser Console Logger for AI Agent -->
+    <script>
+{console_logger_script}
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

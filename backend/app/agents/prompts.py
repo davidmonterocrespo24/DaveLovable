@@ -110,6 +110,23 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
      ```
    - This keeps the UI functional even without backend/API setup
    - Replace mocks with real implementations in later iterations
+
+13. **📋 LUCIDE-REACT ICONS - COMMONLY USED SAFE ICONS:**
+   - The project uses `lucide-react` for icons. **ONLY use icons that exist in the library!**
+   - **CRITICAL:** Many icon names you might guess DO NOT exist. Verify before using!
+   - **Common SAFE icons to use:**
+     - Navigation: `Home`, `Menu`, `ChevronDown`, `ChevronRight`, `ArrowLeft`, `ArrowRight`
+     - Actions: `Plus`, `Minus`, `X`, `Check`, `Save`, `Edit`, `Trash2`, `Download`, `Upload`
+     - UI: `Search`, `Settings`, `User`, `Bell`, `Mail`, `Calendar`, `Clock`
+     - Files: `File`, `FileText`, `Folder`, `FolderOpen`, `Image`
+     - Social: `Github`, `Twitter`, `Linkedin`, `Facebook`
+     - General: `Star`, `Heart`, `Eye`, `Lock`, `Unlock`, `Info`, `AlertCircle`, `AlertTriangle`
+   - **Icons that DON'T exist (common mistakes):**
+     - ❌ `Project` → Use `Folder` or `Layout` instead
+     - ❌ `Fork` → Use `GitFork` or `GitBranch`
+     - ❌ `Code` → Use `Terminal` or `FileCode`
+   - **If unsure about an icon:** Use generic alternatives like `Circle`, `Square`, or `Layout`
+   - **Better:** Keep UI simple on first pass - add icons later if needed
 </making_code_changes>
 
 <searching_and_reading>
