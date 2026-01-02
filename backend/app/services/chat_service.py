@@ -381,6 +381,12 @@ Please analyze the request, create a plan if needed, and implement the solution.
         ).count()
         is_first_message = message_count <= 1  # Only user message exists
 
+        # Files to exclude from LLM context (internal use only)
+        EXCLUDED_FILES = {'.agent_state.json', '.gitignore'}
+
+        # Filter out internal files that should never be sent to the LLM
+        user_files = [f for f in project_files if f.filename not in EXCLUDED_FILES]
+
         # For first message: provide FULL file content to avoid wasteful read_file calls
         # For subsequent messages: provide only preview (first 500 chars)
         context = {
@@ -392,7 +398,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     "language": f.language,
                     "content": (FileSystemService.read_file(project_id, f.filepath) or "") if is_first_message else (FileSystemService.read_file(project_id, f.filepath) or "")[:500],
                 }
-                for f in project_files
+                for f in user_files  # Use filtered list instead of all project_files
             ]
         }
 
