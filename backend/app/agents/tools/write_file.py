@@ -5,12 +5,21 @@ from app.agents.tools.common import get_workspace
 from app.utils.linter import lint_code_check
 
 async def write_file(target_file: str, file_content: str) -> str:
-    """Writes content to a file"""
+    """
+    Writes content to a file.
+
+    IMPORTANT: This function AUTOMATICALLY creates all parent directories
+    (like 'mkdir -p'). You do NOT need to create folders before calling this.
+
+    Example: write_file('src/components/ui/Button.tsx', content) will
+    automatically create 'src/', 'src/components/', and 'src/components/ui/'.
+    """
     try:
         workspace = get_workspace()
         target = (
             workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
         )
+        # AUTOMATICALLY create all parent directories (like mkdir -p)
         target.parent.mkdir(parents=True, exist_ok=True)
         # Syntax Guardrail
         lint_error = lint_code_check(target, file_content)

@@ -235,6 +235,47 @@ export async function readFile(filepath: string): Promise<string> {
 }
 
 /**
+ * Reload project files WITHOUT reinstalling dependencies or restarting server
+ * This is much lighter than loadProject() - use this for incremental updates
+ */
+export async function reloadProjectFiles(
+  projectId: number,
+  onLog?: (message: string) => void
+): Promise<void> {
+  const log = (msg: string) => {
+    if (onLog) onLog(msg);
+  };
+
+  try {
+    if (!webcontainerInstance) {
+      throw new Error('WebContainer not initialized. Call loadProject first.');
+    }
+
+    log('[WebContainer] Fetching updated project files...');
+    const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/bundle`);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
+    }
+
+    const { files } = await response.json();
+    log(`[WebContainer] Received ${Object.keys(files).length} files`);
+
+    // Write each file directly to the existing container
+    log('[WebContainer] Updating files...');
+    for (const [filepath, content] of Object.entries(files)) {
+      await webcontainerInstance.fs.writeFile(filepath, content as string);
+    }
+
+    log('[WebContainer] Files updated successfully (HMR will auto-reload)');
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (onLog) onLog(`ERROR: Failed to reload files: ${message}`);
+    throw err;
+  }
+}
+
+/**
  * Clean up WebContainer instance
  */
 export async function teardown(): Promise<void> {

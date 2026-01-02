@@ -15,7 +15,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { loadProject } from '@/services/webcontainer';
+import { loadProject, reloadProjectFiles } from '@/services/webcontainer';
 
 interface PreviewPanelProps {
   projectId: number;
@@ -109,13 +109,37 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       initializeWebContainer();
     }, [projectId]);
 
-    // Expose reload method to parent via ref
+    // Lightweight reload: only update files without reinstalling or restarting
+    const reloadFiles = async () => {
+      if (!previewUrl) {
+        // If not initialized yet, do full initialization
+        initializeWebContainer();
+        return;
+      }
+
+      addLog('info', '[WebContainer] Reloading files...');
+
+      try {
+        await reloadProjectFiles(
+          projectId,
+          (msg) => {
+            addLog('info', msg);
+          }
+        );
+        addLog('log', '✓ Files reloaded successfully');
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        addLog('error', `✗ Failed to reload files: ${errorMsg}`);
+      }
+    };
+
+    // Expose reload method to parent via ref (uses lightweight reload)
     useImperativeHandle(ref, () => ({
       reload: () => {
         if (onReload) {
           onReload();
         }
-        initializeWebContainer();
+        reloadFiles();
       },
     }));
 

@@ -375,6 +375,14 @@ Please analyze the request, create a plan if needed, and implement the solution.
             ProjectFile.project_id == project_id
         ).all()
 
+        # Check if this is the first message in the session (optimize for speed)
+        message_count = db.query(ChatMessage).filter(
+            ChatMessage.session_id == session.id
+        ).count()
+        is_first_message = message_count <= 1  # Only user message exists
+
+        # For first message: provide FULL file content to avoid wasteful read_file calls
+        # For subsequent messages: provide only preview (first 500 chars)
         context = {
             "project_id": project_id,
             "files": [
@@ -382,7 +390,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     "filename": f.filename,
                     "filepath": f.filepath,
                     "language": f.language,
-                    "content": (FileSystemService.read_file(project_id, f.filepath) or "")[:500],
+                    "content": (FileSystemService.read_file(project_id, f.filepath) or "") if is_first_message else (FileSystemService.read_file(project_id, f.filepath) or "")[:500],
                 }
                 for f in project_files
             ]
@@ -411,14 +419,59 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 os.chdir(project_dir)
                 logger.info(f"📂 Changed working directory to: {project_dir}")
 
-                # Build task description
-                task_description = f"""User Request: {chat_request.message}
+                # Build task description with optimizations for first message
+                if is_first_message:
+                    # FIRST MESSAGE: Provide complete file structure and content to avoid wasteful tool calls
+                    file_contents_section = "\n\n".join([
+                        f"File: {f['filepath']}\nLanguage: {f['language']}\nContent:\n```{f['language']}\n{f['content']}\n```"
+                        for f in context['files']
+                    ])
+
+                    task_description = f"""User Request: {chat_request.message}
+
+🚀 FIRST MESSAGE OPTIMIZATION - Quick Prototype Strategy:
+- This is the FIRST user request for this project
+- Build a FAST, WORKING prototype in the EXISTING base files (App.tsx, index.css, main.tsx)
+- DO NOT create many separate component files initially - keep it simple and fast
+- You can refactor and create components in subsequent iterations
+- Focus on getting a working UI quickly, then iterate
+
+Project Context:
+- Project ID: {project_id}
+- Working Directory: {project_dir}
+- Existing Files: {len(context['files'])} files
+
+📁 COMPLETE FILE STRUCTURE AND CONTENT (no need to use list_dir or read_file):
+
+{file_contents_section}
+
+🔧 ENVIRONMENT ASSUMPTIONS (already configured, no need to verify):
+- Vite + React + TypeScript project (package.json already configured)
+- Tailwind CSS installed and configured (tailwind.config.js, postcss.config.js ready)
+- All dependencies in package.json are installed (lucide-react, date-fns, clsx, react-router-dom, axios, zustand, @tanstack/react-query, framer-motion, react-hook-form, zod)
+- Entry point: index.html → main.tsx → App.tsx
+- Base styles: index.css with Tailwind directives
+
+⚡ CRITICAL OPTIMIZATION RULES:
+1. **write_file AUTOMATICALLY creates parent directories** - NEVER use mkdir or run_terminal_cmd to create folders
+2. **For FIRST implementation**: Write code in App.tsx, index.css, main.tsx - keep it simple!
+3. **Avoid unnecessary tool calls**: You already have ALL file contents above, don't read them again
+4. **Think before acting**: Plan your edits, then execute efficiently
+
+IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
+Please implement the solution QUICKLY and EFFICIENTLY."""
+                else:
+                    # SUBSEQUENT MESSAGES: Standard prompt with file previews
+                    task_description = f"""User Request: {chat_request.message}
 
 Project Context:
 - Project ID: {project_id}
 - Working Directory: {project_dir}
 - Existing Files: {len(context['files'])} files
 - Files: {', '.join([f['filepath'] for f in context['files']])}
+
+⚡ OPTIMIZATION REMINDER:
+- **write_file AUTOMATICALLY creates parent directories** - NEVER use mkdir
 
 IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
 Please analyze the request, create a plan if needed, and implement the solution."""
