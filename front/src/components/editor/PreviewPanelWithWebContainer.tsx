@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useRef } from 'react';
 import {
   RefreshCw,
   Smartphone,
@@ -16,6 +16,7 @@ import {
   Check
 } from 'lucide-react';
 import { loadProject, reloadProjectFiles } from '@/services/webcontainer';
+import { initializeLogCapture } from '@/services/browserLogs';
 
 interface PreviewPanelProps {
   projectId: number;
@@ -44,6 +45,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     const [initError, setInitError] = useState<string>('');
     const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
     const [urlCopied, setUrlCopied] = useState(false);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const deviceWidths = {
       mobile: 'max-w-[375px]',
@@ -108,6 +110,12 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     useEffect(() => {
       initializeWebContainer();
     }, [projectId]);
+
+    // Initialize browser log capture when component mounts
+    useEffect(() => {
+      console.log('[PreviewPanel] Initializing browser log capture listener');
+      initializeLogCapture();
+    }, []);
 
     // Lightweight reload: only update files without reinstalling or restarting
     const reloadFiles = async () => {
@@ -333,6 +341,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
               </div>
             ) : previewUrl ? (
               <iframe
+                ref={iframeRef}
                 src={previewUrl}
                 className="w-full h-full border-0"
                 title="Preview"
@@ -373,11 +382,11 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
                 {consoleLogs.filter(l => l.type === 'error').length > 0 && (
                   <button
                     onClick={handleReportErrors}
-                    className="text-xs px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded transition-colors text-red-400 flex items-center gap-1.5 border border-red-500/30"
-                    title="Send errors to AI for fixing"
+                    className="text-xs px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded transition-colors text-red-400 flex items-center gap-1.5 border border-red-500/30 animate-pulse"
+                    title="Send browser errors to AI for fixing"
                   >
                     <Send className="w-3 h-3" />
-                    Report to AI
+                    Report Browser Errors to AI
                   </button>
                 )}
                 <button
