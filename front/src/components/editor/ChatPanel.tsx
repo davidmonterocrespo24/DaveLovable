@@ -292,10 +292,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onAgentInteraction: (interaction) => {
               console.log('[ChatPanel] Received agent interaction:', interaction);
 
-              // If agent is writing a file, refresh the file explorer
+              // Refresh file explorer when write_file tool is executed
               if (interaction.message_type === 'tool_call' && interaction.tool_name === 'write_file') {
-                console.log('[ChatPanel] write_file detected, refreshing file explorer');
-                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                console.log('[ChatPanel] write_file tool detected, refreshing file explorer...');
+                // Use setTimeout to delay invalidation slightly to allow backend to write the file
+                setTimeout(() => {
+                  queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                }, 500);
               }
 
               // Add interaction to the streaming message in real-time
