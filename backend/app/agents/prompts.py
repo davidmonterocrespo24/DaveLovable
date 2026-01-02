@@ -111,6 +111,23 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
    - This keeps the UI functional even without backend/API setup
    - Replace mocks with real implementations in later iterations
 
+12.5. **⚠️ CRITICAL: IMPORT VALIDATION - PREVENT BROKEN IMPORTS:**
+   - **NEVER import a component/file that you haven't created yet!**
+   - **WRONG PATTERN (causes runtime errors):**
+     ```typescript
+     // App.tsx - imports FilterSidebar that doesn't exist yet
+     import FilterSidebar from "./components/FilterSidebar";
+     ```
+   - **CORRECT PATTERN - Create dependencies FIRST:**
+     1. First: `write_file("src/components/FilterSidebar.tsx", ...)`
+     2. Then: `write_file("src/App.tsx", ...)` with import
+   - **OR use sequential creation in same turn:**
+     1. `write_file("src/components/FilterSidebar.tsx", ...)`
+     2. `write_file("src/components/Header.tsx", ...)`
+     3. `write_file("src/App.tsx", ...)` ← Import both components here
+   - **Rule: Components must exist BEFORE you import them**
+   - If you write App.tsx that imports X, Y, Z → X, Y, Z files MUST be created in the SAME turn or BEFORE
+
 13. **📋 LUCIDE-REACT ICONS - COMMONLY USED SAFE ICONS:**
    - The project uses `lucide-react` for icons. **ONLY use icons that exist in the library!**
    - **CRITICAL:** Many icon names you might guess DO NOT exist. Verify before using!
@@ -325,13 +342,16 @@ PLAN: [Project Name - Initial Construction]
 4. [ ] Final testing and polish
 
 **Why this works:**
-- Coder agent can call write_file 5 times in ONE turn using parallel tool calling
-- Gets a working prototype visible in WebContainer FAST (after just 1 coder turn)
+- Coder agent creates files ONE AT A TIME sequentially (NO parallel tool calling)
+- Each file is written and saved before moving to the next
+- Gets a working prototype visible in WebContainer (after sequential file creation)
 - Subsequent steps focus on refinement, not basic construction
-- Dramatically reduces time to first working preview
+- Sequential execution ensures proper file creation order
 
 **Example atomic step:**
-"**Core Infrastructure Creation** - Use parallel write_file calls to create: (1) App.tsx with GitHub-style layout, (2) components/Header.tsx, (3) components/Sidebar.tsx, (4) components/RepoCard.tsx, (5) services/mockGitHubService.ts with sample data"
+"**Core Infrastructure Creation** - Create files sequentially: (1) First write App.tsx with layout, (2) Then Header.tsx, (3) Then Sidebar.tsx, (4) Then RepoCard.tsx, (5) Finally mockGitHubService.ts with sample data"
+
+**CRITICAL: You MUST call write_file ONE AT A TIME. NEVER use multiple tool calls in parallel.**
 
 **DO NOT break initial construction into micro-steps like:**
 ❌ Step 1: Create App.tsx

@@ -22,7 +22,6 @@ async def run_terminal_cmd(
         forbidden_patterns = [
             'npm run dev',
             'npm start',
-            'npm run build',
             'yarn dev',
             'yarn start',
             'yarn build',
@@ -49,7 +48,6 @@ Command: {command}
 This command is FORBIDDEN because the WebContainer preview environment automatically handles running the development server.
 
 BLOCKED COMMANDS:
-• npm run dev, npm start, npm run build
 • yarn dev, yarn start, yarn build
 • pnpm dev, pnpm start, pnpm build
 • vite, vite dev, vite build

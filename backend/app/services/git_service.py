@@ -161,7 +161,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                text=True
+                encoding='utf-8',
+                errors='replace'
             )
 
             commits = []
@@ -201,7 +202,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                text=True
+                encoding='utf-8',
+                errors='replace'
             )
 
             return result.stdout
@@ -238,7 +240,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                text=True
+                encoding='utf-8',
+                errors='replace'
             )
 
             return result.stdout
@@ -302,7 +305,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                text=True
+                encoding='utf-8',
+                errors='replace'
             )
 
             return result.stdout.strip()
@@ -330,7 +334,8 @@ build/
                 ["git", "remote", "get-url", "origin"],
                 cwd=project_dir,
                 capture_output=True,
-                text=True
+                encoding='utf-8',
+                errors='replace'
             )
 
             if result.returncode == 0:
@@ -430,7 +435,8 @@ build/
                     ["git", "fetch", "origin"],
                     cwd=project_dir,
                     capture_output=True,
-                    text=True,
+                    encoding='utf-8',
+                errors='replace',
                     timeout=30
                 )
                 result["fetch"] = "✓ Fetched from remote"
@@ -445,7 +451,8 @@ build/
                     ["git", "pull", "origin", GitService.get_current_branch(project_id), "--no-rebase"],
                     cwd=project_dir,
                     capture_output=True,
-                    text=True,
+                    encoding='utf-8',
+                errors='replace',
                     timeout=30
                 )
                 if "Already up to date" in pull_result.stdout:
@@ -490,7 +497,8 @@ build/
                     ["git", "push", "origin", GitService.get_current_branch(project_id)],
                     cwd=project_dir,
                     capture_output=True,
-                    text=True,
+                    encoding='utf-8',
+                errors='replace',
                     timeout=30
                 )
                 result["push"] = "✓ Pushed to remote"
