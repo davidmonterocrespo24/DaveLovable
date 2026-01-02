@@ -71,6 +71,7 @@ export interface CreateFileRequest {
 
 export interface UpdateFileRequest {
   content: string;
+  filepath?: string; // Required for filesystem-based updates
 }
 
 export interface SendChatMessageRequest {

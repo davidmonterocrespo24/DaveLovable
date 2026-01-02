@@ -51,9 +51,11 @@ def get_project(
     project_id: int,
     db: Session = Depends(get_db)
 ):
-    """Get a specific project with its files"""
+    """Get a specific project with its files (read from filesystem)"""
     project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
-    files = ProjectService.get_project_files(db, project_id, MOCK_USER_ID)
+
+    # Get files from filesystem (not database)
+    files = FileSystemService.get_all_project_files(project_id)
 
     # Convert to dict and add files
     project_dict = {
@@ -66,6 +68,7 @@ def get_project(
         "updated_at": project.updated_at,
         "template": project.template,
         "framework": project.framework,
+        "thumbnail": project.thumbnail,
         "files": files,
     }
 
@@ -97,8 +100,12 @@ def get_project_files(
     project_id: int,
     db: Session = Depends(get_db)
 ):
-    """Get all files for a project"""
-    return ProjectService.get_project_files(db, project_id, MOCK_USER_ID)
+    """Get all files for a project (read from filesystem)"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Get files from filesystem
+    return FileSystemService.get_all_project_files(project_id)
 
 
 @router.post("/{project_id}/files", response_model=ProjectFile, status_code=status.HTTP_201_CREATED)
@@ -107,8 +114,32 @@ def add_file_to_project(
     file_data: ProjectFileCreate,
     db: Session = Depends(get_db)
 ):
-    """Add a file to a project"""
-    return ProjectService.add_file_to_project(db, project_id, MOCK_USER_ID, file_data)
+    """Add a file to a project (writes to filesystem only)"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Write file to filesystem
+    FileSystemService.write_file(project_id, file_data.filepath, file_data.content)
+
+    # Get file timestamps from filesystem
+    from datetime import datetime
+    project_dir = FileSystemService.get_project_dir(project_id)
+    file_path = project_dir / file_data.filepath
+    stat = file_path.stat()
+    created_at = datetime.fromtimestamp(stat.st_ctime)
+    updated_at = datetime.fromtimestamp(stat.st_mtime)
+
+    # Return file info (matching database schema for compatibility)
+    return {
+        "id": hash(file_data.filepath) % 100000,  # Generate pseudo-ID from filepath
+        "project_id": project_id,
+        "filename": Path(file_data.filepath).name,
+        "filepath": file_data.filepath,
+        "content": file_data.content,
+        "language": file_data.language,
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
 
 
 @router.put("/{project_id}/files/{file_id}", response_model=ProjectFile)
@@ -118,19 +149,51 @@ def update_file(
     file_update: ProjectFileUpdate = Body(...),
     db: Session = Depends(get_db)
 ):
-    """Update a file's content"""
+    """Update a file's content (writes to filesystem only)"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Get the filepath - we need to find it by file_id
+    # Since we're not using DB anymore, we need filepath from the update
+    if not hasattr(file_update, 'filepath') or not file_update.filepath:
+        raise HTTPException(status_code=400, detail="filepath is required for filesystem-based updates")
+
     content = file_update.content or ''
-    return ProjectService.update_file(db, file_id, project_id, MOCK_USER_ID, content)
+    FileSystemService.write_file(project_id, file_update.filepath, content)
+
+    # Get file timestamps from filesystem
+    from datetime import datetime
+    project_dir = FileSystemService.get_project_dir(project_id)
+    file_path = project_dir / file_update.filepath
+    stat = file_path.stat()
+    created_at = datetime.fromtimestamp(stat.st_ctime)
+    updated_at = datetime.fromtimestamp(stat.st_mtime)
+
+    return {
+        "id": file_id,
+        "project_id": project_id,
+        "filename": Path(file_update.filepath).name,
+        "filepath": file_update.filepath,
+        "content": content,
+        "language": getattr(file_update, 'language', 'text'),
+        "created_at": created_at,
+        "updated_at": updated_at,
+    }
 
 
 @router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_file(
     project_id: int,
     file_id: int,
+    filepath: str = Body(..., embed=True),
     db: Session = Depends(get_db)
 ):
-    """Delete a file from a project"""
-    ProjectService.delete_file(db, file_id, project_id, MOCK_USER_ID)
+    """Delete a file from a project (deletes from filesystem only)"""
+    # Verify project exists
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    # Delete from filesystem
+    FileSystemService.delete_file(project_id, filepath)
     return None
 
 

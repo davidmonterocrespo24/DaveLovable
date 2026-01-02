@@ -383,3 +383,89 @@ code {
                     pass
 
         return files
+
+    @staticmethod
+    def get_all_project_files(project_id: int) -> List[Dict]:
+        """
+        Get all files in a project with metadata (for API responses).
+        Returns list of file objects compatible with frontend expectations.
+        """
+        project_dir = FileSystemService.get_project_dir(project_id)
+
+        if not project_dir.exists():
+            return []
+
+        # Directories to exclude
+        excluded_dirs = {
+            'node_modules', '.git', 'dist', 'build', '.vite', 'coverage',
+            '.turbo', '.next', '.cache', '__pycache__', '.pytest_cache',
+            '.mypy_cache',
+        }
+
+        # Files to exclude
+        excluded_files = {
+            '.DS_Store', 'Thumbs.db', '.env', '.env.local',
+            'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+            '.gitignore', '.browser_logs.json', '.agent_state.json',
+        }
+
+        # Language mapping by extension
+        language_map = {
+            '.tsx': 'tsx',
+            '.ts': 'typescript',
+            '.jsx': 'jsx',
+            '.js': 'javascript',
+            '.css': 'css',
+            '.html': 'html',
+            '.json': 'json',
+            '.md': 'markdown',
+            '.py': 'python',
+            '.yml': 'yaml',
+            '.yaml': 'yaml',
+        }
+
+        files = []
+        file_id = 1  # Generate sequential IDs for frontend
+
+        for file_path in sorted(project_dir.rglob("*")):
+            if not file_path.is_file():
+                continue
+
+            relative_path = file_path.relative_to(project_dir)
+
+            # Check if file is in an excluded directory
+            if any(excluded_dir in relative_path.parts for excluded_dir in excluded_dirs):
+                continue
+
+            # Check if file name is excluded
+            if file_path.name in excluded_files:
+                continue
+
+            try:
+                content = file_path.read_text(encoding='utf-8')
+                filepath_str = str(relative_path).replace("\\", "/")
+                extension = file_path.suffix
+                language = language_map.get(extension, 'text')
+
+                # Get file timestamps from filesystem
+                from datetime import datetime
+                stat = file_path.stat()
+                created_at = datetime.fromtimestamp(stat.st_ctime)
+                updated_at = datetime.fromtimestamp(stat.st_mtime)
+
+                files.append({
+                    "id": file_id,
+                    "project_id": project_id,
+                    "filename": file_path.name,
+                    "filepath": filepath_str,
+                    "content": content,
+                    "language": language,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                })
+                file_id += 1
+            except Exception:
+                # Skip binary files or files that can't be read
+                pass
+
+        return files

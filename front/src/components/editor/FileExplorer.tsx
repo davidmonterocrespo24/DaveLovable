@@ -38,6 +38,7 @@ interface FileNode {
   children?: FileNode[];
   fileId?: number;
   content?: string;
+  filepath?: string;
 }
 
 // Helper function to build a file tree from flat file list
@@ -72,6 +73,7 @@ function buildFileTree(files: ProjectFile[]): FileNode[] {
       type: 'file',
       fileId: file.id,
       content: file.content,
+      filepath: file.filepath,
     });
   });
 
@@ -82,7 +84,7 @@ interface FileItemProps {
   node: FileNode;
   depth: number;
   selectedFile: string;
-  onSelect: (file: { name: string; id: number; content: string }) => void;
+  onSelect: (file: { name: string; id: number; content: string; filepath: string }) => void;
   expandedFolders: Set<string>;
   onToggleFolder: (path: string) => void;
   path: string;
@@ -118,8 +120,8 @@ const FileItem = ({
   const handleClick = () => {
     if (node.type === 'folder') {
       onToggleFolder(currentPath);
-    } else if (node.fileId && node.content !== undefined) {
-      onSelect({ name: node.name, id: node.fileId, content: node.content });
+    } else if (node.fileId && node.content !== undefined && node.filepath) {
+      onSelect({ name: node.name, id: node.fileId, content: node.content, filepath: node.filepath });
     }
   };
 
@@ -201,7 +203,7 @@ const FileItem = ({
 interface FileExplorerProps {
   projectId: number;
   selectedFile: string;
-  onSelectFile: (file: { name: string; id: number; content: string }) => void;
+  onSelectFile: (file: { name: string; id: number; content: string; filepath: string }) => void;
   hasUnsavedChanges?: boolean;
   onSaveFile?: () => void;
   isSaving?: boolean;

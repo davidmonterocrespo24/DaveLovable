@@ -10,6 +10,7 @@ import 'highlight.js/styles/github-dark.css';
 import { AgentInteraction } from './AgentInteraction';
 import { ToolExecutionBlock } from './ToolExecutionBlock';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface AgentInteractionData {
   agent_name: string;
@@ -42,7 +43,7 @@ interface ChatPanelProps {
   sessionId?: number;
   onCodeChange?: () => void;
   onGitCommit?: (data: { success: boolean; error?: string; message?: string }) => void;
-  onReloadPreview?: (data: { tool_call_count: number; message: string }) => void;
+  onReloadPreview?: (data: { message: string }) => void;
 }
 
 export interface ChatPanelRef {
@@ -51,6 +52,7 @@ export interface ChatPanelRef {
 
 export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
   ({ projectId, sessionId, onCodeChange, onGitCommit, onReloadPreview }, ref) => {
+    const queryClient = useQueryClient();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
     const [currentSessionId, setCurrentSessionId] = useState<number | undefined>(sessionId);
@@ -289,6 +291,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             },
             onAgentInteraction: (interaction) => {
               console.log('[ChatPanel] Received agent interaction:', interaction);
+
+              // If agent is writing a file, refresh the file explorer
+              if (interaction.message_type === 'tool_call' && interaction.tool_name === 'write_file') {
+                console.log('[ChatPanel] write_file detected, refreshing file explorer');
+                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+              }
+
               // Add interaction to the streaming message in real-time
               setMessages((prev) => {
                 console.log('[ChatPanel] Current messages:', prev.length);

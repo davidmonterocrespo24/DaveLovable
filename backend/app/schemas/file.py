@@ -24,8 +24,8 @@ class ProjectFileInDB(ProjectFileBase):
     """File metadata stored in database (no content)"""
     id: int
     project_id: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None  # Optional for filesystem-only mode
+    updated_at: Optional[datetime] = None  # Optional for filesystem-only mode
 
     class Config:
         from_attributes = True

@@ -40,7 +40,7 @@ const Editor = () => {
   const { data: project, isLoading: projectLoading } = useProject(Number(projectId));
   const updateFileMutation = useUpdateFile();
 
-  const [selectedFile, setSelectedFile] = useState<{ name: string; id: number; content: string } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ name: string; id: number; content: string; filepath: string } | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeView, setActiveView] = useState<'code' | 'preview' | 'split'>('split');
@@ -102,7 +102,7 @@ const Editor = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasUnsavedChanges, selectedFile, editedContent]);
 
-  const handleFileSelect = (file: { name: string; id: number; content: string }) => {
+  const handleFileSelect = (file: { name: string; id: number; content: string; filepath: string }) => {
     setSelectedFile(file);
     setEditedContent(file.content);
     setHasUnsavedChanges(false);
@@ -129,11 +129,19 @@ const Editor = () => {
       await updateFileMutation.mutateAsync({
         projectId: Number(projectId),
         fileId: selectedFile.id,
-        data: { content: editedContent }
+        data: {
+          content: editedContent,
+          filepath: selectedFile.filepath
+        }
       });
 
       setSelectedFile({ ...selectedFile, content: editedContent });
       setHasUnsavedChanges(false);
+
+      // Reload WebContainer to reflect changes
+      if (previewPanelRef.current) {
+        previewPanelRef.current.reload();
+      }
 
       toast({
         title: "File saved",
@@ -171,6 +179,11 @@ const Editor = () => {
     setTimeout(() => {
       setIsPreviewLoading(false);
     }, 1000);
+
+    // Refetch files to update the file explorer
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: ['project', Number(projectId)] });
+    }
   };
 
   const handleReportError = (errorMessage: string) => {
@@ -346,8 +359,13 @@ const Editor = () => {
     }
   };
 
-  const handleReloadPreview = (data: { tool_call_count: number; message: string }) => {
+  const handleReloadPreview = (data: { message: string }) => {
     console.log('[Editor] Reload preview requested:', data);
+
+    // Refetch files to update the file explorer
+    if (projectId) {
+      queryClient.invalidateQueries({ queryKey: ['project', Number(projectId)] });
+    }
 
     // Trigger WebContainer reload via ref
     if (previewPanelRef.current) {
