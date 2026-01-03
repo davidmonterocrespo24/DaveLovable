@@ -1,5 +1,9 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Wrench, CheckCircle, XCircle } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
 
 interface ToolExecution {
   toolName: string;
@@ -20,6 +24,9 @@ const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) 
   const isObject = typeof value === 'object' && value !== null;
 
   if (isLongValue) {
+    // Detect if content looks like code (contains typical code patterns)
+    const looksLikeCode = /^[\s\S]*(?:import|export|function|const|let|var|class|interface|type|=>|{|}|\(|\)|;|<|>)[\s\S]*$/.test(value);
+
     return (
       <div className="mb-2">
         <button
@@ -31,9 +38,21 @@ const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) 
           <span className="text-muted-foreground">({value.length} chars)</span>
         </button>
         {isExpanded && (
-          <pre className="mt-1 text-[10px] bg-muted/40 text-foreground p-2 rounded overflow-x-auto border border-border/20 max-h-96">
-            {value}
-          </pre>
+          <div className="mt-1 text-[10px] bg-muted/40 p-2 rounded overflow-x-auto border border-border/20 max-h-96">
+            {looksLikeCode ? (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  p: ({ children }) => <>{children}</>,
+                }}
+              >
+                {`\`\`\`\n${value}\n\`\`\``}
+              </ReactMarkdown>
+            ) : (
+              <pre className="text-foreground m-0">{value}</pre>
+            )}
+          </div>
         )}
       </div>
     );

@@ -19,18 +19,16 @@ async def run_terminal_cmd(
 
         # GUARDRAIL: Block forbidden development server commands
         # These commands interfere with WebContainer's automatic dev server
+        # BUT ALLOW verification commands like "npm run build" or "tsc --noEmit"
         forbidden_patterns = [
             'npm run dev',
             'npm start',
             'yarn dev',
             'yarn start',
-            'yarn build',
             'pnpm dev',
             'pnpm start',
-            'pnpm build',
-            'vite',
             'vite dev',
-            'vite build',
+            'vite preview',
             'react-scripts start',
             'next dev',
             'next start',
@@ -48,9 +46,10 @@ Command: {command}
 This command is FORBIDDEN because the WebContainer preview environment automatically handles running the development server.
 
 BLOCKED COMMANDS:
-• yarn dev, yarn start, yarn build
-• pnpm dev, pnpm start, pnpm build
-• vite, vite dev, vite build
+• npm run dev, npm start
+• yarn dev, yarn start
+• pnpm dev, pnpm start
+• vite dev, vite preview
 • react-scripts start
 • next dev, next start
 
@@ -64,9 +63,10 @@ WHAT YOU CAN DO INSTEAD:
 ✓ Changes are automatically hot-reloaded
 ✓ Just edit files and see changes instantly
 
-ALLOWED COMMANDS:
-✓ npm install <package> - Install dependencies
-✓ npm ci - Clean install
+VERIFICATION COMMANDS (ALLOWED):
+✓ npm run build - Verify the project builds successfully
+✓ npx tsc --noEmit - Check for TypeScript errors
+✓ npm run lint - Run linting checks
 
 If you need to test the application, it's already running in the WebContainer preview panel on the right side of the screen."""
 
@@ -91,11 +91,11 @@ The WebContainer handles all server processes automatically."""
                 command = command.replace('ls', 'dir', 1)
 
         # Detect commands that might take a long time
-        long_running_commands = ['tsc', 'npx tsc', 'npm audit', 'npm outdated']
+        long_running_commands = ['tsc', 'npx tsc', 'npm audit', 'npm outdated', 'npm run build', 'yarn build', 'pnpm build']
         is_long_running = any(cmd in command_lower for cmd in long_running_commands)
 
-        # Set timeout: 15 seconds for normal commands, 30 for potentially long ones
-        timeout_seconds = 30 if is_long_running else 15
+        # Set timeout: 15 seconds for normal commands, 60 for build/check commands
+        timeout_seconds = 60 if is_long_running else 15
 
         # shell=True is required for terminal command execution tool
         result = subprocess.run(  # nosec B602
