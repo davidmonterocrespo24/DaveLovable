@@ -51,7 +51,7 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
    - **Good:** Replacing only the 5 lines that need to change using specific context lines.
    - The system checks for "File Demolition" (mass deletions) and will reject your edit if you delete >100 lines without replacing them.
 
-🚀 **CRITICAL PERFORMANCE OPTIMIZATION:**
+ **CRITICAL PERFORMANCE OPTIMIZATION:**
 9. **write_file AUTOMATICALLY creates parent directories** - You do NOT need to create folders first!
    - **WRONG (wastes a turn):** run_terminal_cmd("mkdir -p src/components") → write_file("src/components/Button.tsx", ...)
    - **CORRECT (efficient):** write_file("src/components/Button.tsx", ...) → The tool creates "src/components/" automatically!

@@ -215,8 +215,20 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             tool_args = {}
                             try:
                                 import json
-                                tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
-                            except:
+                                if isinstance(tool_call.arguments, str):
+                                    tool_args = json.loads(tool_call.arguments)
+                                elif isinstance(tool_call.arguments, dict):
+                                    tool_args = tool_call.arguments
+                                else:
+                                    tool_args = {"raw": str(tool_call.arguments)}
+                            except json.JSONDecodeError as e:
+                                # Try to fix common JSON issues
+                                logger.warning(f"⚠️  Failed to parse tool arguments as JSON: {e}")
+                                logger.warning(f"Arguments: {tool_call.arguments[:200]}...")
+                                # Store as raw but log the error for debugging
+                                tool_args = {"raw": str(tool_call.arguments)}
+                            except Exception as e:
+                                logger.error(f"❌ Unexpected error parsing tool arguments: {e}")
                                 tool_args = {"raw": str(tool_call.arguments)}
 
                             agent_interactions.append({
@@ -579,8 +591,20 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             tool_args = {}
                             try:
                                 import json
-                                tool_args = json.loads(tool_call.arguments) if isinstance(tool_call.arguments, str) else tool_call.arguments
-                            except:
+                                if isinstance(tool_call.arguments, str):
+                                    tool_args = json.loads(tool_call.arguments)
+                                elif isinstance(tool_call.arguments, dict):
+                                    tool_args = tool_call.arguments
+                                else:
+                                    tool_args = {"raw": str(tool_call.arguments)}
+                            except json.JSONDecodeError as e:
+                                # Try to fix common JSON issues
+                                logger.warning(f"⚠️  Failed to parse tool arguments as JSON: {e}")
+                                logger.warning(f"Arguments: {tool_call.arguments[:200]}...")
+                                # Store as raw but log the error for debugging
+                                tool_args = {"raw": str(tool_call.arguments)}
+                            except Exception as e:
+                                logger.error(f"❌ Unexpected error parsing tool arguments: {e}")
                                 tool_args = {"raw": str(tool_call.arguments)}
 
                             interaction_data = {
