@@ -198,7 +198,15 @@ Please analyze the request, create a plan if needed, and implement the solution.
                         content_preview = message.content[:200] if len(message.content) > 200 else message.content
                         logger.info(f"💭 {msg_source}: {content_preview}")
 
-                        if msg_source != "user" and "TASK_COMPLETED" not in message.content:
+                        # Skip user messages and filter out system/control messages
+                        skip_patterns = ["TASK_COMPLETED", "TERMINATE", "DELEGATE_TO_PLANNER", "SUBTASK_DONE"]
+                        should_skip = (
+                            msg_source == "user" or
+                            any(pattern in message.content for pattern in skip_patterns) or
+                            len(message.content.strip()) < 10  # Skip very short messages
+                        )
+
+                        if not should_skip:
                             agent_interactions.append({
                                 "agent_name": msg_source,
                                 "message_type": "thought",
@@ -565,7 +573,15 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
                     # TextMessage - Agent thoughts/responses
                     if event_type == "TextMessage":
-                        if msg_source != "user" and "TASK_COMPLETED" not in message.content:
+                        # Skip user messages and filter out system/control messages
+                        skip_patterns = ["TASK_COMPLETED", "TERMINATE", "DELEGATE_TO_PLANNER", "SUBTASK_DONE"]
+                        should_skip = (
+                            msg_source == "user" or
+                            any(pattern in message.content for pattern in skip_patterns) or
+                            len(message.content.strip()) < 10  # Skip very short messages
+                        )
+
+                        if not should_skip:
                             interaction_data = {
                                 "agent_name": msg_source,
                                 "message_type": "thought",
