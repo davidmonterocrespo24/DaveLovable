@@ -63,6 +63,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const containerRef = useRef<HTMLDivElement>(null);
     const { toast } = useToast();
     const abortControllerRef = useRef<AbortController | null>(null);
+    const pendingReloadRef = useRef<{ message: string } | null>(null);
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -240,6 +241,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       setIsStreaming(true);
       setStreamInterrupted(false); // Clear any previous interruption flag
 
+      // Clear any pending reload from previous messages
+      pendingReloadRef.current = null;
+
       // Create AbortController for this request
       abortControllerRef.current = new AbortController();
 
@@ -345,17 +349,17 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               }
             },
             onReloadPreview: (data) => {
-              console.log('[ChatPanel] Reload preview event:', data);
+              console.log('[ChatPanel] Reload preview event received - storing for later:', data);
+
+              // Store the reload request to execute AFTER complete event
+              // This prevents interrupting the SSE stream before all messages are processed
+              pendingReloadRef.current = data;
+
               toast({
-                title: "🔄 Reloading preview",
+                title: "🔄 Preview will reload",
                 description: data.message,
                 duration: 3000,
               });
-
-              // Call parent callback to trigger WebContainer reload
-              if (onReloadPreview) {
-                onReloadPreview(data);
-              }
             },
             onComplete: (data) => {
               // Update the streaming message with the final response
@@ -380,6 +384,19 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               }
 
               setIsStreaming(false);
+
+              // Execute pending reload AFTER stream completes
+              // This ensures all messages are processed before WebContainer reloads
+              if (pendingReloadRef.current && onReloadPreview) {
+                console.log('[ChatPanel] Executing pending reload after stream completion');
+                // Small delay to ensure all state updates are processed
+                setTimeout(() => {
+                  if (onReloadPreview && pendingReloadRef.current) {
+                    onReloadPreview(pendingReloadRef.current);
+                    pendingReloadRef.current = null;
+                  }
+                }, 100);
+              }
             },
             onError: (error) => {
               console.error('Streaming error:', error);
@@ -469,8 +486,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             >
               <div
                 className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
-                    ? 'bg-primary/20'
-                    : 'bg-gradient-to-br from-primary to-purple-600'
+                  ? 'bg-primary/20'
+                  : 'bg-gradient-to-br from-primary to-purple-600'
                   }`}
               >
                 {message.role === 'user' ? (
@@ -482,8 +499,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               <div className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
                   className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
-                      ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                      : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
+                    ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                    : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
                     }`}
                 >
                   {message.role === 'assistant' ? (
@@ -553,7 +570,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                           );
                         });
 
-                        // Render all matched tool calls in a single block
+                        // Then render matched tool calls
                         if (matchedToolCalls.length > 0) {
                           elements.push(
                             <ToolExecutionBlock
