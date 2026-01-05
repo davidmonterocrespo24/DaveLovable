@@ -1,5 +1,4 @@
 from pathlib import Path
-import os
 
 from app.agents.tools.common import get_workspace
 from app.utils.linter import lint_code_check

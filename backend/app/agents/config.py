@@ -1,5 +1,4 @@
-from app.core.config import settings
-from app.agents.prompts import AGENT_SYSTEM_PROMPT, CODER_AGENT_DESCRIPTION
+from app.agents.prompts import AGENT_SYSTEM_PROMPT
 
 # Use the comprehensive coding agent prompt with tools
 CODING_AGENT_SYSTEM_MESSAGE = AGENT_SYSTEM_PROMPT

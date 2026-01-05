@@ -1,6 +1,6 @@
 from typing import List, Optional
 from sqlalchemy.orm import Session
-from app.models import Project, ProjectFile, ProjectStatus
+from app.models import Project, ProjectFile
 from app.schemas import ProjectCreate, ProjectUpdate, ProjectFileCreate
 from app.services.filesystem_service import FileSystemService
 from fastapi import HTTPException, status

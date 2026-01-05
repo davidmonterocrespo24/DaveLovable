@@ -28,5 +28,4 @@ def get_db():
 
 # Initialize database
 def init_db():
-    from app.models import user, project, chat, file
     Base.metadata.create_all(bind=engine)

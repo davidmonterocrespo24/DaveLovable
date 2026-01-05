@@ -27,8 +27,8 @@ def create_sample_user():
             db.add(sample_user)
             db.commit()
             print("✅ Sample user created:")
-            print(f"   Email: demo@lovable.dev")
-            print(f"   Password: demo123")
+            print("   Email: demo@lovable.dev")
+            print("   Password: demo123")
         else:
             print("ℹ️  Sample user already exists")
 
