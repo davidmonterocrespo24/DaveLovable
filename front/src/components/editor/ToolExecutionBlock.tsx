@@ -20,12 +20,25 @@ interface ToolExecutionBlockProps {
 
 const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isLongValue = typeof value === 'string' && value.length > 100;
-  const isObject = typeof value === 'object' && value !== null;
+
+  // Handle {raw: "..."} format from backend parsing errors
+  let displayValue = value;
+  if (typeof value === 'object' && value !== null && 'raw' in value && typeof value.raw === 'string') {
+    try {
+      // Try to parse the raw JSON string
+      displayValue = JSON.parse(value.raw);
+    } catch {
+      // If parsing fails, use the raw string directly
+      displayValue = value.raw;
+    }
+  }
+
+  const isLongValue = typeof displayValue === 'string' && displayValue.length > 100;
+  const isObject = typeof displayValue === 'object' && displayValue !== null;
 
   if (isLongValue) {
     // Detect if content looks like code (contains typical code patterns)
-    const looksLikeCode = /^[\s\S]*(?:import|export|function|const|let|var|class|interface|type|=>|{|}|\(|\)|;|<|>)[\s\S]*$/.test(value);
+    const looksLikeCode = /^[\s\S]*(?:import|export|function|const|let|var|class|interface|type|=>|{|}|\(|\)|;|<|>)[\s\S]*$/.test(displayValue);
 
     return (
       <div className="mb-2">
@@ -35,7 +48,7 @@ const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) 
         >
           {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           <span className="font-mono">{name}</span>
-          <span className="text-muted-foreground">({value.length} chars)</span>
+          <span className="text-muted-foreground">({displayValue.length} chars)</span>
         </button>
         {isExpanded && (
           <div className="mt-1 text-[10px] bg-muted/40 p-2 rounded overflow-x-auto border border-border/20 max-h-96">
@@ -47,10 +60,10 @@ const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) 
                   p: ({ children }) => <>{children}</>,
                 }}
               >
-                {`\`\`\`\n${value}\n\`\`\``}
+                {`\`\`\`\n${displayValue}\n\`\`\``}
               </ReactMarkdown>
             ) : (
-              <pre className="text-foreground m-0">{value}</pre>
+              <pre className="text-foreground m-0">{displayValue}</pre>
             )}
           </div>
         )}
@@ -63,7 +76,7 @@ const ArgumentField: React.FC<{ name: string; value: any }> = ({ name, value }) 
       <span className="text-[10px] font-mono text-purple-400">{name}</span>
       <span className="text-muted-foreground">: </span>
       <span className="text-[10px] text-foreground font-mono">
-        {isObject ? JSON.stringify(value) : String(value)}
+        {isObject ? JSON.stringify(displayValue) : String(displayValue)}
       </span>
     </div>
   );
