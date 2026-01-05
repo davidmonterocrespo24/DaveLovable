@@ -2,53 +2,72 @@
 
 This document outlines pending tasks and development plan for the lovable.dev clone project.
 
+**Last Updated:** 2026-01-05
+
+---
+
 ## Current Status
 
 ✅ **Completed:**
 - Frontend UI/UX (Landing page, Editor interface)
 - Backend API with FastAPI
-- Microsoft AutoGen multi-agent system
+- Microsoft AutoGen multi-agent system (4 agents: Planner, Coder, Reviewer, Team)
 - Database models (SQLite)
-- Frontend-Backend integration
+- Frontend-Backend integration with React Query
 - API service layer and React Query hooks
-- Basic tests and documentation
-
-## High Priority Tasks
-
-### 1. Complete Editor Page Integration
-**Priority:** 🔴 Critical
-**Estimated Time:** 4-6 hours
-**Status:** ⏳ In Progress
-
-**Tasks:**
-- [ ] Update `front/src/pages/Editor.tsx` to use new integrated components
-- [ ] Fix routing to properly handle project ID parameter
-- [ ] Add error boundaries for better error handling
-- [ ] Test file selection and tab management
-- [ ] Verify all components work together correctly
-
-**Files to modify:**
-- `front/src/pages/Editor.tsx`
-
-**Acceptance Criteria:**
-- User can open editor with project ID in URL
-- Files load correctly from backend
-- Chat sends messages and displays AI responses
-- File explorer updates when new files are created
-- Tabs work correctly for multiple files
+- WebContainers integration for live preview ✅
+- Physical file storage system with Git versioning ✅
+- Real-time streaming with SSE (Server-Sent Events) ✅
+- Multi-agent orchestration with thought messages ✅
+- Syntax highlighting in code editor and tool responses ✅
+- Auto-commit with AI-generated commit messages ✅
+- File tree navigation and multi-tab editing ✅
+- Project creation and management ✅
+- Chat interface with agent interactions display ✅
+- Installation and deployment scripts ✅
 
 ---
 
-### 2. Implement File Editing
-**Priority:** 🔴 Critical
-**Estimated Time:** 6-8 hours
-**Status:** ⏸️ Not Started
+## High Priority Tasks
 
-**Tasks:**
-- [ ] Add editable textarea/monaco editor to CodeEditor component
-- [ ] Implement auto-save with debouncing (2-3 seconds)
+### 1. ✅ Complete Editor Page Integration
+**Priority:** 🔴 Critical
+**Status:** ✅ **COMPLETED**
+
+**Completed Tasks:**
+- ✅ Updated `front/src/pages/Editor.tsx` to use integrated components
+- ✅ Fixed routing to handle project ID parameter
+- ✅ Added error boundaries for better error handling
+- ✅ Implemented file selection and tab management
+- ✅ All components work together correctly
+- ✅ Added WebContainer integration
+- ✅ Real-time preview with hot reload
+
+**Files modified:**
+- `front/src/pages/Editor.tsx`
+- `front/src/components/editor/ChatPanel.tsx`
+- `front/src/components/editor/FileExplorer.tsx`
+- `front/src/components/editor/CodeEditor.tsx`
+- `front/src/components/editor/EditorTabs.tsx`
+- `front/src/components/editor/PreviewPanelWithWebContainer.tsx`
+
+---
+
+### 2. ⏸️ Implement File Editing (Manual Editing)
+**Priority:** 🟡 Medium
+**Status:** ⏸️ **PARTIALLY IMPLEMENTED**
+
+**Current State:**
+- ✅ CodeEditor displays file content with syntax highlighting
+- ✅ AI can edit files via agents
+- ❌ Manual editing by user not yet implemented
+- ❌ No save button or auto-save
+
+**Remaining Tasks:**
+- [ ] Add Monaco Editor for better editing experience
+- [ ] Implement manual file editing (editable textarea)
+- [ ] Add auto-save with debouncing (2-3 seconds)
 - [ ] Add save indicator (saved/unsaved state)
-- [ ] Connect to `useUpdateFile()` hook
 - [ ] Handle merge conflicts when AI updates same file
 - [ ] Add keyboard shortcuts (Ctrl+S to save)
 
@@ -56,51 +75,45 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 - `front/src/components/editor/CodeEditor.tsx`
 - Consider adding Monaco Editor: `npm install @monaco-editor/react`
 
-**Acceptance Criteria:**
-- User can edit file content
-- Changes auto-save after inactivity
-- Visual indicator shows save status
-- No data loss on page refresh
-
 ---
 
-### 3. Implement WebContainers for Live Preview
+### 3. ✅ Implement WebContainers for Live Preview
 **Priority:** 🟡 High
-**Estimated Time:** 12-16 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **COMPLETED**
 
-**Tasks:**
-- [ ] Install WebContainers API: `npm install @webcontainer/api`
-- [ ] Create WebContainer service in frontend
-- [ ] Mount project files to virtual filesystem
-- [ ] Start dev server inside WebContainer
-- [ ] Stream preview to PreviewPanel iframe
-- [ ] Handle file updates and hot reload
-- [ ] Add loading states and error handling
-- [ ] Handle WebContainer boot time
+**Completed Tasks:**
+- ✅ Installed WebContainers API
+- ✅ Created WebContainer service in frontend
+- ✅ Mounted project files to virtual filesystem
+- ✅ Started dev server inside WebContainer (Vite)
+- ✅ Stream preview to iframe
+- ✅ Handle file updates and hot reload
+- ✅ Added loading states and error handling
+- ✅ Handle WebContainer boot time
+- ✅ Console log capture and display
+- ✅ Device preview modes (mobile, tablet, desktop)
+- ✅ COOP/COEP headers configured for WebContainer compatibility
 
-**Files to create:**
+**Files created:**
 - `front/src/services/webcontainer.ts`
+- `front/src/services/browserLogs.ts`
+- `front/src/components/editor/PreviewPanelWithWebContainer.tsx`
 
-**Files to modify:**
-- `front/src/components/editor/PreviewPanel.tsx`
-- `front/src/pages/Editor.tsx`
-
-**Reference:**
-- [WebContainers Documentation](https://webcontainers.io/guides/quickstart)
-
-**Acceptance Criteria:**
-- Preview shows actual running application
-- Changes reflect in real-time
-- Console logs accessible
-- Error messages displayed properly
+**Files modified:**
+- `front/vite.config.ts` (added COOP/COEP headers)
 
 ---
 
-### 4. Add User Authentication
+### 4. ⏸️ Add User Authentication
 **Priority:** 🟡 High
 **Estimated Time:** 8-12 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
+
+**Current State:**
+- ⚠️ Backend has JWT and bcrypt dependencies installed
+- ⚠️ Using `MOCK_USER_ID = 1` for all operations
+- ❌ No authentication endpoints
+- ❌ No login/register pages
 
 **Backend Tasks:**
 - [ ] Create auth endpoints (`/api/v1/auth/register`, `/api/v1/auth/login`)
@@ -125,138 +138,120 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 - `front/src/contexts/AuthContext.tsx`
 - `front/src/services/auth.ts`
 
-**Files to modify:**
-- `front/src/App.tsx` (add auth routes)
-- `front/src/services/api.ts` (add auth headers)
-- `backend/app/main.py` (add auth routes)
-
-**Acceptance Criteria:**
-- Users can register and login
-- JWT tokens work correctly
-- Protected routes redirect to login
-- Users only see their own projects
-
 ---
 
 ## Medium Priority Tasks
 
-### 5. Add Real-time Collaboration with WebSockets
+### 5. ✅ Real-time Streaming (SSE)
 **Priority:** 🟠 Medium
-**Estimated Time:** 16-20 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **COMPLETED**
 
-**Tasks:**
-- [ ] Install WebSocket library: `pip install python-socketio`
-- [ ] Create WebSocket server in backend
-- [ ] Implement room-based connections (per project)
-- [ ] Broadcast file changes to all connected users
-- [ ] Show active users in project
-- [ ] Add presence indicators (who's viewing what)
-- [ ] Handle conflict resolution for simultaneous edits
-- [ ] Add user cursors in editor (optional)
+**Completed Tasks:**
+- ✅ Implemented Server-Sent Events (SSE) for real-time streaming
+- ✅ Agent interactions stream in real-time
+- ✅ Tool calls and responses display as they happen
+- ✅ Thought messages show before tool calls
+- ✅ Progress indicators during AI processing
+- ✅ Stream reconnection on page reload
+- ✅ Proper handling of stream interruptions
 
-**Files to create:**
-- `backend/app/websockets/manager.py`
-- `backend/app/websockets/events.py`
-- `front/src/services/websocket.ts`
-
-**Acceptance Criteria:**
-- Multiple users can work on same project
-- Changes sync in real-time
-- Active users list displayed
-- No data loss during concurrent edits
+**Files implemented:**
+- `front/src/services/api.ts` (SSE client)
+- `front/src/components/editor/ChatPanel.tsx` (SSE handling)
+- `backend/app/api/chat.py` (SSE endpoints)
+- `backend/app/services/chat_service.py` (streaming logic)
 
 ---
 
-### 6. Improve AI Agent System
+### 6. ✅ Improve AI Agent System
 **Priority:** 🟠 Medium
-**Estimated Time:** 8-12 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **SIGNIFICANTLY IMPROVED**
 
-**Tasks:**
-- [ ] Add streaming responses (show AI thinking in real-time)
-- [ ] Improve code extraction from agent responses
+**Completed Tasks:**
+- ✅ Added streaming responses (real-time AI thinking)
+- ✅ Improved code extraction from agent responses
+- ✅ 4 specialized agents (Planner, Coder, Reviewer, Team)
+- ✅ Implemented agent state persistence
+- ✅ Sequential tool calling to prevent token limits
+- ✅ Tool call explanations (thought messages)
+- ✅ Error handling for agent failures
+- ✅ Agent interaction logging and display
+
+**Remaining Tasks:**
 - [ ] Add more specialized agents (Testing Agent, Documentation Agent)
-- [ ] Implement agent memory for context awareness
-- [ ] Add ability to choose which agents to use
-- [ ] Improve error handling for agent failures
 - [ ] Add cost tracking for OpenAI API usage
+- [ ] Implement agent memory for longer context
+- [ ] Add ability to choose which agents to use
 
-**Files to modify:**
+**Files modified:**
 - `backend/app/agents/orchestrator.py`
 - `backend/app/agents/config.py`
+- `backend/app/agents/prompts.py`
 - `backend/app/services/chat_service.py`
 
-**Files to create:**
-- `backend/app/agents/testing_agent.py`
-- `backend/app/agents/documentation_agent.py`
+---
 
-**Acceptance Criteria:**
-- Users see AI response in real-time
-- More accurate code generation
-- Better context understanding
-- Cost tracking available
+### 7. ✅ Add Project Templates
+**Priority:** 🟠 Medium
+**Status:** ✅ **COMPLETED**
+
+**Completed Tasks:**
+- ✅ Vite + React + TypeScript template created automatically
+- ✅ Tailwind CSS pre-configured
+- ✅ Complete package.json with all dependencies
+- ✅ Projects initialize with working structure
+- ✅ Template includes: index.html, main.tsx, App.tsx, index.css
+
+**Current Template:**
+- React 18.3 + TypeScript 5.8
+- Vite 5.4
+- Tailwind CSS 3.4
+- Pre-installed: lucide-react, clsx, date-fns, axios, zustand, react-query, framer-motion, react-hook-form, zod
+
+**Future Enhancement:**
+- [ ] Add multiple template options (Next.js, Vue, Svelte)
+- [ ] Template selection UI
+- [ ] User-defined custom templates
+
+**Files implementing templates:**
+- `backend/app/services/filesystem_service.py` (create_project_structure)
 
 ---
 
-### 7. Add Project Templates
+### 8. ✅ Implement Git Integration
 **Priority:** 🟠 Medium
-**Estimated Time:** 6-8 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **COMPLETED**
 
-**Tasks:**
-- [ ] Create template system in backend
-- [ ] Add templates: React + Tailwind, Next.js, Vue, etc.
-- [ ] Create template selection UI in frontend
-- [ ] Allow users to create projects from templates
-- [ ] Add template preview/description
-- [ ] Support custom templates (user-defined)
+**Completed Tasks:**
+- ✅ Installed GitPython
+- ✅ Created git repository for each project
+- ✅ Auto-commit on AI code changes
+- ✅ AI-generated commit messages
+- ✅ Git initialization on project creation
+- ✅ Commit history available via API
 
-**Files to create:**
-- `backend/app/templates/` (directory with template files)
-- `backend/app/services/template_service.py`
-- `front/src/components/templates/TemplateSelector.tsx`
-
-**Acceptance Criteria:**
-- Users can choose from multiple templates
-- Projects initialize with template files
-- Templates are well-documented
-
----
-
-### 8. Implement Git Integration
-**Priority:** 🟠 Medium
-**Estimated Time:** 12-16 hours
-**Status:** ⏸️ Not Started
-
-**Tasks:**
-- [ ] Install GitPython: `pip install gitpython`
-- [ ] Create git repository for each project
-- [ ] Auto-commit on significant changes
+**Remaining Tasks:**
 - [ ] Show commit history in UI
-- [ ] Allow manual commits with messages
+- [ ] Allow manual commits with custom messages
 - [ ] Implement branch management
 - [ ] Add diff viewer
 - [ ] Support push to GitHub (optional)
 
-**Files to create:**
+**Files created:**
 - `backend/app/services/git_service.py`
-- `front/src/components/editor/GitPanel.tsx`
+- `backend/app/services/commit_message_service.py`
 
-**Acceptance Criteria:**
-- Automatic version control
-- Users can view history
-- Can revert to previous versions
-- Manual commit option available
+**Future UI:**
+- [ ] `front/src/components/editor/GitPanel.tsx`
 
 ---
 
 ## Low Priority Tasks
 
-### 9. Add Project Export/Import
+### 9. ⏸️ Add Project Export/Import
 **Priority:** 🟢 Low
 **Estimated Time:** 4-6 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
 
 **Tasks:**
 - [ ] Create export endpoint (download project as ZIP)
@@ -265,16 +260,12 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 - [ ] Support import from GitHub URL
 - [ ] Include project settings in export
 
-**Files to create:**
-- `backend/app/api/export.py`
-- `front/src/components/editor/ExportDialog.tsx`
-
 ---
 
-### 10. Add Code Linting and Formatting
+### 10. ⏸️ Add Code Linting and Formatting
 **Priority:** 🟢 Low
 **Estimated Time:** 6-8 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
 
 **Tasks:**
 - [ ] Integrate ESLint for TypeScript/JavaScript
@@ -283,32 +274,33 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 - [ ] Add auto-format on save option
 - [ ] Support configuration files (.eslintrc, .prettierrc)
 
-**Files to modify:**
-- `front/src/components/editor/CodeEditor.tsx`
-
 ---
 
-### 11. Improve UI/UX
+### 11. ⏸️ Improve UI/UX
 **Priority:** 🟢 Low
 **Estimated Time:** 8-10 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **PARTIALLY IMPLEMENTED**
 
-**Tasks:**
+**Completed:**
+- ✅ Dark theme (default)
+- ✅ Responsive design
+- ✅ Loading states and animations
+- ✅ Tooltips for many features
+
+**Remaining Tasks:**
 - [ ] Add dark/light theme toggle
 - [ ] Improve mobile responsiveness
 - [ ] Add keyboard shortcuts guide
 - [ ] Implement command palette (Cmd/Ctrl + K)
 - [ ] Add drag-and-drop for files
-- [ ] Improve loading states and animations
-- [ ] Add tooltips for all features
 - [ ] Create onboarding tour for new users
 
 ---
 
-### 12. Add Search and Replace
+### 12. ⏸️ Add Search and Replace
 **Priority:** 🟢 Low
 **Estimated Time:** 4-6 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
 
 **Tasks:**
 - [ ] Add search input in editor
@@ -320,10 +312,15 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ---
 
-### 13. Implement Testing Infrastructure
+### 13. ⏸️ Implement Testing Infrastructure
 **Priority:** 🟢 Low
 **Estimated Time:** 10-12 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **MINIMAL IMPLEMENTATION**
+
+**Current State:**
+- ✅ Backend has basic test structure
+- ⚠️ Test coverage is minimal
+- ❌ Frontend has no tests
 
 **Backend Tasks:**
 - [ ] Expand test coverage to 80%+
@@ -339,17 +336,12 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 - [ ] Test all hooks
 - [ ] Test API service layer
 
-**Files to create:**
-- `front/vitest.config.ts`
-- `front/src/**/*.test.tsx`
-- `.github/workflows/test.yml`
-
 ---
 
-### 14. Add Analytics and Monitoring
+### 14. ⏸️ Add Analytics and Monitoring
 **Priority:** 🟢 Low
 **Estimated Time:** 6-8 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
 
 **Tasks:**
 - [ ] Add error tracking (Sentry)
@@ -361,16 +353,20 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ---
 
-### 15. Performance Optimization
+### 15. ⏸️ Performance Optimization
 **Priority:** 🟢 Low
 **Estimated Time:** 8-10 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **PARTIALLY OPTIMIZED**
 
-**Tasks:**
-- [ ] Implement code splitting in frontend
-- [ ] Add lazy loading for components
-- [ ] Optimize bundle size
-- [ ] Add caching with Redis (backend)
+**Completed:**
+- ✅ Code splitting with Vite
+- ✅ Lazy loading for routes
+- ✅ Optimized bundle with Vite
+- ✅ React Query caching
+- ✅ Streaming responses (SSE)
+
+**Remaining Tasks:**
+- [ ] Add Redis caching (backend)
 - [ ] Implement pagination for large file lists
 - [ ] Optimize database queries
 - [ ] Add CDN for static assets
@@ -379,10 +375,14 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ## Infrastructure Tasks
 
-### 16. Database Migration to PostgreSQL
+### 16. ⏸️ Database Migration to PostgreSQL
 **Priority:** 🟢 Low
 **Estimated Time:** 4-6 hours
-**Status:** ⏸️ Not Started
+**Status:** ⏸️ **NOT STARTED**
+
+**Current State:**
+- ⚠️ Using SQLite (works well for development)
+- ⚠️ Code is database-agnostic (SQLAlchemy)
 
 **Tasks:**
 - [ ] Set up PostgreSQL database
@@ -393,29 +393,32 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ---
 
-### 17. Deployment Setup
+### 17. ✅ Deployment Setup
 **Priority:** 🟢 Low
-**Estimated Time:** 8-12 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **COMPLETED**
 
-**Backend Deployment:**
-- [ ] Set up Docker containers
-- [ ] Configure production environment
-- [ ] Set up cloud hosting (AWS/GCP/Azure)
-- [ ] Configure SSL certificates
-- [ ] Set up domain name
-- [ ] Configure environment variables
+**Completed Tasks:**
+- ✅ Created installation script (`install.sh`)
+- ✅ Created uninstallation script (`uninstall.sh`)
+- ✅ Configured Nginx with SSL (Let's Encrypt)
+- ✅ Created systemd service for backend
+- ✅ Automatic daily backups
+- ✅ Update script (`update.sh`)
+- ✅ Backup script (`backup.sh`)
+- ✅ Firewall configuration (UFW)
+- ✅ Complete deployment documentation
 
-**Frontend Deployment:**
-- [ ] Build production bundle
-- [ ] Deploy to Vercel/Netlify
-- [ ] Configure custom domain
-- [ ] Set up CDN
+**Files created:**
+- `install.sh`
+- `uninstall.sh`
+- `INSTALLATION.md`
+- `DEPLOYMENT.md`
 
-**Files to create:**
-- `Dockerfile` (backend)
-- `docker-compose.yml`
-- `.github/workflows/deploy.yml`
+**Future Enhancements:**
+- [ ] Docker containerization
+- [ ] Kubernetes deployment
+- [ ] CI/CD pipeline with GitHub Actions
+- [ ] Multi-region deployment
 
 ---
 
@@ -423,81 +426,164 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ### Current Known Issues
 
-1. **File Tree Building**
-   - [ ] Fix edge cases in `buildFileTree()` function
-   - [ ] Handle nested folders correctly
+1. ✅ **WebContainer Reload Timing**
+   - **Status:** ✅ **FIXED**
+   - ✅ Implemented 2-second delay after stream completes
+   - ✅ Prevents import errors from premature reload
+   - ✅ Final message displays correctly
+
+2. ✅ **Tool Call Display**
+   - **Status:** ✅ **FIXED**
+   - ✅ All tool calls now display correctly
+   - ✅ Proper matching of tool_calls with tool_responses
+   - ✅ Handles multiple parallel tool calls
+
+3. ✅ **Syntax Highlighting in Tool Responses**
+   - **Status:** ✅ **FIXED**
+   - ✅ Code in tool responses shows syntax highlighting
+   - ✅ File content renders with proper formatting
+
+4. ✅ **Agent State File Blocking**
+   - **Status:** ✅ **FIXED**
+   - ✅ Blocked `.agent_state.json` from all file operations
+   - ✅ Filtered from WebContainer bundle
+
+5. ✅ **Planner Agent Generating Code**
+   - **Status:** ✅ **FIXED**
+   - ✅ Updated prompts to prevent Planner from showing code
+   - ✅ Planner now only creates plans, Coder generates code
+
+6. ✅ **Parallel Tool Calls Token Limits**
+   - **Status:** ✅ **FIXED**
+   - ✅ Disabled parallel tool calls at model client level
+   - ✅ Prevents JSON truncation errors
+
+7. ⏸️ **File Tree Building**
+   - **Status:** ⏸️ **NEEDS TESTING**
+   - [ ] Test with deeply nested folders
+   - [ ] Handle edge cases in `buildFileTree()`
    - [ ] Test with complex project structures
 
-2. **Chat Session Management**
-   - [ ] Ensure sessions persist correctly
-   - [ ] Fix session selection in ChatPanel
-   - [ ] Test with multiple concurrent sessions
-
-3. **Editor Performance**
-   - [ ] Optimize syntax highlighting for large files
-   - [ ] Add virtualization for long files
-   - [ ] Improve scroll performance
+8. ⏸️ **Chat Session Management**
+   - **Status:** ⏸️ **NEEDS IMPROVEMENT**
+   - [ ] Better session selection UI
+   - [ ] Session persistence across page reloads
+   - [ ] Delete old sessions
 
 ---
 
 ## Documentation Tasks
 
-### 18. Improve Documentation
+### 18. ✅ Improve Documentation
 **Priority:** 🟠 Medium
-**Estimated Time:** 6-8 hours
-**Status:** ⏸️ Not Started
+**Status:** ✅ **SIGNIFICANTLY IMPROVED**
 
-**Tasks:**
-- [ ] Add API documentation with examples
-- [ ] Create component documentation
+**Completed Documentation:**
+- ✅ `README.md` - Project overview
+- ✅ `CLAUDE.md` - Claude Code guidance
+- ✅ `INSTALLATION.md` - Detailed installation guide
+- ✅ `DEPLOYMENT.md` - Quick deployment guide
+- ✅ `INTEGRATION_GUIDE.md` - Frontend-backend integration
+- ✅ `README_INTEGRATION.md` - Integration details
+- ✅ `WEBCONTAINERS_IMPLEMENTATION.md` - WebContainer setup
+- ✅ `ARCHITECTURE_ANALYSIS.md` - Architecture overview
+
+**Remaining Tasks:**
+- [ ] Add API documentation with Swagger/OpenAPI examples
+- [ ] Create component documentation with Storybook
 - [ ] Add architecture diagrams
-- [ ] Write contributing guidelines
+- [ ] Write contributing guidelines (`CONTRIBUTING.md`)
 - [ ] Create video tutorials
 - [ ] Add troubleshooting guide
-- [ ] Document all environment variables
-- [ ] Add changelog
-
-**Files to create:**
-- `CONTRIBUTING.md`
-- `CHANGELOG.md`
-- `docs/API.md`
-- `docs/COMPONENTS.md`
+- [ ] Add changelog (`CHANGELOG.md`)
 
 ---
 
-## Development Priorities
+## Development Priorities (Updated)
 
-### Sprint 1 (Week 1-2): Critical Foundation
-1. Complete Editor Page Integration ⏳
-2. Implement File Editing
-3. Add User Authentication
+### ✅ Sprint 1 (Completed): Foundation
+1. ✅ Complete Editor Page Integration
+2. ✅ Implement WebContainers for Live Preview
+3. ✅ Multi-agent system with streaming
+4. ✅ Git integration with auto-commit
+5. ✅ Real-time SSE streaming
+6. ✅ Deployment scripts
 
-### Sprint 2 (Week 3-4): Core Features
-4. Implement WebContainers for Live Preview
-5. Add Project Templates
-6. Improve AI Agent System
+### 🟡 Sprint 2 (Current): Core Features
+1. ⏸️ Implement File Editing (manual editing)
+2. ⏸️ Add User Authentication
+3. ⏸️ Project list improvements (ordering, redirection)
+4. ⏸️ Git UI (commit history, manual commits)
 
-### Sprint 3 (Week 5-6): Collaboration
-7. Add Real-time Collaboration with WebSockets
-8. Implement Git Integration
-9. Improve UI/UX
+### 🔵 Sprint 3 (Upcoming): Enhancement
+1. Add Project Templates (multiple options)
+2. Improve UI/UX (theme toggle, keyboard shortcuts)
+3. Add Search and Replace
+4. Code Linting and Formatting
 
-### Sprint 4 (Week 7-8): Polish & Deploy
-10. Testing Infrastructure
-11. Performance Optimization
-12. Deployment Setup
-13. Documentation
+### 🟣 Sprint 4 (Future): Scale & Polish
+1. Add Real-time Collaboration (WebSockets)
+2. Testing Infrastructure
+3. Performance Optimization
+4. Analytics and Monitoring
+
+---
+
+## Progress Summary
+
+### Completion Status
+
+**Completed Features:** ~65%
+- ✅ Core editor functionality
+- ✅ AI agent system with 4 agents
+- ✅ WebContainers integration
+- ✅ Real-time streaming (SSE)
+- ✅ Git versioning
+- ✅ File management
+- ✅ Project management
+- ✅ Deployment infrastructure
+
+**In Progress:** ~15%
+- ⏳ Manual file editing
+- ⏳ Authentication system
+- ⏳ UI improvements
+
+**Not Started:** ~20%
+- ⏸️ Real-time collaboration
+- ⏸️ Testing infrastructure
+- ⏸️ Advanced git UI
+- ⏸️ Project templates selection
 
 ---
 
 ## Notes
 
-- All code must be in English (comments, variable names, documentation)
-- Follow existing code style and conventions
-- Write tests for new features
-- Update documentation when adding features
-- Create pull requests for major changes
-- Run `pytest` and `npm run lint` before committing
+- ✅ All code is in English (comments, variable names, documentation)
+- ✅ Following consistent code style and conventions
+- ⚠️ Tests need expansion
+- ✅ Documentation is comprehensive
+- ⚠️ Need CI/CD pipeline
+
+---
+
+## Recent Improvements (January 2026)
+
+1. ✅ **Thought Messages Before Tool Calls**
+   - Agent now explains what it's about to do before each tool call
+   - Better transparency for users
+
+2. ✅ **WebContainer Reload Timing Fix**
+   - Fixed issue where reload happened too early
+   - Increased delay to 2 seconds after stream completion
+
+3. ✅ **Tool Call Display Improvements**
+   - All tool calls now display correctly
+   - Proper grouping and matching with responses
+
+4. ✅ **Deployment Scripts**
+   - Complete installation automation
+   - Nginx + SSL + systemd service
+   - Automatic backups and updates
 
 ---
 
@@ -511,9 +597,6 @@ This document outlines pending tasks and development plan for the lovable.dev cl
 
 ---
 
-**Last Updated:** 2025-12-26
-
-**Total Estimated Time:** 150-200 hours
+**Total Estimated Remaining Time:** ~60-80 hours
 
 **Contributors:** Add your name when completing tasks
-

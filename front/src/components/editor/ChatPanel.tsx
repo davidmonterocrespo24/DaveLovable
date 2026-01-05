@@ -403,7 +403,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                     onReloadPreview(pendingReloadRef.current);
                     pendingReloadRef.current = null;
                   }
-                }, 1000); // Increased to 1000ms to give more time for file sync
+                }, 2000); // Increased to 2000ms (2 seconds) to give more time for file sync
               }
             },
             onError: (error) => {
