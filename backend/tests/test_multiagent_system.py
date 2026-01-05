@@ -10,17 +10,15 @@ Run specific test: pytest backend/tests/test_multiagent_system.py::test_orchestr
 
 import pytest
 import os
-import asyncio
 import tempfile
 import shutil
 from pathlib import Path
 from unittest.mock import Mock, patch, AsyncMock
-from sqlalchemy.orm import Session
 
 from app.agents.orchestrator import AgentOrchestrator, get_orchestrator
 from app.services.chat_service import ChatService
-from app.schemas import ChatRequest, ChatMessageCreate
-from app.models import ChatSession, ChatMessage, MessageRole, Project, ProjectFile
+from app.schemas import ChatRequest
+from app.models import MessageRole, Project
 from app.db.database import SessionLocal, Base, engine
 from app.core.config import settings
 
@@ -185,7 +183,6 @@ class TestChatServiceIntegration:
     @pytest.mark.asyncio
     async def test_chat_service_with_mock_orchestrator(self, db_session, test_project):
         """Test chat service with mocked orchestrator response"""
-        from app.schemas import ChatRequest
 
         # Create mock response from orchestrator
         mock_result = Mock()
@@ -222,7 +219,6 @@ class TestChatServiceIntegration:
     @pytest.mark.asyncio
     async def test_working_directory_context(self, db_session, test_project):
         """Test that working directory is set correctly for agent tools"""
-        from app.schemas import ChatRequest
         from pathlib import Path
 
         original_cwd = os.getcwd()
@@ -316,7 +312,6 @@ class TestEndToEndMultiAgent:
     @pytest.mark.slow
     async def test_real_agent_simple_task(self, db_session, test_project):
         """Test real multi-agent system with a simple task"""
-        from app.schemas import ChatRequest
 
         chat_request = ChatRequest(
             message="Create a simple file called hello.txt with the content 'Hello from agents!'",
@@ -388,7 +383,6 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_orchestrator_error_handling(self, db_session, test_project):
         """Test that errors from orchestrator are handled gracefully"""
-        from app.schemas import ChatRequest
 
         # Mock orchestrator to raise an error
         with patch('app.services.chat_service.get_orchestrator') as mock_get_orch:
@@ -415,7 +409,6 @@ class TestErrorHandling:
     @pytest.mark.asyncio
     async def test_missing_api_key_handling(self, db_session, test_project):
         """Test handling when OpenAI API key is not configured"""
-        from app.schemas import ChatRequest
 
         # Mock get_orchestrator to raise ValueError (like when API key is missing)
         with patch('app.services.chat_service.get_orchestrator', side_effect=ValueError("OpenAI API key not configured")):

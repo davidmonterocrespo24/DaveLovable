@@ -46,7 +46,7 @@ def test_orchestrator_initialization():
     essential_tools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'list_dir']
     for tool in essential_tools:
         assert tool in tool_names, f"Missing essential tool: {tool}"
-    print(f"✓ All essential file operation tools present")
+    print("✓ All essential file operation tools present")
 
     # Check planner has no tools
     assert orchestrator.planning_agent._tools == [], "Planner should have no tools"
@@ -129,7 +129,6 @@ def test_working_directory_context():
     """Test that working directory context is set correctly"""
     print("\n=== Test 3: Working Directory Context ===")
 
-    import os
     import tempfile
     import shutil
     from pathlib import Path
@@ -145,12 +144,12 @@ def test_working_directory_context():
     current_dir = str(Path(os.getcwd()).resolve())
     expected_resolved = str(temp_dir.resolve())
     assert current_dir == expected_resolved, f"Working directory should change. Expected: {expected_resolved}, Got: {current_dir}"
-    print(f"✓ Changed working directory to temp directory")
+    print("✓ Changed working directory to temp directory")
 
     # Test restoring directory
     os.chdir(original_cwd)
     assert os.getcwd() == original_cwd, "Working directory should restore"
-    print(f"✓ Restored original working directory")
+    print("✓ Restored original working directory")
 
     # Cleanup
     shutil.rmtree(temp_dir)

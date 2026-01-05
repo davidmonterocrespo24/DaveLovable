@@ -3,7 +3,6 @@ Tool for executing terminal commands safely
 """
 
 import subprocess
-import os
 
 from app.agents.tools.common import get_workspace
 

@@ -1,4 +1,4 @@
-from typing import List, Optional, Dict
+from typing import List, Dict
 from sqlalchemy.orm import Session
 from app.models import ChatSession, ChatMessage, MessageRole, ProjectFile
 from app.schemas import ChatSessionCreate, ChatMessageCreate, ChatRequest
@@ -518,7 +518,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 # Load saved agent state if it exists
                 state_loaded = await orchestrator.load_state(project_id)
                 if state_loaded:
-                    logger.info(f"♻️  Restored agent state from previous session")
+                    logger.info("♻️  Restored agent state from previous session")
 
                 # List to collect all agent interactions for database storage
                 agent_interactions = []
