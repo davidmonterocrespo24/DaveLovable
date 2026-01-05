@@ -212,8 +212,15 @@ def get_project_bundle(
     # Get all files from filesystem
     files_list = FileSystemService.get_all_files(project_id)
 
+    # Filter out internal agent state files before sending to WebContainer
+    forbidden_files = ['.agent_state.json', 'agent_state.json']
+    filtered_files = [
+        file for file in files_list
+        if not any(forbidden in file["path"] for forbidden in forbidden_files)
+    ]
+
     # Convert to WebContainers format: { "path": "content" }
-    files_dict = {file["path"]: file["content"] for file in files_list}
+    files_dict = {file["path"]: file["content"] for file in filtered_files}
 
     return {"files": files_dict}
 

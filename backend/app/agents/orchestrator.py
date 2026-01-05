@@ -95,6 +95,7 @@ class AgentOrchestrator:
             base_url=settings.OPENAI_API_BASE_URL,
             temperature=0.7,
             model_info=model_info,
+            parallel_tool_calls=False,  # Disable parallel tool calls to prevent token limit issues with large files
         )
         self.coder_agent = AssistantAgent(
             name="Coder",

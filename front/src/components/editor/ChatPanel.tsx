@@ -490,65 +490,78 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                     <>
                       {/* Agent Interactions */}
                       {message.agent_interactions && message.agent_interactions.length > 0 && (() => {
-                        // Process interactions in order, grouping consecutive tool calls by agent
+                        // Process interactions: separate tool_calls and tool_responses, then match them
                         const elements: JSX.Element[] = [];
-                        let currentToolCalls: any[] = [];
-                        let currentAgent: string | null = null;
-                        let currentToolCall: any = null;
 
-                        const flushToolCalls = () => {
-                          if (currentToolCalls.length > 0) {
-                            elements.push(
-                              <ToolExecutionBlock
-                                key={`${message.id}-tools-${elements.length}`}
-                                executions={currentToolCalls}
-                              />
-                            );
-                            currentToolCalls = [];
-                            currentAgent = null;
-                          }
-                        };
+                        // First pass: collect all tool_calls and tool_responses separately
+                        const toolCalls: any[] = [];
+                        const toolResponses: any[] = [];
+                        const thoughts: any[] = [];
 
                         message.agent_interactions.forEach((interaction, idx) => {
                           if (interaction.message_type === 'thought') {
-                            // Flush any pending tool calls before showing thought
-                            flushToolCalls();
-
-                            elements.push(
-                              <AgentInteraction
-                                key={`${message.id}-thought-${idx}`}
-                                agentName={interaction.agent_name}
-                                messageType={interaction.message_type}
-                                content={interaction.content}
-                                toolName={interaction.tool_name}
-                                toolArguments={interaction.tool_arguments}
-                                timestamp={interaction.timestamp}
-                              />
-                            );
+                            thoughts.push({ interaction, idx });
                           } else if (interaction.message_type === 'tool_call') {
-                            // If agent changed, flush previous tool calls
-                            if (currentAgent && currentAgent !== interaction.agent_name) {
-                              flushToolCalls();
-                            }
-
-                            currentAgent = interaction.agent_name;
-                            currentToolCall = {
+                            toolCalls.push({
                               toolName: interaction.tool_name || 'unknown',
                               agentName: interaction.agent_name,
                               arguments: interaction.tool_arguments || {},
-                              response: '',
+                              response: '', // Will be filled later
                               timestamp: interaction.timestamp,
-                            };
-                          } else if (interaction.message_type === 'tool_response' && currentToolCall) {
-                            currentToolCall.response = interaction.content;
-                            currentToolCall.hasError = interaction.content.toLowerCase().includes('error');
-                            currentToolCalls.push(currentToolCall);
-                            currentToolCall = null;
+                              idx,
+                            });
+                          } else if (interaction.message_type === 'tool_response') {
+                            toolResponses.push({
+                              content: interaction.content,
+                              hasError: interaction.content.toLowerCase().includes('error'),
+                              idx,
+                            });
                           }
                         });
 
-                        // Flush any remaining tool calls
-                        flushToolCalls();
+                        // Second pass: match tool_calls with tool_responses in order
+                        const matchedToolCalls: any[] = [];
+                        for (let i = 0; i < Math.min(toolCalls.length, toolResponses.length); i++) {
+                          matchedToolCalls.push({
+                            ...toolCalls[i],
+                            response: toolResponses[i].content,
+                            hasError: toolResponses[i].hasError,
+                          });
+                        }
+
+                        // Add unmatched tool calls (responses not received yet)
+                        for (let i = toolResponses.length; i < toolCalls.length; i++) {
+                          matchedToolCalls.push({
+                            ...toolCalls[i],
+                            response: '⏳ Waiting for response...',
+                            hasError: false,
+                          });
+                        }
+
+                        // Render thoughts first (if any)
+                        thoughts.forEach(({ interaction, idx }) => {
+                          elements.push(
+                            <AgentInteraction
+                              key={`${message.id}-thought-${idx}`}
+                              agentName={interaction.agent_name}
+                              messageType={interaction.message_type}
+                              content={interaction.content}
+                              toolName={interaction.tool_name}
+                              toolArguments={interaction.tool_arguments}
+                              timestamp={interaction.timestamp}
+                            />
+                          );
+                        });
+
+                        // Render all matched tool calls in a single block
+                        if (matchedToolCalls.length > 0) {
+                          elements.push(
+                            <ToolExecutionBlock
+                              key={`${message.id}-tools`}
+                              executions={matchedToolCalls}
+                            />
+                          );
+                        }
 
                         return (
                           <div className="space-y-2 mb-3">

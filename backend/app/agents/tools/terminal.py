@@ -17,20 +17,28 @@ async def run_terminal_cmd(
     try:
         workspace = get_workspace()
 
-        # GUARDRAIL: Block forbidden development server commands
-        # These commands interfere with WebContainer's automatic dev server
-        # BUT ALLOW verification commands like "npm run build" or "tsc --noEmit"
+        # GUARDRAIL: Block forbidden development server commands AND build commands
+        # These commands won't work because Node.js runs in WebContainer (browser), not in this backend
         forbidden_patterns = [
             'npm run dev',
+            'npm run build',
             'npm start',
             'yarn dev',
+            'yarn build',
             'yarn start',
             'pnpm dev',
+            'pnpm build',
             'pnpm start',
+            'vite',
             'vite dev',
+            'vite build',
             'vite preview',
+            'tsc',
+            'npx tsc',
             'react-scripts start',
+            'react-scripts build',
             'next dev',
+            'next build',
             'next start',
         ]
 
@@ -43,32 +51,35 @@ async def run_terminal_cmd(
 
 Command: {command}
 
-This command is FORBIDDEN because the WebContainer preview environment automatically handles running the development server.
+This command is FORBIDDEN because Node.js commands cannot run in this backend environment.
+The project runs in WebContainer (in the browser), not in this Python backend.
 
 BLOCKED COMMANDS:
-• npm run dev, npm start
-• yarn dev, yarn start
-• pnpm dev, pnpm start
-• vite dev, vite preview
-• react-scripts start
-• next dev, next start
+• npm run dev, npm run build, npm start
+• yarn dev, yarn build, yarn start
+• pnpm dev, pnpm build, pnpm start
+• vite, vite dev, vite build, vite preview
+• tsc, npx tsc --noEmit
+• react-scripts start, react-scripts build
+• next dev, next build, next start
 
-WHY: Running these commands will:
-✗ Cause the process to hang indefinitely
-✗ Interfere with WebContainer's automatic server
-✗ Waste time and resources
+WHY: These commands won't work because:
+✗ Node.js project runs in WebContainer (browser), not in backend
+✗ Backend is Python environment without Node.js in the project PATH
+✗ Commands would fail with "command not found" or hang
 
 WHAT YOU CAN DO INSTEAD:
-✓ The preview panel already shows your app running
-✓ Changes are automatically hot-reloaded
-✓ Just edit files and see changes instantly
+✓ The preview panel shows your app running in WebContainer
+✓ WebContainer automatically handles npm install, build, and dev server
+✓ Changes are automatically hot-reloaded in the preview
+✓ Use manual verification: list_dir + grep_search to check imports
 
-VERIFICATION COMMANDS (ALLOWED):
-✓ npm run build - Verify the project builds successfully
-✓ npx tsc --noEmit - Check for TypeScript errors
-✓ npm run lint - Run linting checks
+VERIFICATION STRATEGY:
+✓ Use list_dir("src/components") to verify files exist
+✓ Use grep_search to find import statements and cross-check with created files
+✓ WebContainer console shows TypeScript errors in real-time
 
-If you need to test the application, it's already running in the WebContainer preview panel on the right side of the screen."""
+The WebContainer environment handles all Node.js operations automatically."""
 
         # Check for background process attempts (commands with &)
         if '&' in command and not command.strip().endswith('&&'):

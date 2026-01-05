@@ -24,6 +24,22 @@ async def read_file(
         File contents with line range information, or error message if file not found
     """
     try:
+        # GUARDRAIL: Block internal agent state files
+        forbidden_files = ['.agent_state.json', 'agent_state.json']
+        if any(forbidden in target_file for forbidden in forbidden_files):
+            return f"""🚨 FILE BLOCKED 🚨
+
+File: {target_file}
+
+This file is FORBIDDEN because it's an internal agent state file.
+Agent state files should never be part of the user's project.
+
+BLOCKED FILES:
+• .agent_state.json
+• agent_state.json
+
+These files are for internal agent memory only and must not be read from the project."""
+
         workspace = get_workspace()
 
         # Resolve path

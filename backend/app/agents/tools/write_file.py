@@ -15,6 +15,22 @@ async def write_file(target_file: str, file_content: str) -> str:
     automatically create 'src/', 'src/components/', and 'src/components/ui/'.
     """
     try:
+        # GUARDRAIL: Block internal agent state files
+        forbidden_files = ['.agent_state.json', 'agent_state.json']
+        if any(forbidden in target_file for forbidden in forbidden_files):
+            return f"""🚨 FILE BLOCKED 🚨
+
+File: {target_file}
+
+This file is FORBIDDEN because it's an internal agent state file.
+Agent state files should never be part of the user's project.
+
+BLOCKED FILES:
+• .agent_state.json
+• agent_state.json
+
+These files are for internal agent memory only and must not be written to the project."""
+
         workspace = get_workspace()
         target = (
             workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
