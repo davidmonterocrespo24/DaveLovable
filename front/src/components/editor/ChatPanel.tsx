@@ -362,17 +362,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               });
             },
             onComplete: (data) => {
+              console.log('[ChatPanel] Complete event - updating message content');
+
               // Update the streaming message with the final response
-              setMessages((prev) =>
-                prev.map((msg) =>
+              setMessages((prev) => {
+                const updated = prev.map((msg) =>
                   msg.id === streamingMessageId
                     ? {
                       ...msg,
                       content: data.message.content,
                     }
                     : msg
-                )
-              );
+                );
+                console.log('[ChatPanel] Messages updated with final content');
+                return updated;
+              });
 
               // Notify parent if code changes were made OR if termination signal is present
               const hasTerminationSignal = data.message.content.includes('TERMINATE') || data.message.content.includes('TASK_COMPLETED');
@@ -389,13 +393,17 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               // This ensures all messages are processed before WebContainer reloads
               if (pendingReloadRef.current && onReloadPreview) {
                 console.log('[ChatPanel] Executing pending reload after stream completion');
-                // Small delay to ensure all state updates are processed
+                // Wait longer to ensure:
+                // 1. React updates the DOM with the final message
+                // 2. Files are fully written to the backend filesystem
+                // 3. WebContainer has time to sync the files
                 setTimeout(() => {
+                  console.log('[ChatPanel] Now executing the reload');
                   if (onReloadPreview && pendingReloadRef.current) {
                     onReloadPreview(pendingReloadRef.current);
                     pendingReloadRef.current = null;
                   }
-                }, 100);
+                }, 1000); // Increased to 1000ms to give more time for file sync
               }
             },
             onError: (error) => {
