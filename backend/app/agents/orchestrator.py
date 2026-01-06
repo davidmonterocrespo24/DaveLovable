@@ -149,6 +149,16 @@ class AgentOrchestrator:
             if type(last_message).__name__ == "FunctionExecutionResultMessage":
                  # Tool finished, give control back to Coder to handle the output
                  return "Coder"
+
+            # If the last message is from the User
+            if last_message.source == "user":
+                # Check for visual edit tag
+                if "[VISUAL EDIT]" in last_message.content:
+                    logger.info("🎨 Visual Edit detected - Routing directly to Coder")
+                    return "Coder"
+                
+                # Default to Planner for normal requests
+                return "Planner"
                 
             return None
 

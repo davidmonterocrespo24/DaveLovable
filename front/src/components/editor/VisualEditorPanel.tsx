@@ -58,7 +58,7 @@ export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
 
                 {/* Colors */}
                 <div className="space-y-4">

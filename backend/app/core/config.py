@@ -1,5 +1,7 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
+from pathlib import Path
+import os
 
 class Settings(BaseSettings):
     # Application
@@ -37,6 +39,12 @@ class Settings(BaseSettings):
 
     # Projects Storage
     PROJECTS_BASE_DIR: str = "./projects"
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # CRITICAL: Convert PROJECTS_BASE_DIR to absolute path to prevent issues
+        # when os.chdir() changes the working directory
+        self.PROJECTS_BASE_DIR = str(Path(self.PROJECTS_BASE_DIR).resolve())
 
     class Config:
         env_file = ".env"

@@ -98,9 +98,16 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           const { logType, message } = event.data;
           addLog(logType as ConsoleLog['type'], message);
         } else if (event.data?.type === 'visual-editor:selected') {
-          const { elementId, tagName } = event.data;
+          const { elementId, tagName, className, selector, innerText, attributes } = event.data;
           if (onElementSelected) {
-            onElementSelected(elementId, tagName);
+            onElementSelected({
+              elementId,
+              tagName,
+              className,
+              selector,
+              innerText,
+              attributes
+            });
           }
         }
       };

@@ -281,11 +281,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       }
     }, [shouldTriggerReload, isStreaming, onReloadPreview]); // Removed 'messages' to prevent loop
 
-    const handleSend = async () => {
-      if (!input.trim() || isStreaming) return;
+    const handleSend = async (messageOverride?: string) => {
+      const messageContent = messageOverride || input;
+      if (!messageContent.trim() || isStreaming) return;
 
-      const messageContent = input;
-      setInput('');
+      if (!messageOverride) {
+        setInput('');
+      }
       setIsStreaming(true);
       setStreamInterrupted(false); // Clear any previous interruption flag
 
@@ -548,7 +550,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
         }
       }
 
-      setInput(message);
+      // Auto-send the message
+      handleSend(message);
     };
 
     return (
@@ -844,7 +847,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   </div>
                 </div>
                 <Button
-                  onClick={handleSend}
+                  onClick={() => handleSend()}
                   disabled={!input.trim() || isStreaming}
                   className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 p-0 shrink-0"
                 >
