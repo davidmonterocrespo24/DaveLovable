@@ -223,6 +223,32 @@ export async function loadProject(
           
           console.log('[VisualEditor] Selected:', tagName, elementId, selector);
           
+          // Helper to find React Fiber
+          const getReactFiber = (el) => {
+            for (const key in el) {
+              if (key.startsWith('__reactFiber$')) {
+                return el[key];
+              }
+            }
+            return null;
+          };
+
+          // Helper to get source from fiber
+          const getSource = (el) => {
+            let fiber = getReactFiber(el);
+            while (fiber) {
+              if (fiber._debugSource) {
+                return fiber._debugSource;
+              }
+              // Also check 'return' (parent) if not found on current node
+              fiber = fiber.return;
+            }
+            return null;
+          };
+
+          const source = getSource(selectedElement);
+          console.log('[VisualEditor] Source:', source);
+          
           // Send selection to parent
           window.parent.postMessage({
             type: 'visual-editor:selected',
@@ -231,7 +257,8 @@ export async function loadProject(
             className,
             selector,
             innerText,
-            attributes
+            attributes,
+            source // { fileName, lineNumber }
           }, '*');
         }, true);
       })();

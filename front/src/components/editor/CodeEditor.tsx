@@ -1,15 +1,18 @@
-import { forwardRef, useRef, useEffect } from 'react';
+import { forwardRef, useRef, useEffect, useState } from 'react';
 import Editor, { OnMount } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
+import { Share2 } from 'lucide-react';
 
 interface CodeEditorProps {
   selectedFile: {
     name: string;
     id: number;
     content: string;
+    filepath: string;
   } | null;
   isTyping: boolean;
   onContentChange?: (content: string) => void;
+  onAskAgent?: (data: { filepath: string; startLine: number; endLine: number; content: string; message: string }) => void;
 }
 
 // Get language from file extension
@@ -38,13 +41,64 @@ const getLanguage = (filename: string): string => {
 };
 
 export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
-  ({ selectedFile, isTyping, onContentChange }, ref) => {
+  ({ selectedFile, isTyping, onContentChange, onAskAgent }, ref) => {
     const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
     const monacoRef = useRef<typeof Monaco | null>(null);
+
+    const [selection, setSelection] = useState<{
+      rect: { top: number; left: number };
+      visible: boolean;
+      range: { startLine: number; endLine: number; content: string };
+    }>({ rect: { top: 0, left: 0 }, visible: false, range: { startLine: 0, endLine: 0, content: '' } });
 
     const handleEditorDidMount: OnMount = (editor, monaco) => {
       editorRef.current = editor;
       monacoRef.current = monaco;
+
+      // Handle selection changes
+      editor.onDidChangeCursorSelection((e) => {
+        const selection = e.selection;
+        const model = editor.getModel();
+
+        if (selection.isEmpty() || !model) {
+          setSelection(prev => ({ ...prev, visible: false }));
+          return;
+        }
+
+        const selectedContent = model.getValueInRange(selection);
+        if (!selectedContent.trim()) {
+          setSelection(prev => ({ ...prev, visible: false }));
+          return;
+        }
+
+        // Get coordinates for the selection
+        const scrolledVisiblePosition = editor.getScrolledVisiblePosition(selection.getEndPosition());
+        const domNode = editor.getDomNode();
+
+        if (scrolledVisiblePosition && domNode) {
+          // Adjust position so it's slight above or below the selection
+          // We must implement proper positioning logic relative to the editor container
+          const rect = domNode.getBoundingClientRect();
+          setSelection({
+            rect: {
+              top: scrolledVisiblePosition.top + 20,
+              left: scrolledVisiblePosition.left
+            },
+            visible: true,
+            range: {
+              startLine: selection.startLineNumber,
+              endLine: selection.endLineNumber,
+              content: selectedContent
+            }
+          });
+        }
+      });
+      // Handle scrolling to hide/update widget position (simplified: hide on scroll)
+      editor.onDidScrollChange(() => {
+        setSelection(prev => ({ ...prev, visible: false }));
+      });
+
+      // ... existing configuration ...
 
       // Configure TypeScript compiler options
       monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -218,11 +272,33 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
       }
     }, [selectedFile?.id]);
 
+    // Hide widget on file change
+    useEffect(() => {
+      setSelection(prev => ({ ...prev, visible: false }));
+    }, [selectedFile?.id]);
+
     const language = selectedFile ? getLanguage(selectedFile.name) : 'plaintext';
     const value = selectedFile?.content || '// Select a file to view its contents';
 
+    const [message, setMessage] = useState('');
+
+    const handleAskAgent = () => {
+      if (!message.trim() || !onAskAgent || !selectedFile) return;
+
+      onAskAgent({
+        filepath: selectedFile.filepath,
+        startLine: selection.range.startLine,
+        endLine: selection.range.endLine,
+        content: selection.range.content,
+        message: message
+      });
+
+      setMessage('');
+      setSelection(prev => ({ ...prev, visible: false }));
+    };
+
     return (
-      <div ref={ref} className="h-full bg-[#0d1117]">
+      <div ref={ref} className="h-full bg-[#0d1117] relative group">
         <Editor
           height="100%"
           language={language}
@@ -245,6 +321,33 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
             smoothScrolling: true,
           }}
         />
+
+        {/* Inline Ask Agent Widget */}
+        {selection.visible && (
+          <div
+            className="absolute z-10 bg-popover/95 border border-border shadow-lg rounded-lg p-2 flex gap-2 items-center animate-in fade-in zoom-in-95 duration-200"
+            style={{
+              top: selection.rect.top,
+              left: selection.rect.left + 50, // Slight offset
+              maxWidth: '400px'
+            }}
+          >
+            <input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAskAgent()}
+              placeholder="Ask Agent about this code..."
+              className="h-8 text-xs bg-muted/50 border-none rounded px-2 w-[240px] focus:ring-1 focus:ring-primary focus:outline-none"
+              autoFocus
+            />
+            <button
+              onClick={handleAskAgent}
+              className="h-8 w-8 rounded bg-primary hover:bg-primary/90 flex items-center justify-center transition-colors"
+            >
+              <Share2 className="w-4 h-4 text-primary-foreground -rotate-45 translate-y-0.5 -translate-x-0.5" />
+            </button>
+          </div>
+        )}
       </div>
     );
   }

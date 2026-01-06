@@ -25,6 +25,10 @@ export interface SelectedElementData {
   selector: string;
   innerText: string;
   attributes: Record<string, string>;
+  source?: {
+    fileName: string;
+    lineNumber: number;
+  };
 }
 
 interface PreviewPanelProps {
@@ -98,7 +102,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           const { logType, message } = event.data;
           addLog(logType as ConsoleLog['type'], message);
         } else if (event.data?.type === 'visual-editor:selected') {
-          const { elementId, tagName, className, selector, innerText, attributes } = event.data;
+          const { elementId, tagName, className, selector, innerText, attributes, source } = event.data;
           if (onElementSelected) {
             onElementSelected({
               elementId,
@@ -106,7 +110,8 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
               className,
               selector,
               innerText,
-              attributes
+              attributes,
+              source
             });
           }
         }

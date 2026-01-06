@@ -24,7 +24,7 @@ import {
 import { FileExplorer } from '@/components/editor/FileExplorer';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { ChatPanel } from '@/components/editor/ChatPanel';
-import { PreviewPanel, PreviewPanelRef } from '@/components/editor/PreviewPanelWithWebContainer';
+import { PreviewPanel, PreviewPanelRef, SelectedElementData } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
 import { GitHistoryModal } from '@/components/editor/GitHistoryModal';
 import { GitConfigModal } from '@/components/editor/GitConfigModal';
@@ -599,6 +599,13 @@ const Editor = () => {
                           selectedFile={selectedFile ? { ...selectedFile, content: editedContent } : null}
                           isTyping={isTyping}
                           onContentChange={handleContentChange}
+                          onAskAgent={(data) => {
+                            if (chatPanelRef.current) {
+                              const contextMessage = `I have a question about the file \`${data.filepath}\` (lines ${data.startLine}-${data.endLine}):\n\n\`\`\`${selectedFile?.name.split('.').pop() || ''}\n${data.content}\n\`\`\`\n\nQ: ${data.message}`;
+                              chatPanelRef.current.sendMessage(contextMessage);
+                              if (!showChat) setShowChat(true);
+                            }
+                          }}
                         />
                       </ResizablePanel>
                     )}
