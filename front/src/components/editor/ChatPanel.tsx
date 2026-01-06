@@ -64,6 +64,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const { toast } = useToast();
     const abortControllerRef = useRef<AbortController | null>(null);
     const pendingReloadRef = useRef<{ message: string } | null>(null);
+    const [shouldTriggerReload, setShouldTriggerReload] = useState(false);
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -233,6 +234,25 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       };
     }, [isStreaming, messages, projectId, currentSessionId]);
 
+    // Handle WebContainer reload AFTER messages are fully updated
+    useEffect(() => {
+      if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview) {
+        console.log('[ChatPanel] Messages fully rendered, now triggering reload');
+
+        // Additional delay to ensure files are synced to backend
+        const reloadTimer = setTimeout(() => {
+          console.log('[ChatPanel] Executing reload now');
+          if (onReloadPreview && pendingReloadRef.current) {
+            onReloadPreview(pendingReloadRef.current);
+            pendingReloadRef.current = null;
+            setShouldTriggerReload(false);
+          }
+        }, 1500); // 1.5s additional delay for file sync
+
+        return () => clearTimeout(reloadTimer);
+      }
+    }, [shouldTriggerReload, isStreaming, messages, onReloadPreview]);
+
     const handleSend = async () => {
       if (!input.trim() || isStreaming) return;
 
@@ -243,6 +263,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
       // Clear any pending reload from previous messages
       pendingReloadRef.current = null;
+      setShouldTriggerReload(false);
 
       // Create AbortController for this request
       abortControllerRef.current = new AbortController();
@@ -389,21 +410,11 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
               setIsStreaming(false);
 
-              // Execute pending reload AFTER stream completes
-              // This ensures all messages are processed before WebContainer reloads
+              // Trigger reload via useEffect instead of setTimeout
+              // This ensures messages are fully rendered before reload
               if (pendingReloadRef.current && onReloadPreview) {
-                console.log('[ChatPanel] Executing pending reload after stream completion');
-                // Wait longer to ensure:
-                // 1. React updates the DOM with the final message
-                // 2. Files are fully written to the backend filesystem
-                // 3. WebContainer has time to sync the files
-                setTimeout(() => {
-                  console.log('[ChatPanel] Now executing the reload');
-                  if (onReloadPreview && pendingReloadRef.current) {
-                    onReloadPreview(pendingReloadRef.current);
-                    pendingReloadRef.current = null;
-                  }
-                }, 2000); // Increased to 2000ms (2 seconds) to give more time for file sync
+                console.log('[ChatPanel] Stream complete, will trigger reload after messages render');
+                setShouldTriggerReload(true);
               }
             },
             onError: (error) => {
