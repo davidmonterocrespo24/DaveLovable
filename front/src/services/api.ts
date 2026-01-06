@@ -132,6 +132,19 @@ async function fetchApi<T>(
   return response.json();
 }
 
+export interface VisualEditRequest {
+  filepath: string;
+  element_selector: string;
+  style_changes: Record<string, string>;
+}
+
+export interface VisualEditResponse {
+  success: boolean;
+  message: string;
+  filepath: string;
+  styles_applied?: Record<string, string>;
+}
+
 // Project API
 export const projectApi = {
   // Create a new project
@@ -167,6 +180,17 @@ export const projectApi = {
   delete: async (projectId: number): Promise<void> => {
     return fetchApi<void>(`/projects/${projectId}`, {
       method: 'DELETE',
+    });
+  },
+
+  // Apply visual edits directly to a file
+  applyVisualEdit: async (
+    projectId: number,
+    data: VisualEditRequest
+  ): Promise<VisualEditResponse> => {
+    return fetchApi<VisualEditResponse>(`/projects/${projectId}/visual-edit`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 };

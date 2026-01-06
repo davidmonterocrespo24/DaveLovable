@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { projectApi } from '@/services/api';
+import { useToast } from '@/hooks/use-toast';
 
 interface ColorPickerProps {
     value: string;
@@ -92,8 +94,11 @@ interface VisualEditorPanelProps {
     onAgentRequest: (prompt: string) => void;
     selectedElementId?: string;
     selectedElementTagName?: string;
+    selectedElementFilepath?: string;
     initialStyles?: Record<string, string>;
     onSave?: (styles: Record<string, string>) => void;
+    projectId: number;
+    onReloadPreview?: () => void;
 }
 
 export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
@@ -102,11 +107,16 @@ export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
     onAgentRequest,
     selectedElementId,
     selectedElementTagName,
+    selectedElementFilepath,
     initialStyles = {},
-    onSave
+    onSave,
+    projectId,
+    onReloadPreview
 }) => {
+    const { toast } = useToast();
     const [customPrompt, setCustomPrompt] = useState('');
     const [modifiedStyles, setModifiedStyles] = useState<Record<string, string>>({});
+    const [isSaving, setIsSaving] = useState(false);
 
     // Reset modified styles when selection changes
     useEffect(() => {
@@ -127,11 +137,86 @@ export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
         setCustomPrompt('');
     };
 
-    const handleSave = () => {
-        if (onSave) {
-            onSave(modifiedStyles);
-            // Optional: clear modified styles or keep them until selection changes
-            // setModifiedStyles({}); 
+    const handleSave = async () => {
+        if (!selectedElementTagName || !selectedElementFilepath) {
+            toast({
+                title: "Cannot save",
+                description: "No element selected or file path not available",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        if (Object.keys(modifiedStyles).length === 0) {
+            toast({
+                title: "No changes",
+                description: "No style changes to save",
+                variant: "destructive",
+            });
+            return;
+        }
+
+        setIsSaving(true);
+
+        try {
+            // Extract relative path from WebContainer absolute path
+            // WebContainer paths look like: /home/1cc9j47hh9g2sacuxjymmmjo48awol-se3b/src/components/HeroSection.tsx
+            // We need just: src/components/HeroSection.tsx
+            let relativePath = selectedElementFilepath;
+
+            // Remove WebContainer home directory prefix if present
+            const webContainerMatch = relativePath.match(/^\/home\/[^\/]+\/(.+)$/);
+            if (webContainerMatch) {
+                relativePath = webContainerMatch[1];
+            }
+
+            // Also handle cases where it might just start with /
+            if (relativePath.startsWith('/') && !relativePath.startsWith('/home/')) {
+                relativePath = relativePath.substring(1);
+            }
+
+            console.log('[VisualEditor] Original path:', selectedElementFilepath);
+            console.log('[VisualEditor] Cleaned path:', relativePath);
+
+            const result = await projectApi.applyVisualEdit(projectId, {
+                filepath: relativePath,
+                element_selector: selectedElementTagName,
+                style_changes: modifiedStyles,
+            });
+
+            if (result.success) {
+                toast({
+                    title: "Styles applied",
+                    description: `Successfully updated ${selectedElementTagName} in ${selectedElementFilepath}`,
+                });
+
+                // Reload preview to show changes
+                if (onReloadPreview) {
+                    onReloadPreview();
+                }
+
+                // Clear modified styles after successful save
+                setModifiedStyles({});
+
+                if (onSave) {
+                    onSave(modifiedStyles);
+                }
+            } else {
+                toast({
+                    title: "Failed to apply styles",
+                    description: result.message || "Could not find the element in the file",
+                    variant: "destructive",
+                });
+            }
+        } catch (error) {
+            console.error('[VisualEditor] Save error:', error);
+            toast({
+                title: "Error saving styles",
+                description: error instanceof Error ? error.message : "Failed to apply visual edits",
+                variant: "destructive",
+            });
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -156,8 +241,9 @@ export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
                             size="sm"
                             className="h-7 text-xs bg-green-600 hover:bg-green-700 text-white"
                             onClick={handleSave}
+                            disabled={isSaving}
                         >
-                            Save Changes
+                            {isSaving ? 'Saving...' : 'Save Changes'}
                         </Button>
                     )}
                     <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8">
