@@ -123,7 +123,6 @@ Respond in JSON format:
                 api_key=settings.OPENAI_API_KEY,
                 model_capabilities=model_info,
                 http_client=http_client,
-                response_format={"type": "json_object"},
             )
 
             # Create messages
@@ -132,8 +131,15 @@ Respond in JSON format:
                 UserMessage(content=user_prompt, source="user"),
             ]
 
-            # Call the model
-            result = await client.create(messages, temperature=0.3, max_tokens=500)
+            # Call the model with extra parameters for OpenAI
+            result = await client.create(
+                messages,
+                extra_create_args={
+                    "temperature": 0.3,
+                    "max_tokens": 500,
+                    "response_format": {"type": "json_object"}
+                }
+            )
             response_content = result.content
 
             # Handle potential code block wrapping

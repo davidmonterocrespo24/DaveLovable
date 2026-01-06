@@ -65,6 +65,21 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       setConsoleLogs(prev => [...prev, { type, message, timestamp }]);
     };
 
+    // Listen for browser logs from the iframe via postMessage
+    useEffect(() => {
+      const handleMessage = (event: MessageEvent) => {
+        // Security: verify the message is from our WebContainer
+        if (event.data?.type === 'console-log') {
+          const { logType, message } = event.data;
+          // Add browser console logs to our log display
+          addLog(logType as ConsoleLog['type'], message);
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }, []);
+
     const initializeWebContainer = async () => {
       setIsInitializing(true);
       setInitError('');
