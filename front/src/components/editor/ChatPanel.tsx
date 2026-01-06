@@ -8,6 +8,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import { AgentInteraction } from './AgentInteraction';
+import { VisualEditorPanel } from './VisualEditorPanel';
 import { ToolExecutionBlock } from './ToolExecutionBlock';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -44,6 +45,11 @@ interface ChatPanelProps {
   onCodeChange?: () => void;
   onGitCommit?: (data: { success: boolean; error?: string; message?: string }) => void;
   onReloadPreview?: (data: { message: string }) => void;
+  // Visual Editor Props
+  onVisualModeChange?: (isVisualMode: boolean) => void;
+  onStyleUpdate?: (property: string, value: string) => void;
+  selectedElementId?: string;
+  selectedElementTagName?: string;
 }
 
 export interface ChatPanelRef {
@@ -51,7 +57,17 @@ export interface ChatPanelRef {
 }
 
 export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
-  ({ projectId, sessionId, onCodeChange, onGitCommit, onReloadPreview }, ref) => {
+  ({
+    projectId,
+    sessionId,
+    onCodeChange,
+    onGitCommit,
+    onReloadPreview,
+    onVisualModeChange,
+    onStyleUpdate,
+    selectedElementId,
+    selectedElementTagName
+  }, ref) => {
     const queryClient = useQueryClient();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [input, setInput] = useState('');
@@ -116,9 +132,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
           timestamp: new Date(msg.created_at),
           agent_interactions: msg.agent_interactions || [],
         }));
-        setMessages([...initialMessages, ...loadedMessages]);
+
+        // CRITICAL: Only reload if we don't have more messages locally
+        // This prevents overwriting local state with stale server data
+        const serverMessageCount = loadedMessages.length;
+        const localMessageCount = messages.length - initialMessages.length; // Exclude initial message
+
+        if (serverMessageCount > localMessageCount) {
+          console.log('[ChatPanel] Loading messages from session (server has more messages)');
+          setMessages([...initialMessages, ...loadedMessages]);
+        } else {
+          console.log('[ChatPanel] Skipping message reload - local state is up to date');
+          console.log(`  Server: ${serverMessageCount} messages, Local: ${localMessageCount} messages`);
+        }
       }
-    }, [session, isStreaming]);
+    }, [session, isStreaming, messages.length]);
 
     // Auto-resize textarea
     useEffect(() => {
@@ -234,12 +262,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       };
     }, [isStreaming, messages, projectId, currentSessionId]);
 
-    // Handle WebContainer reload AFTER messages are fully updated
+    // Handle WebContainer reload AFTER streaming completes
+    // Note: We don't include 'messages' in dependencies to avoid re-triggering loop
     useEffect(() => {
       if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview) {
-        console.log('[ChatPanel] Messages fully rendered, now triggering reload');
+        console.log('[ChatPanel] Scheduling WebContainer reload (one-time trigger)');
 
-        // Additional delay to ensure files are synced to backend
+        // Delay to ensure files are synced to backend
         const reloadTimer = setTimeout(() => {
           console.log('[ChatPanel] Executing reload now');
           if (onReloadPreview && pendingReloadRef.current) {
@@ -247,11 +276,11 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             pendingReloadRef.current = null;
             setShouldTriggerReload(false);
           }
-        }, 1500); // 1.5s additional delay for file sync
+        }, 3000); // 3 seconds for file sync
 
         return () => clearTimeout(reloadTimer);
       }
-    }, [shouldTriggerReload, isStreaming, messages, onReloadPreview]);
+    }, [shouldTriggerReload, isStreaming, onReloadPreview]); // Removed 'messages' to prevent loop
 
     const handleSend = async () => {
       if (!input.trim() || isStreaming) return;
@@ -384,17 +413,27 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             },
             onComplete: (data) => {
               console.log('[ChatPanel] Complete event - updating message content');
+              console.log('[ChatPanel] Complete data:', data);
 
               // Update the streaming message with the final response
               setMessages((prev) => {
+                console.log('[ChatPanel] Before complete update, messages:', prev.length);
+                const streamingMsg = prev.find(m => m.id === streamingMessageId);
+                console.log('[ChatPanel] Streaming message before update:', streamingMsg);
+                console.log('[ChatPanel] Agent interactions count:', streamingMsg?.agent_interactions?.length || 0);
+
                 const updated = prev.map((msg) =>
                   msg.id === streamingMessageId
                     ? {
-                      ...msg,
+                      ...msg, // Preserve all existing properties including agent_interactions
                       content: data.message.content,
                     }
                     : msg
                 );
+
+                const updatedStreamingMsg = updated.find(m => m.id === streamingMessageId);
+                console.log('[ChatPanel] Streaming message after update:', updatedStreamingMsg);
+                console.log('[ChatPanel] Agent interactions count after:', updatedStreamingMsg?.agent_interactions?.length || 0);
                 console.log('[ChatPanel] Messages updated with final content');
                 return updated;
               });
@@ -408,13 +447,27 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 }
               }
 
-              setIsStreaming(false);
+              // CRITICAL FIX: Delay setIsStreaming(false) to prevent race condition
+              // The issue: onCodeChange() invalidates queries, which refetches session data
+              // If we set isStreaming=false immediately, the useEffect will reload messages
+              // from the OLD session data (DB hasn't been updated yet), overwriting our local state
+              // Solution: Keep isStreaming=true for 3 seconds to block the useEffect from running
+              console.log('[ChatPanel] Keeping isStreaming=true for 3s to prevent message reload');
+              setTimeout(() => {
+                console.log('[ChatPanel] Now setting isStreaming=false - safe to reload messages');
+                setIsStreaming(false);
+              }, 3000);
 
-              // Trigger reload via useEffect instead of setTimeout
-              // This ensures messages are fully rendered before reload
+              // Schedule WebContainer reload after messages are stable
               if (pendingReloadRef.current && onReloadPreview) {
-                console.log('[ChatPanel] Stream complete, will trigger reload after messages render');
-                setShouldTriggerReload(true);
+                console.log('[ChatPanel] Stream complete - will trigger WebContainer reload');
+                // Trigger reload after a delay to ensure:
+                // 1. Messages are fully rendered (3s for isStreaming)
+                // 2. Files are synced to filesystem (additional 2s)
+                setTimeout(() => {
+                  console.log('[ChatPanel] Triggering WebContainer reload now');
+                  setShouldTriggerReload(true);
+                }, 5000); // 5 seconds total: 3s for messages + 2s for file sync
               }
             },
             onError: (error) => {
@@ -461,289 +514,334 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     };
 
+    const [viewMode, setViewMode] = useState<'chat' | 'visual'>('chat');
+
+    // Toggle visual mode
+    const toggleVisualMode = () => {
+      const newMode = viewMode === 'chat' ? 'visual' : 'chat';
+      setViewMode(newMode);
+      if (onVisualModeChange) {
+        onVisualModeChange(newMode === 'visual');
+      }
+    };
+
+    // Handle agent request from visual editor
+    const handleVisualAgentRequest = (prompt: string) => {
+      // Switch back to chat
+      setViewMode('chat');
+      // Pre-fill input (or send immediately)
+      // For now, let's just set input and maybe auto-send or let user confirm
+      setInput(`[VISUAL EDIT] ${prompt}`);
+      // Ideally we would include context about the selected element here
+    };
+
     return (
       <div ref={containerRef} className="h-full flex flex-col bg-background/80">
         {/* Header */}
-        <div className="p-4 border-b border-border/50 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20">
-            <Sparkles className="w-5 h-5 text-primary-foreground" />
+        <div className="p-4 border-b border-border/50 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center shadow-lg shadow-primary/20">
+              <Sparkles className="w-5 h-5 text-primary-foreground" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-sm">Lovable AI</h3>
+              <p className="text-xs text-muted-foreground">Your development assistant</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-semibold text-sm">Lovable AI</h3>
-            <p className="text-xs text-muted-foreground">Your development assistant</p>
-          </div>
+
+          <Button
+            variant={viewMode === 'visual' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={toggleVisualMode}
+            className="text-xs gap-1.5 h-8"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            {viewMode === 'visual' ? 'Back to Chat' : 'Visual Edits'}
+          </Button>
         </div>
 
-        {/* Stream Interrupted Warning Banner */}
-        {streamInterrupted && (
-          <div className="mx-4 mt-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-2">
-            <div className="text-yellow-500 mt-0.5">⚠️</div>
-            <div className="flex-1 text-xs">
-              <p className="font-medium text-yellow-500">Connection was interrupted</p>
-              <p className="text-muted-foreground mt-1">
-                The AI response was interrupted when you refreshed the page. The backend may still be processing your request.
-                You can continue with a new message or wait for any file changes to appear.
-              </p>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-xs"
-              onClick={() => setStreamInterrupted(false)}
-            >
-              Dismiss
-            </Button>
-          </div>
-        )}
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
-                  ? 'bg-primary/20'
-                  : 'bg-gradient-to-br from-primary to-purple-600'
-                  }`}
-              >
-                {message.role === 'user' ? (
-                  <User className="w-4 h-4 text-primary" />
-                ) : (
-                  <Bot className="w-4 h-4 text-primary-foreground" />
-                )}
+        {viewMode === 'visual' ? (
+          <VisualEditorPanel
+            onClose={() => toggleVisualMode()}
+            onStyleUpdate={(prop, val) => onStyleUpdate && onStyleUpdate(prop, val)}
+            onAgentRequest={handleVisualAgentRequest}
+            selectedElementId={selectedElementId}
+            selectedElementTagName={selectedElementTagName}
+          />
+        ) : (
+          <>
+            {/* Stream Interrupted Warning Banner */}
+            {streamInterrupted && (
+              <div className="mx-4 mt-2 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg flex items-start gap-2">
+                <div className="text-yellow-500 mt-0.5">⚠️</div>
+                <div className="flex-1 text-xs">
+                  <p className="font-medium text-yellow-500">Connection was interrupted</p>
+                  <p className="text-muted-foreground mt-1">
+                    The AI response was interrupted when you refreshed the page. The backend may still be processing your request.
+                    You can continue with a new message or wait for any file changes to appear.
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => setStreamInterrupted(false)}
+                >
+                  Dismiss
+                </Button>
               </div>
-              <div className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+            )}
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.map((message) => (
                 <div
-                  className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
-                    ? 'bg-primary text-primary-foreground rounded-tr-sm'
-                    : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
-                    }`}
+                  key={message.id}
+                  className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
                 >
-                  {message.role === 'assistant' ? (
-                    <>
-                      {/* Agent Interactions */}
-                      {message.agent_interactions && message.agent_interactions.length > 0 && (() => {
-                        // Process interactions: separate tool_calls and tool_responses, then match them
-                        const elements: JSX.Element[] = [];
+                  <div
+                    className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
+                      ? 'bg-primary/20'
+                      : 'bg-gradient-to-br from-primary to-purple-600'
+                      }`}
+                  >
+                    {message.role === 'user' ? (
+                      <User className="w-4 h-4 text-primary" />
+                    ) : (
+                      <Bot className="w-4 h-4 text-primary-foreground" />
+                    )}
+                  </div>
+                  <div className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
+                        ? 'bg-primary text-primary-foreground rounded-tr-sm'
+                        : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
+                        }`}
+                    >
+                      {message.role === 'assistant' ? (
+                        <>
+                          {/* Agent Interactions */}
+                          {message.agent_interactions && message.agent_interactions.length > 0 && (() => {
+                            // Process interactions: separate tool_calls and tool_responses, then match them
+                            const elements: JSX.Element[] = [];
 
-                        // First pass: collect all tool_calls and tool_responses separately
-                        const toolCalls: any[] = [];
-                        const toolResponses: any[] = [];
-                        const thoughts: any[] = [];
+                            // First pass: collect all tool_calls and tool_responses separately
+                            const toolCalls: any[] = [];
+                            const toolResponses: any[] = [];
+                            const thoughts: any[] = [];
 
-                        message.agent_interactions.forEach((interaction, idx) => {
-                          if (interaction.message_type === 'thought') {
-                            thoughts.push({ interaction, idx });
-                          } else if (interaction.message_type === 'tool_call') {
-                            toolCalls.push({
-                              toolName: interaction.tool_name || 'unknown',
-                              agentName: interaction.agent_name,
-                              arguments: interaction.tool_arguments || {},
-                              response: '', // Will be filled later
-                              timestamp: interaction.timestamp,
-                              idx,
+                            message.agent_interactions.forEach((interaction, idx) => {
+                              if (interaction.message_type === 'thought') {
+                                thoughts.push({ interaction, idx });
+                              } else if (interaction.message_type === 'tool_call') {
+                                toolCalls.push({
+                                  toolName: interaction.tool_name || 'unknown',
+                                  agentName: interaction.agent_name,
+                                  arguments: interaction.tool_arguments || {},
+                                  response: '', // Will be filled later
+                                  timestamp: interaction.timestamp,
+                                  idx,
+                                });
+                              } else if (interaction.message_type === 'tool_response') {
+                                toolResponses.push({
+                                  content: interaction.content,
+                                  hasError: interaction.content.toLowerCase().includes('error'),
+                                  idx,
+                                });
+                              }
                             });
-                          } else if (interaction.message_type === 'tool_response') {
-                            toolResponses.push({
-                              content: interaction.content,
-                              hasError: interaction.content.toLowerCase().includes('error'),
-                              idx,
+
+                            // Second pass: match tool_calls with tool_responses in order
+                            const matchedToolCalls: any[] = [];
+                            for (let i = 0; i < Math.min(toolCalls.length, toolResponses.length); i++) {
+                              matchedToolCalls.push({
+                                ...toolCalls[i],
+                                response: toolResponses[i].content,
+                                hasError: toolResponses[i].hasError,
+                              });
+                            }
+
+                            // Add unmatched tool calls (responses not received yet)
+                            for (let i = toolResponses.length; i < toolCalls.length; i++) {
+                              matchedToolCalls.push({
+                                ...toolCalls[i],
+                                response: '⏳ Waiting for response...',
+                                hasError: false,
+                              });
+                            }
+
+                            // Render thoughts first (if any)
+                            thoughts.forEach(({ interaction, idx }) => {
+                              elements.push(
+                                <AgentInteraction
+                                  key={`${message.id}-thought-${idx}`}
+                                  agentName={interaction.agent_name}
+                                  messageType={interaction.message_type}
+                                  content={interaction.content}
+                                  toolName={interaction.tool_name}
+                                  toolArguments={interaction.tool_arguments}
+                                  timestamp={interaction.timestamp}
+                                />
+                              );
                             });
-                          }
-                        });
 
-                        // Second pass: match tool_calls with tool_responses in order
-                        const matchedToolCalls: any[] = [];
-                        for (let i = 0; i < Math.min(toolCalls.length, toolResponses.length); i++) {
-                          matchedToolCalls.push({
-                            ...toolCalls[i],
-                            response: toolResponses[i].content,
-                            hasError: toolResponses[i].hasError,
-                          });
-                        }
+                            // Then render matched tool calls
+                            if (matchedToolCalls.length > 0) {
+                              elements.push(
+                                <ToolExecutionBlock
+                                  key={`${message.id}-tools`}
+                                  executions={matchedToolCalls}
+                                />
+                              );
+                            }
 
-                        // Add unmatched tool calls (responses not received yet)
-                        for (let i = toolResponses.length; i < toolCalls.length; i++) {
-                          matchedToolCalls.push({
-                            ...toolCalls[i],
-                            response: '⏳ Waiting for response...',
-                            hasError: false,
-                          });
-                        }
+                            return (
+                              <div className="space-y-2 mb-3">
+                                <div className="text-xs font-semibold text-muted-foreground mb-2">
+                                  Agent Activity:
+                                </div>
+                                {elements}
+                              </div>
+                            );
+                          })()}
 
-                        // Render thoughts first (if any)
-                        thoughts.forEach(({ interaction, idx }) => {
-                          elements.push(
-                            <AgentInteraction
-                              key={`${message.id}-thought-${idx}`}
-                              agentName={interaction.agent_name}
-                              messageType={interaction.message_type}
-                              content={interaction.content}
-                              toolName={interaction.tool_name}
-                              toolArguments={interaction.tool_arguments}
-                              timestamp={interaction.timestamp}
-                            />
-                          );
-                        });
-
-                        // Then render matched tool calls
-                        if (matchedToolCalls.length > 0) {
-                          elements.push(
-                            <ToolExecutionBlock
-                              key={`${message.id}-tools`}
-                              executions={matchedToolCalls}
-                            />
-                          );
-                        }
-
-                        return (
-                          <div className="space-y-2 mb-3">
-                            <div className="text-xs font-semibold text-muted-foreground mb-2">
-                              Agent Activity:
+                          {/* Final Response */}
+                          {message.content && (
+                            <div className="prose prose-sm prose-invert max-w-none markdown-content">
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight]}
+                                components={{
+                                  code: ({ node, inline, className, children, ...props }: any) => {
+                                    return !inline ? (
+                                      <code className={className} {...props}>
+                                        {children}
+                                      </code>
+                                    ) : (
+                                      <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
+                                        {children}
+                                      </code>
+                                    );
+                                  },
+                                  pre: ({ children, ...props }: any) => (
+                                    <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
+                                      {children}
+                                    </pre>
+                                  ),
+                                  p: ({ children, ...props }: any) => (
+                                    <p className="mb-2 last:mb-0" {...props}>{children}</p>
+                                  ),
+                                  ul: ({ children, ...props }: any) => (
+                                    <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
+                                  ),
+                                  ol: ({ children, ...props }: any) => (
+                                    <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
+                                  ),
+                                  li: ({ children, ...props }: any) => (
+                                    <li className="mb-1" {...props}>{children}</li>
+                                  ),
+                                }}
+                              >
+                                {message.content}
+                              </ReactMarkdown>
                             </div>
-                            {elements}
-                          </div>
-                        );
-                      })()}
-
-                      {/* Final Response */}
-                      {message.content && (
-                        <div className="prose prose-sm prose-invert max-w-none markdown-content">
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight]}
-                            components={{
-                              code: ({ node, inline, className, children, ...props }: any) => {
-                                return !inline ? (
-                                  <code className={className} {...props}>
-                                    {children}
-                                  </code>
-                                ) : (
-                                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono" {...props}>
-                                    {children}
-                                  </code>
-                                );
-                              },
-                              pre: ({ children, ...props }: any) => (
-                                <pre className="bg-[#0d1117] rounded-lg p-4 overflow-x-auto my-2" {...props}>
-                                  {children}
-                                </pre>
-                              ),
-                              p: ({ children, ...props }: any) => (
-                                <p className="mb-2 last:mb-0" {...props}>{children}</p>
-                              ),
-                              ul: ({ children, ...props }: any) => (
-                                <ul className="list-disc list-inside mb-2" {...props}>{children}</ul>
-                              ),
-                              ol: ({ children, ...props }: any) => (
-                                <ol className="list-decimal list-inside mb-2" {...props}>{children}</ol>
-                              ),
-                              li: ({ children, ...props }: any) => (
-                                <li className="mb-1" {...props}>{children}</li>
-                              ),
-                            }}
-                          >
-                            {message.content}
-                          </ReactMarkdown>
-                        </div>
+                          )}
+                        </>
+                      ) : (
+                        message.content
                       )}
-                    </>
-                  ) : (
-                    message.content
-                  )}
+                    </div>
+                    <span className="text-[10px] text-muted-foreground/60 px-1">
+                      {formatTime(message.timestamp)}
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground/60 px-1">
-                  {formatTime(message.timestamp)}
-                </span>
-              </div>
-            </div>
-          ))}
+              ))}
 
-          {isStreaming && (
-            <div className="flex gap-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
-                <Bot className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <div className="bg-muted/30 p-3 rounded-2xl rounded-tl-sm border border-border/30">
-                <div className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  <span className="text-xs text-muted-foreground">AI is thinking...</span>
+              {isStreaming && (
+                <div className="flex gap-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-600 flex items-center justify-center">
+                    <Bot className="w-4 h-4 text-primary-foreground" />
+                  </div>
+                  <div className="bg-muted/30 p-3 rounded-2xl rounded-tl-sm border border-border/30">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                      <span className="text-xs text-muted-foreground">AI is thinking...</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* Suggestions */}
-        {messages.length <= 2 && !isStreaming && (
-          <div className="px-4 pb-2 flex flex-wrap gap-2">
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => setInput(suggestion)}
-                className="text-xs px-3 py-1.5 rounded-full bg-muted/20 hover:bg-muted/40
-                           text-muted-foreground hover:text-foreground transition-colors border border-border/30"
-              >
-                {suggestion}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Input */}
-        <div className="p-4 border-t border-border/50">
-          <div className="flex items-end gap-2">
-            <div className="flex-1 relative">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Describe what you want to create..."
-                className="w-full bg-muted/20 border border-border/30 rounded-xl px-4 py-3 pr-20
-                           text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50
-                           placeholder:text-muted-foreground min-h-[48px] max-h-32 transition-all"
-                rows={1}
-                disabled={isStreaming}
-              />
-              <div className="absolute right-2 bottom-2 flex items-center gap-1">
-                <button
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
-                  title="Attach file"
-                >
-                  <Paperclip className="w-4 h-4" />
-                </button>
-                <button
-                  className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
-                  title="Add image"
-                >
-                  <Image className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-            <Button
-              onClick={handleSend}
-              disabled={!input.trim() || isStreaming}
-              className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 p-0 shrink-0"
-            >
-              {isStreaming ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Send className="w-5 h-5" />
               )}
-            </Button>
-          </div>
-        </div>
+
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Suggestions */}
+            {messages.length <= 2 && !isStreaming && (
+              <div className="px-4 pb-2 flex flex-wrap gap-2">
+                {suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => setInput(suggestion)}
+                    className="text-xs px-3 py-1.5 rounded-full bg-muted/20 hover:bg-muted/40
+                               text-muted-foreground hover:text-foreground transition-colors border border-border/30"
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="p-4 border-t border-border/50">
+              <div className="flex items-end gap-2">
+                <div className="flex-1 relative">
+                  <textarea
+                    ref={textareaRef}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder="Describe what you want to create..."
+                    className="w-full bg-muted/20 border border-border/30 rounded-xl px-4 py-3 pr-20
+                               text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/50
+                               placeholder:text-muted-foreground min-h-[48px] max-h-32 transition-all"
+                    rows={1}
+                    disabled={isStreaming}
+                  />
+                  <div className="absolute right-2 bottom-2 flex items-center gap-1">
+                    <button
+                      className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
+                      title="Attach file"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                    <button
+                      className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded hover:bg-muted/30"
+                      title="Add image"
+                    >
+                      <Image className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isStreaming}
+                  className="h-12 w-12 rounded-xl bg-primary hover:bg-primary/90 p-0 shrink-0"
+                >
+                  {isStreaming ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Send className="w-5 h-5" />
+                  )}
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   }
