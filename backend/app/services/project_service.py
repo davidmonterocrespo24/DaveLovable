@@ -247,6 +247,133 @@ class ProjectService:
         return True
 
     @staticmethod
+    def apply_visual_edits(
+        db: Session,
+        project_id: int,
+        owner_id: int,
+        filepath: str,
+        element_selector: str,
+        style_changes: dict
+    ) -> dict:
+        """
+        Apply visual style changes directly to a component file.
+
+        Args:
+            db: Database session
+            project_id: Project ID
+            owner_id: User ID
+            filepath: Path to the file to edit (e.g., 'src/components/Button.tsx')
+            element_selector: CSS-like selector or element tag name
+            style_changes: Dict of style properties to apply (e.g., {'color': '#fff', 'backgroundColor': '#000'})
+
+        Returns:
+            Dict with success status and updated file info
+        """
+        from app.services.git_service import GitService
+        import re
+
+        # Verify ownership
+        ProjectService.get_project(db, project_id, owner_id)
+
+        # Read current file content
+        content = FileSystemService.read_file(project_id, filepath)
+        if not content:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"File not found: {filepath}"
+            )
+
+        # Convert style_changes to Tailwind classes or inline styles
+        modified_content = ProjectService._apply_styles_to_jsx(
+            content,
+            element_selector,
+            style_changes
+        )
+
+        if modified_content == content:
+            # No changes made
+            return {
+                "success": False,
+                "message": "No matching element found or styles already applied",
+                "filepath": filepath
+            }
+
+        # Write modified content back to filesystem
+        FileSystemService.write_file(project_id, filepath, modified_content)
+
+        # Commit to Git
+        GitService.commit_changes(
+            project_id,
+            f"Visual edit: Apply styles to {element_selector} in {filepath}",
+            [filepath]
+        )
+
+        return {
+            "success": True,
+            "message": f"Applied visual edits to {filepath}",
+            "filepath": filepath,
+            "styles_applied": style_changes
+        }
+
+    @staticmethod
+    def _apply_styles_to_jsx(content: str, element_selector: str, style_changes: dict) -> str:
+        """
+        Apply style changes to JSX/TSX content.
+        Adds inline style attribute or modifies existing one.
+
+        Args:
+            content: File content
+            element_selector: Element tag name (e.g., 'button', 'div', 'Button')
+            style_changes: Dict of CSS properties to apply
+
+        Returns:
+            Modified content with styles applied
+        """
+        import re
+
+        # Convert CSS property names to camelCase for React inline styles
+        def to_camel_case(prop):
+            """Convert CSS property to camelCase (e.g., background-color -> backgroundColor)"""
+            parts = prop.split('-')
+            return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+
+        react_styles = {to_camel_case(k): v for k, v in style_changes.items()}
+
+        # Build style string for inline styles
+        style_string = ', '.join([f"{k}: '{v}'" for k, v in react_styles.items()])
+
+        # Pattern to find JSX elements with the given tag name
+        # Matches: <Button ... > or <Button ... />
+        tag_pattern = rf'(<{element_selector}(?:\s+[^>]*?)?)((?:\s+style={{[^}}]*}})?)((?:\s+[^>]*?)?(?:>|/>))'
+
+        def replace_style(match):
+            opening = match.group(1)  # <Button ...
+            existing_style = match.group(2)  # existing style={{...}}
+            closing = match.group(3)  # ... > or />
+
+            if existing_style:
+                # Merge with existing styles
+                # Extract existing style object content
+                style_content_match = re.search(r'style={{([^}}]*)}}', existing_style)
+                if style_content_match:
+                    existing_style_content = style_content_match.group(1).strip()
+                    # Merge styles (new styles override existing ones)
+                    merged_styles = f"{existing_style_content}, {style_string}"
+                    new_style = f' style={{{{{merged_styles}}}}}'
+                else:
+                    new_style = f' style={{{{{style_string}}}}}'
+            else:
+                # Add new style attribute
+                new_style = f' style={{{{{style_string}}}}}'
+
+            return f"{opening}{new_style}{closing}"
+
+        # Apply the replacement
+        modified_content = re.sub(tag_pattern, replace_style, content, count=1)
+
+        return modified_content
+
+    @staticmethod
     def _create_initial_files(db: Session, project_id: int, project_name: str, template: str):
         """Create initial project structure based on template"""
 

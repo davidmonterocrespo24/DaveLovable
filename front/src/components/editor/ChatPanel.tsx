@@ -586,6 +586,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onAgentRequest={handleVisualAgentRequest}
             selectedElementId={selectedElement?.elementId}
             selectedElementTagName={selectedElement?.tagName}
+            selectedElementFilepath={selectedElement?.source?.fileName}
+            projectId={projectId}
+            onReloadPreview={() => {
+              if (onReloadPreview) {
+                onReloadPreview({ message: 'Visual edits applied' });
+              }
+            }}
           />
         ) : (
           <>

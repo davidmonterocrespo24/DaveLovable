@@ -484,6 +484,47 @@ def update_project_thumbnail(
     }
 
 
+@router.post("/{project_id}/visual-edit")
+def apply_visual_edit(
+    project_id: int,
+    edit_data: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Apply visual style changes directly to a component file.
+
+    Args:
+        project_id: The project ID
+        edit_data: JSON body containing:
+            - filepath: Path to the file to edit (e.g., 'src/App.tsx')
+            - element_selector: Element tag name (e.g., 'button', 'div', 'Button')
+            - style_changes: Dict of CSS properties (e.g., {'color': '#fff', 'backgroundColor': '#000'})
+
+    Returns:
+        Success status and updated file info
+    """
+    filepath = edit_data.get("filepath")
+    element_selector = edit_data.get("element_selector")
+    style_changes = edit_data.get("style_changes")
+
+    if not filepath or not element_selector or not style_changes:
+        raise HTTPException(
+            status_code=400,
+            detail="filepath, element_selector, and style_changes are required"
+        )
+
+    result = ProjectService.apply_visual_edits(
+        db,
+        project_id,
+        MOCK_USER_ID,
+        filepath,
+        element_selector,
+        style_changes
+    )
+
+    return result
+
+
 @router.get("/{project_id}/download")
 def download_project(
     project_id: int,
