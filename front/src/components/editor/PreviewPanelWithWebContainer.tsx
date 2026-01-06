@@ -18,12 +18,24 @@ import {
 import { loadProject, reloadProjectFiles } from '@/services/webcontainer';
 import { initializeLogCapture } from '@/services/browserLogs';
 
+export interface SelectedElementData {
+  elementId: string;
+  tagName: string;
+  className: string;
+  selector: string;
+  innerText: string;
+  attributes: Record<string, string>;
+}
+
 interface PreviewPanelProps {
   projectId: number;
   isLoading?: boolean;
   onReload?: () => void;
   onReportError?: (errorMessage: string) => void;
   onPreviewReady?: (url: string) => void;
+  // Visual Editor Props
+  isVisualMode?: boolean;
+  onElementSelected?: (data: SelectedElementData) => void;
 }
 
 interface ConsoleLog {
@@ -34,10 +46,11 @@ interface ConsoleLog {
 
 export interface PreviewPanelRef {
   reload: () => void;
+  updateStyle: (property: string, value: string) => void;
 }
 
 export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
-  ({ projectId, isLoading: externalLoading, onReload, onReportError, onPreviewReady }, ref) => {
+  ({ projectId, isLoading: externalLoading, onReload, onReportError, onPreviewReady, isVisualMode, onElementSelected }, ref) => {
     const [device, setDevice] = useState<'mobile' | 'tablet' | 'desktop'>('desktop');
     const [showConsole, setShowConsole] = useState(true);
     const [previewUrl, setPreviewUrl] = useState<string>('');
@@ -46,6 +59,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     const [consoleLogs, setConsoleLogs] = useState<ConsoleLog[]>([]);
     const [urlCopied, setUrlCopied] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
 
     const deviceWidths = {
       mobile: 'max-w-[375px]',
@@ -58,27 +72,42 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         hour12: false,
         hour: '2-digit',
         minute: '2-digit',
-        second: '2-digit',
-        fractionalSecondDigits: 3
+        second: '2-digit'
       });
 
       setConsoleLogs(prev => [...prev, { type, message, timestamp }]);
     };
 
-    // Listen for browser logs from the iframe via postMessage
+    // Communicate visual mode change to iframe
+    useEffect(() => {
+      if (!iframeRef.current?.contentWindow) return;
+
+      iframeRef.current.contentWindow.postMessage({
+        type: 'visual-editor:toggle-mode',
+        enabled: isVisualMode
+      }, '*');
+    }, [isVisualMode]);
+
+    // Listen for browser logs AND visual editor events from the iframe
     useEffect(() => {
       const handleMessage = (event: MessageEvent) => {
-        // Security: verify the message is from our WebContainer
+        // Security: verify the message is from our WebContainer (roughly)
+        // Ideally we check origin, but WebContainer origin is dynamic
+
         if (event.data?.type === 'console-log') {
           const { logType, message } = event.data;
-          // Add browser console logs to our log display
           addLog(logType as ConsoleLog['type'], message);
+        } else if (event.data?.type === 'visual-editor:selected') {
+          const { elementId, tagName } = event.data;
+          if (onElementSelected) {
+            onElementSelected(elementId, tagName);
+          }
         }
       };
 
       window.addEventListener('message', handleMessage);
       return () => window.removeEventListener('message', handleMessage);
-    }, []);
+    }, [onElementSelected]);
 
     const initializeWebContainer = async () => {
       setIsInitializing(true);
@@ -164,6 +193,14 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         }
         reloadFiles();
       },
+      updateStyle: (property: string, value: string) => {
+        if (!iframeRef.current?.contentWindow) return;
+        iframeRef.current.contentWindow.postMessage({
+          type: 'visual-editor:update-style',
+          property,
+          value
+        }, '*');
+      }
     }));
 
     const handleRefresh = () => {
@@ -213,9 +250,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     };
 
     const handleFullscreen = () => {
-      if (!ref || typeof ref === 'function') return;
-
-      const element = ref.current;
+      const element = containerRef.current;
       if (!element) return;
 
       if (!document.fullscreenElement) {
@@ -230,7 +265,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     const isLoading = externalLoading || isInitializing;
 
     return (
-      <div ref={ref} className="h-full flex flex-col bg-[#0d1117]">
+      <div ref={containerRef} className="h-full flex flex-col bg-[#0d1117]">
         {/* Toolbar */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-background/50">
           <div className="flex items-center gap-2">
@@ -246,27 +281,24 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
             <div className="flex items-center bg-muted/20 rounded-lg p-0.5">
               <button
                 onClick={() => setDevice('mobile')}
-                className={`p-1.5 rounded transition-colors ${
-                  device === 'mobile' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`p-1.5 rounded transition-colors ${device === 'mobile' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 title="Mobile view"
               >
                 <Smartphone className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setDevice('tablet')}
-                className={`p-1.5 rounded transition-colors ${
-                  device === 'tablet' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`p-1.5 rounded transition-colors ${device === 'tablet' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 title="Tablet view"
               >
                 <Tablet className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setDevice('desktop')}
-                className={`p-1.5 rounded transition-colors ${
-                  device === 'desktop' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-                }`}
+                className={`p-1.5 rounded transition-colors ${device === 'desktop' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 title="Desktop view"
               >
                 <Monitor className="w-4 h-4" />
@@ -277,9 +309,8 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           {/* URL Bar */}
           <div className="flex-1 mx-4">
             <div className="flex items-center gap-2 bg-muted/20 rounded-lg px-3 py-1.5 max-w-md mx-auto border border-border/30">
-              <div className={`w-2 h-2 rounded-full ${
-                previewUrl ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
-              }`} />
+              <div className={`w-2 h-2 rounded-full ${previewUrl ? 'bg-green-500 animate-pulse' : 'bg-gray-500'
+                }`} />
               <span className="text-xs text-muted-foreground truncate">
                 {previewUrl || 'Initializing...'}
               </span>
@@ -289,9 +320,8 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           <div className="flex items-center gap-1">
             <button
               onClick={() => setShowConsole(!showConsole)}
-              className={`p-1.5 rounded transition-colors relative ${
-                showConsole ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/20 text-muted-foreground hover:text-foreground'
-              }`}
+              className={`p-1.5 rounded transition-colors relative ${showConsole ? 'bg-primary text-primary-foreground' : 'hover:bg-muted/20 text-muted-foreground hover:text-foreground'
+                }`}
               title="Toggle console"
             >
               <Terminal className="w-4 h-4" />
@@ -302,11 +332,10 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
             <button
               disabled={!previewUrl}
               onClick={handleCopyUrl}
-              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${
-                urlCopied
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'hover:bg-muted/20 text-muted-foreground hover:text-foreground'
-              }`}
+              className={`p-1.5 rounded transition-colors disabled:opacity-50 ${urlCopied
+                ? 'bg-green-500/20 text-green-400'
+                : 'hover:bg-muted/20 text-muted-foreground hover:text-foreground'
+                }`}
               title={urlCopied ? "URL copied!" : "Copy preview URL"}
             >
               {urlCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
@@ -428,11 +457,10 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
                   <div key={i} className="flex items-start gap-2 hover:bg-muted/10 px-1 rounded">
                     <span className="text-muted-foreground/50 w-20 shrink-0 font-mono">{log.timestamp}</span>
                     <span className="shrink-0">{getLogIcon(log.type)}</span>
-                    <span className={`flex-1 break-all ${
-                      log.type === 'error' ? 'text-red-400' :
+                    <span className={`flex-1 break-all ${log.type === 'error' ? 'text-red-400' :
                       log.type === 'warn' ? 'text-yellow-400' :
-                      'text-foreground/80'
-                    }`}>{log.message}</span>
+                        'text-foreground/80'
+                      }`}>{log.message}</span>
                   </div>
                 ))
               )}

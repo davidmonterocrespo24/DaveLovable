@@ -12,6 +12,7 @@ import { VisualEditorPanel } from './VisualEditorPanel';
 import { ToolExecutionBlock } from './ToolExecutionBlock';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
+import { SelectedElementData } from './PreviewPanelWithWebContainer';
 
 interface AgentInteractionData {
   agent_name: string;
@@ -48,8 +49,7 @@ interface ChatPanelProps {
   // Visual Editor Props
   onVisualModeChange?: (isVisualMode: boolean) => void;
   onStyleUpdate?: (property: string, value: string) => void;
-  selectedElementId?: string;
-  selectedElementTagName?: string;
+  selectedElement?: SelectedElementData;
 }
 
 export interface ChatPanelRef {
@@ -65,8 +65,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     onReloadPreview,
     onVisualModeChange,
     onStyleUpdate,
-    selectedElementId,
-    selectedElementTagName
+    selectedElement
   }, ref) => {
     const queryClient = useQueryClient();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -529,10 +528,27 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const handleVisualAgentRequest = (prompt: string) => {
       // Switch back to chat
       setViewMode('chat');
-      // Pre-fill input (or send immediately)
-      // For now, let's just set input and maybe auto-send or let user confirm
-      setInput(`[VISUAL EDIT] ${prompt}`);
-      // Ideally we would include context about the selected element here
+
+      // Construct context-rich message
+      let message = `[VISUAL EDIT] ${prompt}`;
+
+      if (selectedElement) {
+        message += `\n\nContext:\nTarget Element: <${selectedElement.tagName}`;
+        if (selectedElement.elementId) message += ` id="${selectedElement.elementId}"`;
+        if (selectedElement.className) message += ` class="${selectedElement.className}"`;
+        message += `>`;
+
+        message += `\nCSS Selector: ${selectedElement.selector}`;
+        if (selectedElement.innerText) {
+          message += `\nText Content: "${selectedElement.innerText}"`;
+        }
+
+        if (Object.keys(selectedElement.attributes).length > 0) {
+          message += `\nAttributes: ${JSON.stringify(selectedElement.attributes)}`;
+        }
+      }
+
+      setInput(message);
     };
 
     return (
@@ -565,8 +581,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onClose={() => toggleVisualMode()}
             onStyleUpdate={(prop, val) => onStyleUpdate && onStyleUpdate(prop, val)}
             onAgentRequest={handleVisualAgentRequest}
-            selectedElementId={selectedElementId}
-            selectedElementTagName={selectedElementTagName}
+            selectedElementId={selectedElement?.elementId}
+            selectedElementTagName={selectedElement?.tagName}
           />
         ) : (
           <>

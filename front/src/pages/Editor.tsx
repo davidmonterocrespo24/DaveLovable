@@ -24,7 +24,7 @@ import {
 import { FileExplorer } from '@/components/editor/FileExplorer';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { ChatPanel } from '@/components/editor/ChatPanel';
-import { PreviewPanel } from '@/components/editor/PreviewPanelWithWebContainer';
+import { PreviewPanel, PreviewPanelRef } from '@/components/editor/PreviewPanelWithWebContainer';
 import { EditorTabs } from '@/components/editor/EditorTabs';
 import { GitHistoryModal } from '@/components/editor/GitHistoryModal';
 import { GitConfigModal } from '@/components/editor/GitConfigModal';
@@ -54,8 +54,11 @@ const Editor = () => {
   const [currentBranch, setCurrentBranch] = useState('main');
   const [isSyncing, setIsSyncing] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string>('');
+  const [isVisualMode, setIsVisualMode] = useState(false);
+  const [selectedElement, setSelectedElement] = useState<SelectedElementData | undefined>(undefined);
+
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
-  const previewPanelRef = useRef<{ reload: () => void }>(null);
+  const previewPanelRef = useRef<PreviewPanelRef>(null);
 
   useEffect(() => {
     if (!projectId || isNaN(Number(projectId))) {
@@ -373,6 +376,23 @@ const Editor = () => {
     }
   };
 
+  const handleVisualModeChange = (isVisual: boolean) => {
+    setIsVisualMode(isVisual);
+    if (!isVisual) {
+      setSelectedElement(undefined);
+    }
+  };
+
+  const handleElementSelected = (data: SelectedElementData) => {
+    setSelectedElement(data);
+  };
+
+  const handleStyleUpdate = (property: string, value: string) => {
+    if (previewPanelRef.current) {
+      previewPanelRef.current.updateStyle(property, value);
+    }
+  };
+
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
     // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
     if (!data.success || !previewUrl) return;
@@ -488,6 +508,9 @@ const Editor = () => {
                   onCodeChange={handleCodeChange}
                   onGitCommit={handleGitCommit}
                   onReloadPreview={handleReloadPreview}
+                  onVisualModeChange={handleVisualModeChange}
+                  onStyleUpdate={handleStyleUpdate}
+                  selectedElement={selectedElement}
                 />
                 {/* Toggle Chat Button - positioned at right edge of chat panel */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full z-10">
@@ -592,6 +615,8 @@ const Editor = () => {
                           onReload={handleCodeChange}
                           onReportError={handleReportError}
                           onPreviewReady={handlePreviewReady}
+                          isVisualMode={isVisualMode}
+                          onElementSelected={handleElementSelected}
                         />
                       </ResizablePanel>
                     )}

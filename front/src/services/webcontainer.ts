@@ -1,17 +1,6 @@
-import { WebContainer } from '@webcontainer/api';
+import { WebContainer, FileSystemTree } from '@webcontainer/api';
 
 let webcontainerInstance: WebContainer | null = null;
-
-export interface WebContainerFiles {
-  [path: string]: {
-    file?: {
-      contents: string;
-    };
-    directory?: {
-      [path: string]: any;
-    };
-  };
-}
 
 /**
  * Strip ANSI escape codes from terminal output
@@ -36,8 +25,8 @@ export async function getWebContainer(): Promise<WebContainer> {
 /**
  * Convert flat files object to WebContainer tree structure
  */
-function convertToWebContainerFiles(files: Record<string, string>): WebContainerFiles {
-  const tree: WebContainerFiles = {};
+function convertToWebContainerFiles(files: Record<string, string>): FileSystemTree {
+  const tree: FileSystemTree = {};
 
   Object.entries(files).forEach(([path, content]) => {
     const parts = path.split('/');
@@ -49,6 +38,7 @@ function convertToWebContainerFiles(files: Record<string, string>): WebContainer
       if (!current[part]) {
         current[part] = { directory: {} };
       }
+      // @ts-ignore
       current = current[part].directory!;
     }
 
@@ -102,6 +92,164 @@ export async function loadProject(
 
     const { files } = await response.json();
     log(`[WebContainer] Received ${Object.keys(files).length} files`);
+
+    // Inject Visual Editor Helper Script
+    const VISUAL_EDITOR_SCRIPT = `
+      (function() {
+        console.log('[VisualEditor] Helper script initialized');
+        let isVisualMode = false;
+        let selectedElement = null;
+        let hoveredElement = null;
+        
+        // Add styles for visual editor
+        const style = document.createElement('style');
+        style.textContent = \`
+          .visual-editor-mode { cursor: crosshair !important; }
+          .visual-editor-hover { outline: 2px dashed #3b82f6 !important; z-index: 9999 !important; }
+          .visual-editor-selected { outline: 2px solid #3b82f6 !important; z-index: 9999 !important; }
+        \`;
+        document.head.appendChild(style);
+
+        // Handle messages from parent
+        window.addEventListener('message', (event) => {
+          const { type, enabled, property, value } = event.data;
+          
+          if (type === 'visual-editor:toggle-mode') {
+            isVisualMode = enabled;
+            console.log('[VisualEditor] Mode toggled:', isVisualMode);
+            if (isVisualMode) {
+              document.body.classList.add('visual-editor-mode');
+            } else {
+              document.body.classList.remove('visual-editor-mode');
+              clearSelection();
+            }
+          } else if (type === 'visual-editor:update-style') {
+             if (selectedElement) {
+               console.log('[VisualEditor] Updating style:', property, value);
+               selectedElement.style[property] = value;
+             }
+          }
+        });
+
+        function clearSelection() {
+          if (selectedElement) {
+            selectedElement.classList.remove('visual-editor-selected');
+            selectedElement = null;
+          }
+          if (hoveredElement) {
+            hoveredElement.classList.remove('visual-editor-hover');
+            hoveredElement = null;
+          }
+        }
+
+        // Mouse interaction
+        document.addEventListener('mouseover', (e) => {
+          if (!isVisualMode) return;
+          e.stopPropagation();
+          
+          if (hoveredElement && hoveredElement !== selectedElement) {
+            hoveredElement.classList.remove('visual-editor-hover');
+          }
+          
+          hoveredElement = e.target;
+          if (hoveredElement !== selectedElement) {
+            hoveredElement.classList.add('visual-editor-hover');
+          }
+        }, true);
+
+        document.addEventListener('mouseout', (e) => {
+          if (!isVisualMode) return;
+          if (e.target.classList.contains('visual-editor-hover')) {
+             e.target.classList.remove('visual-editor-hover');
+          }
+        }, true);
+
+        document.addEventListener('click', (e) => {
+          if (!isVisualMode) return;
+          e.preventDefault();
+          e.stopPropagation();
+          
+          if (selectedElement) {
+            selectedElement.classList.remove('visual-editor-selected');
+          }
+          
+          selectedElement = e.target;
+          selectedElement.classList.add('visual-editor-selected');
+          selectedElement.classList.remove('visual-editor-hover');
+          
+          // Generate a unique selector
+          const getSelector = (el) => {
+            if (el.id) return '#' + el.id;
+            
+            let path = [];
+            let current = el;
+            
+            while (current && current !== document.body) {
+              let selector = current.tagName.toLowerCase();
+              
+              if (current.id) {
+                selector += '#' + current.id;
+                path.unshift(selector);
+                break;
+              } else {
+                let nth = 1;
+                let sibling = current;
+                while (sibling = sibling.previousElementSibling) {
+                  if (sibling.tagName.toLowerCase() === selector) nth++;
+                }
+                if (nth !== 1) selector += ':nth-of-type(' + nth + ')';
+              }
+              
+              path.unshift(selector);
+              current = current.parentElement;
+            }
+            
+            return path.join(' > ');
+          };
+          
+          const elementId = selectedElement.id || '';
+          const tagName = selectedElement.tagName.toLowerCase();
+          const className = selectedElement.className;
+          const selector = getSelector(selectedElement);
+          const innerText = selectedElement.innerText.substring(0, 100);
+          
+          // Get useful attributes
+          const attributes = {};
+          ['src', 'href', 'placeholder', 'type', 'name', 'value', 'alt'].forEach(attr => {
+             if (selectedElement.hasAttribute(attr)) {
+               attributes[attr] = selectedElement.getAttribute(attr);
+             }
+          });
+          
+          console.log('[VisualEditor] Selected:', tagName, elementId, selector);
+          
+          // Send selection to parent
+          window.parent.postMessage({
+            type: 'visual-editor:selected',
+            elementId,
+            tagName,
+            className,
+            selector,
+            innerText,
+            attributes
+          }, '*');
+        }, true);
+      })();
+    `;
+
+    // Add helper script to files
+    files['visual-editor-helper.js'] = VISUAL_EDITOR_SCRIPT;
+
+    // Inject script into index.html if it exists
+    if (files['index.html']) {
+      const indexHtml = files['index.html'];
+      if (!indexHtml.includes('visual-editor-helper.js')) {
+        files['index.html'] = indexHtml.replace(
+          '</body>',
+          '<script src="./visual-editor-helper.js"></script></body>'
+        );
+      }
+    }
 
     log('[WebContainer] Converting file structure...');
     const fileTree = convertToWebContainerFiles(files);
