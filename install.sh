@@ -139,8 +139,6 @@ SECRET_KEY=$(openssl rand -hex 32)
 
 # Server
 DEBUG=False
-HOST=0.0.0.0
-PORT=8000
 
 # Projects
 PROJECTS_BASE_DIR=$BACKEND_DIR/projects
