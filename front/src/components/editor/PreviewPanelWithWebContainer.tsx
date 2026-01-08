@@ -83,14 +83,23 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     };
 
     // Communicate visual mode change to iframe
+    // Also re-send when previewUrl changes (when WebContainer reloads)
     useEffect(() => {
-      if (!iframeRef.current?.contentWindow) return;
+      if (!iframeRef.current?.contentWindow || !previewUrl) return;
 
-      iframeRef.current.contentWindow.postMessage({
-        type: 'visual-editor:toggle-mode',
-        enabled: isVisualMode
-      }, '*');
-    }, [isVisualMode]);
+      // Small delay to ensure iframe is fully loaded
+      const timer = setTimeout(() => {
+        if (iframeRef.current?.contentWindow) {
+          console.log('[PreviewPanel] Sending visual mode state to iframe:', isVisualMode);
+          iframeRef.current.contentWindow.postMessage({
+            type: 'visual-editor:toggle-mode',
+            enabled: isVisualMode
+          }, '*');
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }, [isVisualMode, previewUrl]);
 
     // Listen for browser logs AND visual editor events from the iframe
     useEffect(() => {
@@ -199,11 +208,23 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
 
     // Expose reload method to parent via ref (uses lightweight reload)
     useImperativeHandle(ref, () => ({
-      reload: () => {
+      reload: async () => {
         if (onReload) {
           onReload();
         }
-        reloadFiles();
+        await reloadFiles();
+
+        // After reload, re-apply visual mode if it's enabled
+        // Wait a bit longer to ensure iframe processed the file updates
+        setTimeout(() => {
+          if (iframeRef.current?.contentWindow && isVisualMode) {
+            console.log('[PreviewPanel] Re-enabling visual mode after reload');
+            iframeRef.current.contentWindow.postMessage({
+              type: 'visual-editor:toggle-mode',
+              enabled: true
+            }, '*');
+          }
+        }, 1000); // 1 second delay after reload completes
       },
       updateStyle: (property: string, value: string) => {
         if (!iframeRef.current?.contentWindow) return;
