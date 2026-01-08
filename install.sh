@@ -76,13 +76,11 @@ sudo apt upgrade -y
 ################################################################################
 # 2. Install required dependencies
 ################################################################################
-log_info "Installing system dependencies..."
+log_info "Installing system dependencies (without Node.js/npm first)..."
 sudo apt install -y \
     python3 \
     python3-pip \
     python3-venv \
-    nodejs \
-    npm \
     nginx \
     certbot \
     python3-certbot-nginx \
@@ -90,8 +88,13 @@ sudo apt install -y \
     curl \
     build-essential
 
-# Install Node.js 20.x (LTS)
-log_info "Installing Node.js 20.x..."
+# Remove any existing Node.js/npm installations to avoid conflicts
+log_info "Removing any existing Node.js/npm installations..."
+sudo apt remove --purge -y nodejs npm node 2>/dev/null || true
+sudo apt autoremove -y
+
+# Install Node.js 20.x (LTS) from NodeSource (includes npm)
+log_info "Installing Node.js 20.x LTS from NodeSource..."
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
