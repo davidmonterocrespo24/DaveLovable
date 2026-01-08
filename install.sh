@@ -26,10 +26,9 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running as root
+# Check if running as root - allow but warn
 if [[ $EUID -eq 0 ]]; then
-   log_error "This script should NOT be run as root. Please run as a regular user with sudo privileges."
-   exit 1
+   log_warn "Running as root user. This is allowed but not recommended for production environments."
 fi
 
 # Get domain from user
