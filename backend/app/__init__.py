@@ -1,5 +1,5 @@
 """
-Lovable Dev Clone Backend
+DaveLovable Backend
 A FastAPI backend with AutoGen agent orchestration for AI-powered code generation
 """
 

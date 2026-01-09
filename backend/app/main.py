@@ -56,7 +56,7 @@ async def shutdown_event():
 async def root():
     """Root endpoint"""
     return {
-        "message": "Welcome to Lovable Dev Clone API",
+        "message": "Welcome to DaveLovable API",
         "version": settings.APP_VERSION,
         "docs": "/docs",
     }

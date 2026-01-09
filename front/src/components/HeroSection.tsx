@@ -79,7 +79,7 @@ const HeroSection = () => {
                 <div className="w-3 h-3 rounded-full bg-green-500/70" />
               </div>
               <div className="flex-1 text-center">
-                <span className="text-xs text-muted-foreground">lovable.dev</span>
+                <span className="text-xs text-muted-foreground">dlovable.daveplanet.com</span>
               </div>
             </div>
             
@@ -93,7 +93,7 @@ const HeroSection = () => {
                     <p className="text-foreground mt-1">Create a dashboard with analytics charts and user management</p>
                   </div>
                   <div className="glass rounded-lg p-4 border-primary/30">
-                    <p className="text-sm text-primary">Lovable:</p>
+                    <p className="text-sm text-primary">DaveLovable:</p>
                     <p className="text-foreground mt-1">Building your dashboard with interactive charts, user table with search, and role management...</p>
                   </div>
                 </div>

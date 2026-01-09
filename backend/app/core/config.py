@@ -5,7 +5,7 @@ import os
 
 class Settings(BaseSettings):
     # Application
-    APP_NAME: str = "Lovable Dev Clone"
+    APP_NAME: str = "DaveLovable"
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = True
 
@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     API_V1_PREFIX: str = "/api/v1"
 
     # Database
-    DATABASE_URL: str = "sqlite:///./lovable_dev.db"
+    DATABASE_URL: str = "sqlite:///./davelovable.db"
 
     # Security
     SECRET_KEY: str = "your-secret-key-change-this-in-production"

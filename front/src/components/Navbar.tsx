@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
+import { Menu, X, GithubIcon } from "lucide-react";
 import { useState } from "react";
 
 const Navbar = () => {
@@ -8,7 +8,6 @@ const Navbar = () => {
   const navLinks = [
     { label: "Features", href: "#features" },
     { label: "How it Works", href: "#how-it-works" },
-    { label: "Pricing", href: "#pricing" },
     { label: "Docs", href: "#docs" },
   ];
 
@@ -19,9 +18,9 @@ const Navbar = () => {
           {/* Logo */}
           <a href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-lg">L</span>
+              <span className="text-primary-foreground font-bold text-lg">D</span>
             </div>
-            <span className="text-xl font-bold text-foreground">lovable</span>
+            <span className="text-xl font-bold text-foreground">DaveLovable</span>
           </a>
 
           {/* Desktop Navigation */}
@@ -39,6 +38,14 @@ const Navbar = () => {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-3">
+            <a
+              href="https://github.com/davidmonterocrespo24/DaveLovable"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-muted-foreground hover:text-foreground transition-colors duration-200"
+            >
+              <GithubIcon size={20} />
+            </a>
             <Button variant="ghost" size="sm">
               Sign in
             </Button>
@@ -71,6 +78,15 @@ const Navbar = () => {
                 </a>
               ))}
               <div className="flex flex-col gap-2 pt-4 border-t border-border/30">
+                <a
+                  href="https://github.com/davidmonterocrespo24/DaveLovable"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
+                >
+                  <GithubIcon size={18} />
+                  <span>GitHub</span>
+                </a>
                 <Button variant="ghost" size="sm">
                   Sign in
                 </Button>

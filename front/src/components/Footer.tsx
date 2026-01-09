@@ -16,9 +16,9 @@ const Footer = () => {
           <div className="md:col-span-2">
             <a href="/" className="flex items-center gap-2 mb-6">
               <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-lg">L</span>
+                <span className="text-primary-foreground font-bold text-lg">D</span>
               </div>
-              <span className="text-xl font-bold text-foreground">lovable</span>
+              <span className="text-xl font-bold text-foreground">DaveLovable</span>
             </a>
             <p className="text-muted-foreground text-sm leading-relaxed mb-6">
               Build software with superhuman speed. 
@@ -64,7 +64,7 @@ const Footer = () => {
         {/* Bottom */}
         <div className="border-t border-border/30 mt-12 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-sm text-muted-foreground">
-            © 2024 Lovable. All rights reserved.
+            © 2024 DaveLovable. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground">
             Made with ❤️ for developers everywhere

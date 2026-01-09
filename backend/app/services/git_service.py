@@ -40,13 +40,13 @@ build/
 
             # Configure git user (for commits)
             subprocess.run(
-                ["git", "config", "user.name", "Lovable AI"],
+                ["git", "config", "user.name", "DaveLovable AI"],
                 cwd=project_dir,
                 check=True,
                 capture_output=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "ai@lovable.dev"],
+                ["git", "config", "user.email", "ai@daveplanet.com"],
                 cwd=project_dir,
                 check=True,
                 capture_output=True

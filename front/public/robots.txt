@@ -1,14 +1,31 @@
+# robots.txt for DaveLovable
+# https://dlovable.daveplanet.com/robots.txt
+
+# Allow all web crawlers
+User-agent: *
+Allow: /
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Disallow admin and API paths (if any)
+Disallow: /api/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://dlovable.daveplanet.com/sitemap.xml
+
+# Google-specific directives
 User-agent: Googlebot
 Allow: /
 
+# Bing-specific directives
 User-agent: Bingbot
 Allow: /
 
+# Social media bots
+User-agent: facebot
+Allow: /
+
 User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
-User-agent: *
 Allow: /

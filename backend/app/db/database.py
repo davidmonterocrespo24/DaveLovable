@@ -4,7 +4,7 @@ from sqlalchemy.orm import sessionmaker
 import os
 
 # Database configuration
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./lovable_dev.db")
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./davelovable.db")
 
 # Create engine
 engine = create_engine(
