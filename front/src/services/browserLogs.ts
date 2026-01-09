@@ -5,6 +5,8 @@
  * Uses postMessage to communicate with the iframe due to cross-origin restrictions.
  */
 
+import { API_URL } from './api';
+
 export interface BrowserLog {
   type: 'log' | 'error' | 'warning' | 'info';
   message: string;
@@ -83,7 +85,7 @@ export async function sendLogsToBackend(projectId: number): Promise<void> {
   }
 
   try {
-    const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/browser-logs`, {
+    const response = await fetch(`${API_URL}/projects/${projectId}/browser-logs`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

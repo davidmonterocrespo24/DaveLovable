@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, GitBranch, Calendar, User, Hash, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { API_URL } from '@/services/api';
 
 interface GitCommit {
   hash: string;
@@ -31,7 +32,7 @@ export const GitHistoryModal: React.FC<GitHistoryModalProps> = ({ projectId, isO
   const loadGitHistory = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/history?limit=50`);
+      const response = await fetch(`${API_URL}/projects/${projectId}/git/history?limit=50`);
       if (!response.ok) throw new Error('Failed to load git history');
 
       const data = await response.json();
@@ -54,7 +55,7 @@ export const GitHistoryModal: React.FC<GitHistoryModalProps> = ({ projectId, isO
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/restore/${commitHash}`, {
+      const response = await fetch(`${API_URL}/projects/${projectId}/git/restore/${commitHash}`, {
         method: 'POST',
       });
 

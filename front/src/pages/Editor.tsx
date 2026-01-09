@@ -16,6 +16,7 @@ import {
 import { useProject } from '@/hooks/useProjects';
 import { useUpdateFile } from '@/hooks/useFiles';
 import { useQueryClient } from '@tanstack/react-query';
+import { API_URL } from '@/services/api';
 import {
   ResizableHandle,
   ResizablePanel,
@@ -78,7 +79,7 @@ const Editor = () => {
     const fetchBranch = async () => {
       if (!projectId) return;
       try {
-        const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/branch`);
+        const response = await fetch(`${API_URL}/projects/${projectId}/git/branch`);
         if (response.ok) {
           const data = await response.json();
           setCurrentBranch(data.branch);
@@ -213,7 +214,7 @@ const Editor = () => {
 
     setIsSyncing(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/sync`, {
+      const response = await fetch(`${API_URL}/projects/${projectId}/git/sync`, {
         method: 'POST',
       });
 
@@ -276,7 +277,7 @@ const Editor = () => {
       console.log('[Screenshot] Sending URL to backend:', previewUrl);
 
       // Send preview URL to backend for screenshot capture
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/thumbnail`, {
+      const response = await fetch(`${API_URL}/projects/${projectId}/thumbnail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: previewUrl }),
@@ -316,7 +317,7 @@ const Editor = () => {
 
   const handleDownloadProject = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/download`);
+      const response = await fetch(`${API_URL}/projects/${projectId}/download`);
 
       if (!response.ok) {
         throw new Error('Failed to download project');

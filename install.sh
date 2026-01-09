@@ -168,7 +168,7 @@ cd "$FRONTEND_DIR"
 npm install
 
 log_info "Building frontend..."
-VITE_API_URL=https://$DOMAIN/api npm run build
+VITE_API_URL=https://$DOMAIN/api/v1 npm run build
 
 ################################################################################
 # 7. Create systemd service for backend

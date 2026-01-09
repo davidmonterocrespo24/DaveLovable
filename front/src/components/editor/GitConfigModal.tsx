@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, GitBranch, Globe, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { API_URL } from '@/services/api';
 
 interface GitConfigModalProps {
   projectId: number;
@@ -25,7 +26,7 @@ export const GitConfigModal: React.FC<GitConfigModalProps> = ({ projectId, isOpe
   const loadGitConfig = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/config`);
+      const response = await fetch(`${API_URL}/projects/${projectId}/git/config`);
       if (!response.ok) throw new Error('Failed to load git config');
 
       const data = await response.json();
@@ -55,7 +56,7 @@ export const GitConfigModal: React.FC<GitConfigModalProps> = ({ projectId, isOpe
 
     setIsSaving(true);
     try {
-      const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/git/config`, {
+      const response = await fetch(`${API_URL}/projects/${projectId}/git/config`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
