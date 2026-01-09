@@ -63,6 +63,68 @@ export interface LoadProjectResult {
 }
 
 /**
+ * Screenshot Capture Helper Script
+ * Injects html2canvas into the WebContainer to capture its own DOM
+ */
+const SCREENSHOT_HELPER_SCRIPT = `
+(function() {
+  console.log('[Screenshot Helper] Initializing...');
+
+  // Listen for screenshot requests from parent
+  window.addEventListener('message', async (event) => {
+    if (event.data.type === 'capture-screenshot') {
+      console.log('[Screenshot Helper] Received capture request');
+
+      try {
+        // Dynamically import html2canvas
+        if (!window.html2canvas) {
+          console.log('[Screenshot Helper] Loading html2canvas...');
+          const script = document.createElement('script');
+          script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+          document.head.appendChild(script);
+
+          // Wait for script to load
+          await new Promise((resolve, reject) => {
+            script.onload = resolve;
+            script.onerror = reject;
+            setTimeout(reject, 5000); // 5s timeout
+          });
+        }
+
+        console.log('[Screenshot Helper] Capturing DOM with html2canvas...');
+        const canvas = await window.html2canvas(document.body, {
+          allowTaint: true,
+          useCORS: true,
+          logging: false,
+          width: window.innerWidth,
+          height: window.innerHeight,
+          windowWidth: 1280,
+          windowHeight: 720,
+        });
+
+        const dataUrl = canvas.toDataURL('image/png');
+        console.log('[Screenshot Helper] Capture successful, sending to parent');
+
+        // Send screenshot back to parent
+        window.parent.postMessage({
+          type: 'screenshot-captured',
+          data: dataUrl
+        }, '*');
+      } catch (error) {
+        console.error('[Screenshot Helper] Capture failed:', error);
+        window.parent.postMessage({
+          type: 'screenshot-error',
+          error: error.message
+        }, '*');
+      }
+    }
+  });
+
+  console.log('[Screenshot Helper] Ready');
+})();
+`;
+
+/**
  * Lightweight Visual Editor script (minimal version)
  */
 const VISUAL_EDITOR_SCRIPT = `
@@ -106,16 +168,18 @@ export async function loadProject(
     const { files } = await response.json();
     log(`[WebContainer] Received ${Object.keys(files).length} files`);
 
+    // INJECT SCREENSHOT HELPER: Always inject to enable screenshot capture
+    files['screenshot-helper.js'] = SCREENSHOT_HELPER_SCRIPT;
+    if (files['index.html'] && !files['index.html'].includes('screenshot-helper.js')) {
+      files['index.html'] = files['index.html'].replace(
+        '</body>',
+        '<script src="./screenshot-helper.js"></script></body>'
+      );
+      log('[WebContainer] Screenshot helper injected');
+    }
+
     // OPTIMIZATION 2: Lazy load visual editor (only add if needed, skip for now)
     // files['visual-editor-helper.js'] = VISUAL_EDITOR_SCRIPT;
-
-    // OPTIMIZATION 3: Skip HTML injection if not needed
-    // if (files['index.html'] && !files['index.html'].includes('visual-editor-helper.js')) {
-    //   files['index.html'] = files['index.html'].replace(
-    //     '</body>',
-    //     '<script src="./visual-editor-helper.js"></script></body>'
-    //   );
-    // }
 
     // OPTIMIZATION 4: Fast file tree conversion (already optimized)
     log('[WebContainer] Preparing files...');

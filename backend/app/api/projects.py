@@ -553,7 +553,7 @@ def update_project_thumbnail(
     db: Session = Depends(get_db)
 ):
     """
-    Update project thumbnail by capturing screenshot of preview URL
+    Update project thumbnail by capturing screenshot of preview URL (DEPRECATED - use /thumbnail/upload)
 
     Args:
         project_id: The project ID
@@ -588,6 +588,58 @@ def update_project_thumbnail(
         "success": True,
         "message": "Thumbnail updated successfully",
         "project_id": project_id
+    }
+
+
+@router.post("/{project_id}/thumbnail/upload")
+def upload_project_thumbnail(
+    project_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload project thumbnail from frontend (base64 screenshot)
+
+    Args:
+        project_id: The project ID
+        data: JSON body with 'thumbnail' field containing base64 image data
+
+    Returns:
+        Success status and project_id
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+
+    logger.info(f"📸 Receiving thumbnail upload for project {project_id}")
+
+    # Verify project exists
+    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    thumbnail_data = data.get("thumbnail", "")
+
+    if not thumbnail_data:
+        logger.error("❌ No thumbnail data provided")
+        raise HTTPException(status_code=400, detail="Thumbnail data is required")
+
+    # Validate base64 format
+    if not thumbnail_data.startswith("data:image/"):
+        logger.error("❌ Invalid thumbnail format (must be data URI)")
+        raise HTTPException(status_code=400, detail="Thumbnail must be in data URI format")
+
+    logger.info(f"✅ Thumbnail data received ({len(thumbnail_data)} bytes)")
+
+    # Update project thumbnail
+    project.thumbnail = thumbnail_data
+    db.commit()
+    db.refresh(project)
+
+    logger.info(f"✅ Thumbnail saved to database for project {project_id}")
+
+    return {
+        "success": True,
+        "message": "Thumbnail uploaded successfully",
+        "project_id": project_id,
+        "thumbnail_size": len(thumbnail_data)
     }
 
 

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { loadProject, reloadProjectFiles } from '@/services/webcontainer';
 import { initializeLogCapture } from '@/services/browserLogs';
+import { API_URL } from '@/services/api';
 
 export interface SelectedElementData {
   elementId: string;
@@ -130,6 +131,76 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       return () => window.removeEventListener('message', handleMessage);
     }, [onElementSelected]);
 
+    const captureScreenshot = async (): Promise<string | null> => {
+      if (!iframeRef.current?.contentWindow) {
+        console.error('[Screenshot] Iframe ref not available');
+        return null;
+      }
+
+      try {
+        console.log('[Screenshot] Requesting screenshot from WebContainer via postMessage...');
+
+        // Create a promise that resolves when we receive the screenshot
+        const screenshotPromise = new Promise<string | null>((resolve) => {
+          const timeoutId = setTimeout(() => {
+            console.error('[Screenshot] Timeout waiting for response');
+            cleanup();
+            resolve(null);
+          }, 10000); // 10 second timeout
+
+          const handleMessage = (event: MessageEvent) => {
+            if (event.data.type === 'screenshot-captured') {
+              console.log('[Screenshot] Received screenshot from WebContainer');
+              cleanup();
+              resolve(event.data.data);
+            } else if (event.data.type === 'screenshot-error') {
+              console.error('[Screenshot] Error from WebContainer:', event.data.error);
+              cleanup();
+              resolve(null);
+            }
+          };
+
+          const cleanup = () => {
+            clearTimeout(timeoutId);
+            window.removeEventListener('message', handleMessage);
+          };
+
+          window.addEventListener('message', handleMessage);
+        });
+
+        // Send capture request to iframe
+        iframeRef.current.contentWindow.postMessage({ type: 'capture-screenshot' }, '*');
+
+        return await screenshotPromise;
+      } catch (error) {
+        console.error('[Screenshot] Capture failed:', error);
+        return null;
+      }
+    };
+
+    const sendScreenshotToBackend = async (screenshotData: string) => {
+      try {
+        console.log('[Screenshot] Sending to backend...');
+        const response = await fetch(`${API_URL}/projects/${projectId}/thumbnail/upload`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ thumbnail: screenshotData }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to save thumbnail: ${response.status}`);
+        }
+
+        console.log('[Screenshot] Successfully saved to backend');
+        addLog('log', '✓ Project thumbnail captured');
+      } catch (error) {
+        console.error('[Screenshot] Failed to send to backend:', error);
+        addLog('error', `✗ Failed to save thumbnail: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    };
+
     const initializeWebContainer = async () => {
       setIsInitializing(true);
       setInitError('');
@@ -164,6 +235,16 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         if (onPreviewReady) {
           onPreviewReady(result.url);
         }
+
+        // Capture screenshot after preview is fully loaded (for first load)
+        // Wait longer to ensure content is rendered
+        setTimeout(async () => {
+          console.log('[Screenshot] Attempting to capture project thumbnail...');
+          const screenshot = await captureScreenshot();
+          if (screenshot) {
+            await sendScreenshotToBackend(screenshot);
+          }
+        }, 5000); // Wait 5 seconds after preview is ready
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setInitError(errorMsg);

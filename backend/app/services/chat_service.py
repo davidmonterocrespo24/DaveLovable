@@ -712,6 +712,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
             await orchestrator.save_state(project_id)
 
             # AUTO-COMMIT: Create Git commit with AI-generated message
+            commit_count = 0
             try:
                 logger.info("🔄 Creating automatic Git commit...")
 
@@ -737,13 +738,20 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
                     if commit_success:
                         logger.info(f"✅ Git commit created: {commit_info['title']}")
+
+                        # Get commit count (excluding initial commit)
+                        commits = GitService.get_commit_history(project_id, limit=100)
+                        commit_count = len(commits)
+                        logger.info(f"📊 Total commits in project: {commit_count}")
+
                         # Yield commit event to frontend
                         yield {
                             "type": "git_commit",
                             "data": {
                                 "success": True,
                                 "message": commit_info['title'],
-                                "full_message": full_commit_message
+                                "full_message": full_commit_message,
+                                "commit_count": commit_count
                             }
                         }
                     else:
@@ -760,6 +768,15 @@ Please analyze the request, create a plan if needed, and implement the solution.
                         "error": str(e)
                     }
                 }
+
+            # NOTE: Screenshot capture is now handled in the frontend (PreviewPanelWithWebContainer.tsx)
+            # The frontend captures the WebContainer iframe directly and uploads to /thumbnail/upload endpoint
+            # This is necessary because WebContainer runs in the browser, not accessible from backend
+            if commit_count == 2:
+                logger.info("="*80)
+                logger.info("📸 FIRST COMMIT DETECTED")
+                logger.info("📸 Screenshot will be captured by frontend from WebContainer")
+                logger.info("="*80)
 
             # Trigger WebContainer reload after agent completes
             logger.info("🔄 Triggering WebContainer reload (agent finished)")
