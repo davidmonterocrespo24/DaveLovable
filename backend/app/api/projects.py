@@ -78,12 +78,21 @@ Remember to return ONLY the JSON object, nothing else."""
     http_client = httpx.AsyncClient()
 
     try:
+        # Define model capabilities for non-OpenAI models (like DeepSeek)
+        model_info = {
+            "vision": True,
+            "function_calling": True,
+            "json_output": True,
+            "family": "unknown",
+            "structured_output": True,
+        }
+
         client = OpenAIChatCompletionClient(
             model=settings.OPENAI_MODEL,
             base_url=settings.OPENAI_API_BASE_URL,
             api_key=settings.OPENAI_API_KEY,
+            model_capabilities=model_info,
             http_client=http_client,
-            response_format={"type": "json_object"},
         )
 
         messages = [
@@ -93,6 +102,10 @@ Remember to return ONLY the JSON object, nothing else."""
 
         result = await client.create(messages)
         response_content = result.content
+
+        # Extract JSON from markdown code blocks if present (same as llm_edit_fixer.py)
+        if response_content.strip().startswith("```"):
+            response_content = response_content.split("```json")[-1].split("```")[0].strip()
 
         # Parse the JSON response
         metadata = json.loads(response_content)

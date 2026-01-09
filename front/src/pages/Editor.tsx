@@ -97,14 +97,19 @@ const Editor = () => {
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
 
-    if (initialMessage && !initialMessageSent && chatPanelRef.current) {
-      // Wait a bit for chat panel to be fully ready
+    if (initialMessage && !initialMessageSent) {
+      console.log('[Editor] Initial message detected:', initialMessage);
+
+      // Wait for chat panel to be fully ready
       const timer = setTimeout(() => {
         if (chatPanelRef.current) {
+          console.log('[Editor] Sending initial message to chat panel');
           chatPanelRef.current.sendMessage(initialMessage);
           setInitialMessageSent(true);
+        } else {
+          console.warn('[Editor] Chat panel ref not ready yet');
         }
-      }, 500);
+      }, 1500); // Increased delay to ensure chat panel is ready
 
       return () => clearTimeout(timer);
     }
