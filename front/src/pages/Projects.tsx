@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useProjects, useCreateProject, useDeleteProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
-import { Plus, Folder, Calendar, Trash2, MoreVertical } from 'lucide-react';
+import { Plus, Folder, Calendar, Trash2, MoreVertical, Sparkles, ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import {
   DropdownMenu,
@@ -31,6 +31,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 
 const Projects = () => {
   const { data: projects, isLoading } = useProjects();
@@ -94,7 +96,7 @@ const Projects = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading projects...</p>
@@ -104,171 +106,231 @@ const Projects = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="text-3xl font-bold">My Projects</h1>
-            <p className="text-muted-foreground mt-2">
-              Manage and access your development projects
-            </p>
-          </div>
-          <Button onClick={openCreateDialog}>
-            <Plus className="w-4 h-4 mr-2" />
-            New Project
-          </Button>
-        </div>
+    <main className="min-h-screen bg-background">
+      <Navbar />
 
-        {!projects || projects.length === 0 ? (
-          <div className="text-center py-12">
-            <Folder className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-            <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
-            <p className="text-muted-foreground mb-6">
-              Create your first project to get started
-            </p>
-            <Button onClick={openCreateDialog}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Your First Project
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className="block rounded-lg border border-border bg-card hover:border-primary transition-colors overflow-hidden group relative"
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 overflow-hidden">
+        {/* Background Effects */}
+        <div className="absolute inset-0 bg-gradient-subtle" />
+        <div className="absolute top-20 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />
+        <div className="absolute bottom-0 right-1/4 w-80 h-80 bg-accent/15 rounded-full blur-3xl animate-pulse-glow delay-500" />
+
+        {/* Grid Pattern */}
+        <div
+          className="absolute inset-0 opacity-[0.02]"
+          style={{
+            backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px), linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
+            backgroundSize: '60px 60px',
+          }}
+        />
+
+        <div className="container mx-auto px-6 relative z-10">
+          <div className="max-w-6xl mx-auto">
+            {/* Header */}
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-12 animate-fade-in-up">
+              <div>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass mb-4">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-sm text-muted-foreground">Your Workspace</span>
+                </div>
+                <h1 className="text-4xl md:text-5xl font-extrabold mb-3">
+                  My <span className="text-gradient">Projects</span>
+                </h1>
+                <p className="text-lg text-muted-foreground">
+                  Manage and access all your AI-powered development projects
+                </p>
+              </div>
+              <Button
+                onClick={openCreateDialog}
+                size="lg"
+                className="mt-6 md:mt-0 bg-gradient-primary hover:scale-105 transition-all glow-primary"
               >
-                <Link to={`/editor/${project.id}`}>
-                  {/* Thumbnail or placeholder */}
-                  <div className="relative h-48 bg-gradient-to-br from-primary/10 to-purple-600/10 overflow-hidden">
-                    {project.thumbnail ? (
-                      <img
-                        src={project.thumbnail}
-                        alt={project.name}
-                        className="w-full h-full object-cover object-top"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Folder className="w-16 h-16 text-primary/30" />
-                      </div>
-                    )}
-                    <div className="absolute top-2 right-2 flex items-center gap-2">
-                      <span className="text-xs px-2 py-1 rounded bg-background/80 backdrop-blur-sm text-foreground capitalize">
-                        {project.status}
-                      </span>
-                    </div>
-                  </div>
+                <Plus className="w-5 h-5 mr-2" />
+                New Project
+              </Button>
+            </div>
 
-                  {/* Project details */}
-                  <div className="p-6">
-                    <h3 className="text-lg font-semibold mb-2 group-hover:text-primary transition-colors">
-                      {project.name}
-                    </h3>
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {project.description || 'No description'}
-                    </p>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      {new Date(project.created_at).toLocaleDateString()}
-                    </div>
+            {/* Projects Grid */}
+            {!projects || projects.length === 0 ? (
+              <div className="text-center py-20 animate-fade-in">
+                <div className="glass rounded-3xl p-12 max-w-2xl mx-auto glow-accent">
+                  <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Folder className="w-10 h-10 text-primary" />
                   </div>
-                </Link>
-
-                {/* Delete button - positioned absolutely */}
-                <div className="absolute top-52 right-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                      <button className="p-2 bg-background/80 backdrop-blur-sm hover:bg-background rounded-lg border border-border/30 transition-all opacity-0 group-hover:opacity-100">
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={(e) => handleDeleteProject(project.id, project.name, e)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete Project
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <h2 className="text-2xl font-bold mb-3">No projects yet</h2>
+                  <p className="text-muted-foreground mb-8 text-lg">
+                    Create your first project and start building with AI assistance
+                  </p>
+                  <Button
+                    onClick={openCreateDialog}
+                    size="lg"
+                    className="bg-gradient-primary hover:scale-105 transition-all glow-primary"
+                  >
+                    <Plus className="w-5 h-5 mr-2" />
+                    Create Your First Project
+                    <ArrowRight className="w-5 h-5 ml-2" />
+                  </Button>
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up delay-200">
+                {projects.map((project, index) => (
+                  <div
+                    key={project.id}
+                    className="group relative"
+                    style={{
+                      animation: `fadeInUp 0.5s ease-out ${index * 0.1}s both`
+                    }}
+                  >
+                    <Link to={`/editor/${project.id}`}>
+                      <div className="glass rounded-2xl overflow-hidden hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:-translate-y-1">
+                        {/* Thumbnail */}
+                        <div className="relative h-48 bg-gradient-to-br from-primary/20 to-purple-500/20 overflow-hidden">
+                          {project.thumbnail ? (
+                            <img
+                              src={project.thumbnail}
+                              alt={project.name}
+                              className="w-full h-full object-cover object-top transition-transform duration-300 group-hover:scale-110"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Sparkles className="w-16 h-16 text-primary/40 animate-pulse" />
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
+                          {/* Status Badge */}
+                          <div className="absolute top-3 right-3">
+                            <span className="text-xs px-3 py-1.5 rounded-full glass text-foreground capitalize font-medium">
+                              {project.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Project Details */}
+                        <div className="p-6">
+                          <h3 className="text-xl font-bold mb-2 group-hover:text-primary transition-colors line-clamp-1">
+                            {project.name}
+                          </h3>
+                          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                            {project.description || 'No description available'}
+                          </p>
+                          <div className="flex items-center text-xs text-muted-foreground">
+                            <Calendar className="w-3.5 h-3.5 mr-1.5" />
+                            {new Date(project.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+
+                    {/* Actions Menu */}
+                    <div className="absolute top-52 right-3 z-10">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                          <button className="p-2 glass hover:bg-background/80 rounded-lg transition-all opacity-0 group-hover:opacity-100">
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={(e) => handleDeleteProject(project.id, project.name, e)}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="w-4 h-4 mr-2" />
+                            Delete Project
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
+      </section>
 
-        {/* Create Project Dialog */}
-        <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
-                Enter the details for your new development project
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Project Name</Label>
-                <Input
-                  id="name"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  placeholder="My Awesome App"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && projectName.trim()) {
-                      handleCreateProject();
-                    }
-                  }}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="description">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  value={projectDescription}
-                  onChange={(e) => setProjectDescription(e.target.value)}
-                  placeholder="A brief description of your project..."
-                  rows={3}
-                />
-              </div>
+      <Footer />
+
+      {/* Create Project Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Create New Project</DialogTitle>
+            <DialogDescription className="text-base">
+              Enter the details for your new AI-powered development project
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-6 py-4">
+            <div className="grid gap-3">
+              <Label htmlFor="name" className="text-base">Project Name</Label>
+              <Input
+                id="name"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="My Awesome App"
+                className="h-11"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && projectName.trim()) {
+                    handleCreateProject();
+                  }
+                }}
+              />
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={handleCreateProject}
-                disabled={!projectName.trim() || createProject.isPending}
-              >
-                {createProject.isPending ? 'Creating...' : 'Create Project'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+            <div className="grid gap-3">
+              <Label htmlFor="description" className="text-base">Description (Optional)</Label>
+              <Textarea
+                id="description"
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="A brief description of your project..."
+                rows={4}
+                className="resize-none"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)} size="lg">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateProject}
+              disabled={!projectName.trim() || createProject.isPending}
+              size="lg"
+              className="bg-gradient-primary glow-primary"
+            >
+              {createProject.isPending ? 'Creating...' : 'Create Project'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={deleteProjectId !== null} onOpenChange={() => setDeleteProjectId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This will permanently delete <strong>{deleteProjectName}</strong> and all its files. This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={confirmDeleteProject}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              >
-                {deleteProject.isPending ? 'Deleting...' : 'Delete'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteProjectId !== null} onOpenChange={() => setDeleteProjectId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl">Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base">
+              This will permanently delete <strong className="text-foreground">{deleteProjectName}</strong> and all its files. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="h-11">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteProject}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 h-11"
+            >
+              {deleteProject.isPending ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </main>
   );
 };
 
