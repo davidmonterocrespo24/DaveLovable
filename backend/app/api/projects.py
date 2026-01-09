@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 import zipfile
 import io
 from pathlib import Path
+import json
+import httpx
+from pydantic import BaseModel
 
 from app.db import get_db
 from app.schemas import (
@@ -20,11 +23,102 @@ from app.services import ProjectService
 from app.services.filesystem_service import FileSystemService
 from app.services.git_service import GitService
 from app.services.screenshot_service import ScreenshotService
+from app.core.config import settings
+from autogen_core.models import SystemMessage, UserMessage
+from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 router = APIRouter()
 
 # Mock user ID for now (in production, get from JWT token)
 MOCK_USER_ID = 1
+
+
+class ProjectFromMessageRequest(BaseModel):
+    message: str
+
+
+class ProjectFromMessageResponse(BaseModel):
+    project: Project
+    initial_message: str
+
+
+@router.post("/from-message", response_model=ProjectFromMessageResponse, status_code=status.HTTP_201_CREATED)
+async def create_project_from_message(
+    request: ProjectFromMessageRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Create a new project from a user message.
+    Uses AI to generate project name and description from the message.
+    """
+    user_message = request.message[:1000]  # Limit to 1000 characters
+
+    if not user_message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    # Create AI prompt to generate project metadata
+    system_prompt = """You are an AI assistant that helps create project metadata.
+Given a user's message describing what they want to build, generate:
+1. A concise project name (max 50 characters)
+2. A clear project description (max 200 characters)
+
+Return ONLY a JSON object with this exact structure:
+{
+  "name": "project name here",
+  "description": "project description here"
+}"""
+
+    user_prompt = f"""Based on this user request, generate a project name and description:
+
+User request: {user_message}
+
+Remember to return ONLY the JSON object, nothing else."""
+
+    # Call OpenAI to generate metadata
+    http_client = httpx.AsyncClient()
+
+    try:
+        client = OpenAIChatCompletionClient(
+            model=settings.OPENAI_MODEL,
+            base_url=settings.OPENAI_API_BASE_URL,
+            api_key=settings.OPENAI_API_KEY,
+            http_client=http_client,
+            response_format={"type": "json_object"},
+        )
+
+        messages = [
+            SystemMessage(content=system_prompt),
+            UserMessage(content=user_prompt, source="user"),
+        ]
+
+        result = await client.create(messages)
+        response_content = result.content
+
+        # Parse the JSON response
+        metadata = json.loads(response_content)
+        project_name = metadata.get("name", "New Project")[:50]
+        project_description = metadata.get("description", user_message)[:200]
+
+    except Exception as e:
+        # Fallback if AI fails
+        print(f"Error generating project metadata: {e}")
+        project_name = "New Project"
+        project_description = user_message[:200]
+    finally:
+        await http_client.aclose()
+
+    # Create the project
+    project_data = ProjectCreate(
+        name=project_name,
+        description=project_description
+    )
+
+    project = ProjectService.create_project(db, project_data, MOCK_USER_ID)
+
+    return ProjectFromMessageResponse(
+        project=project,
+        initial_message=user_message
+    )
 
 
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)

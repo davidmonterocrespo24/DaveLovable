@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Sparkles,
   Settings,
@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 const Editor = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { data: project, isLoading: projectLoading } = useProject(Number(projectId));
@@ -57,6 +58,7 @@ const Editor = () => {
   const [previewUrl, setPreviewUrl] = useState<string>('');
   const [isVisualMode, setIsVisualMode] = useState(false);
   const [selectedElement, setSelectedElement] = useState<SelectedElementData | undefined>(undefined);
+  const [initialMessageSent, setInitialMessageSent] = useState(false);
 
   const chatPanelRef = useRef<{ sendMessage: (message: string) => void }>(null);
   const previewPanelRef = useRef<PreviewPanelRef>(null);
@@ -90,6 +92,23 @@ const Editor = () => {
     };
     fetchBranch();
   }, [projectId]);
+
+  // Auto-send initial message if provided from homepage
+  useEffect(() => {
+    const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
+
+    if (initialMessage && !initialMessageSent && chatPanelRef.current) {
+      // Wait a bit for chat panel to be fully ready
+      const timer = setTimeout(() => {
+        if (chatPanelRef.current) {
+          chatPanelRef.current.sendMessage(initialMessage);
+          setInitialMessageSent(true);
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [location.state, initialMessageSent]);
 
   // Keyboard shortcut for saving (Ctrl+S)
   useEffect(() => {
