@@ -27,7 +27,7 @@ router = APIRouter()
 MOCK_USER_ID = 1
 
 
-@router.post("/", response_model=Project, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
 def create_project(
     project: ProjectCreate,
     db: Session = Depends(get_db)
@@ -36,7 +36,7 @@ def create_project(
     return ProjectService.create_project(db, project, MOCK_USER_ID)
 
 
-@router.get("/", response_model=List[Project])
+@router.get("", response_model=List[Project])
 def get_projects(
     skip: int = 0,
     limit: int = 100,
