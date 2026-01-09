@@ -92,11 +92,12 @@ export async function loadProject(
   };
 
   try {
-    log('[WebContainer] Getting instance...');
-    const container = await getWebContainer();
-
-    log('[WebContainer] Fetching project files...');
-    const response = await fetch(`${API_URL}/projects/${projectId}/bundle`);
+    // OPTIMIZATION 1: Parallel container boot + file fetch
+    log('[WebContainer] Initializing...');
+    const [container, response] = await Promise.all([
+      getWebContainer(),
+      fetch(`${API_URL}/projects/${projectId}/bundle`)
+    ]);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
@@ -105,28 +106,38 @@ export async function loadProject(
     const { files } = await response.json();
     log(`[WebContainer] Received ${Object.keys(files).length} files`);
 
-    // Add minified helper script
-    files['visual-editor-helper.js'] = VISUAL_EDITOR_SCRIPT;
+    // OPTIMIZATION 2: Lazy load visual editor (only add if needed, skip for now)
+    // files['visual-editor-helper.js'] = VISUAL_EDITOR_SCRIPT;
 
-    // Inject script into index.html if it exists
-    if (files['index.html'] && !files['index.html'].includes('visual-editor-helper.js')) {
-      files['index.html'] = files['index.html'].replace(
-        '</body>',
-        '<script src="./visual-editor-helper.js"></script></body>'
-      );
-    }
+    // OPTIMIZATION 3: Skip HTML injection if not needed
+    // if (files['index.html'] && !files['index.html'].includes('visual-editor-helper.js')) {
+    //   files['index.html'] = files['index.html'].replace(
+    //     '</body>',
+    //     '<script src="./visual-editor-helper.js"></script></body>'
+    //   );
+    // }
 
-    log('[WebContainer] Converting file structure...');
+    // OPTIMIZATION 4: Fast file tree conversion (already optimized)
+    log('[WebContainer] Preparing files...');
     const fileTree = convertToWebContainerFiles(files);
 
     log('[WebContainer] Mounting files...');
     await container.mount(fileTree);
-    log('[WebContainer] Files mounted');
+    log('[WebContainer] Mounted ⚡');
 
-    // OPTIMIZATION: Use template cache if available
+    // OPTIMIZATION 5: Use template cache if available
     if (!templateInstalled || forceReinstall) {
       log('[WebContainer] Installing dependencies...');
-      const installProcess = await container.spawn('npm', ['install', '--prefer-offline', '--no-audit', '--progress=false']);
+      // OPTIMIZATION 6: More aggressive npm flags
+      const installProcess = await container.spawn('npm', [
+        'install',
+        '--prefer-offline',      // Use offline cache first
+        '--no-audit',            // Skip security audit
+        '--no-fund',             // Skip funding messages
+        '--progress=false',      // Disable progress bar
+        '--loglevel=error',      // Only show errors
+        '--ignore-scripts'       // Skip postinstall scripts for speed
+      ]);
 
       // Simplified output streaming
       installProcess.output.pipeTo(
@@ -310,4 +321,29 @@ export async function teardown(): Promise<void> {
 export function clearTemplateCache(): void {
   templateInstalled = false;
   cachedNodeModules = null;
+}
+
+/**
+ * Enable Visual Editor by injecting helper script
+ * Call this only when visual editor mode is activated
+ */
+export async function enableVisualEditor(): Promise<void> {
+  if (!webcontainerInstance) {
+    throw new Error('WebContainer not initialized');
+  }
+
+  // Write visual editor helper script
+  await webcontainerInstance.fs.writeFile('visual-editor-helper.js', VISUAL_EDITOR_SCRIPT);
+
+  // Read and update index.html
+  const indexHtml = await webcontainerInstance.fs.readFile('index.html', 'utf-8');
+
+  if (!indexHtml.includes('visual-editor-helper.js')) {
+    const updatedHtml = indexHtml.replace(
+      '</body>',
+      '<script src="./visual-editor-helper.js"></script></body>'
+    );
+    await webcontainerInstance.fs.writeFile('index.html', updatedHtml);
+    console.log('[WebContainer] Visual Editor enabled');
+  }
 }
