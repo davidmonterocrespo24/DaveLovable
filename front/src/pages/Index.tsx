@@ -1,16 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, ArrowUp, Sparkles } from "lucide-react";
+import { Plus, ArrowUp, Sparkles, Loader2 } from "lucide-react";
 import { useCreateProject } from "@/hooks/useProjects";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import FeaturesSection from "@/components/FeaturesSection";
+import HowItWorksSection from "@/components/HowItWorksSection";
+import DocsSection from "@/components/DocsSection";
 
 const Index = () => {
   const [message, setMessage] = useState("");
   const [showGallery, setShowGallery] = useState(false);
   const [displayedProjects, setDisplayedProjects] = useState(16);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const galleryRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -38,6 +42,12 @@ const Index = () => {
       });
       return;
     }
+
+    if (isSubmitting) {
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       // Call the new endpoint that uses AI to generate project metadata
@@ -76,6 +86,7 @@ const Index = () => {
         description: "Please try again",
         variant: "destructive",
       });
+      setIsSubmitting(false);
     }
   };
 
@@ -147,7 +158,8 @@ const Index = () => {
                   onKeyPress={handleKeyPress}
                   placeholder="Describe your project or ask anything..."
                   rows={4}
-                  className="flex-1 bg-transparent border-none outline-none text-lg text-foreground placeholder:text-muted-foreground resize-none"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-transparent border-none outline-none text-lg text-foreground placeholder:text-muted-foreground resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                 />
 
                 <div className="flex flex-col items-center gap-3 shrink-0 mt-1">
@@ -155,10 +167,14 @@ const Index = () => {
 
                   <button
                     onClick={handleSubmit}
-                    disabled={!message.trim() || createProject.isPending}
+                    disabled={!message.trim() || isSubmitting}
                     className="w-11 h-11 rounded-full bg-gradient-primary hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center transition-all glow-primary"
                   >
-                    <ArrowUp className="w-6 h-6 text-primary-foreground" />
+                    {isSubmitting ? (
+                      <Loader2 className="w-6 h-6 text-primary-foreground animate-spin" />
+                    ) : (
+                      <ArrowUp className="w-6 h-6 text-primary-foreground" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -231,6 +247,15 @@ const Index = () => {
           </div>
         </section>
       )}
+
+      {/* Features Section */}
+      <FeaturesSection />
+
+      {/* How It Works Section */}
+      <HowItWorksSection />
+
+      {/* Docs Section */}
+      <DocsSection />
 
       <Footer />
     </main>

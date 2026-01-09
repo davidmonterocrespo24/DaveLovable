@@ -287,56 +287,14 @@ const Editor = () => {
     setPreviewUrl(url);
   };
 
-  const captureScreenshot = async (showToastOnSuccess = true) => {
-    if (!previewUrl) {
-      toast({
-        title: "Preview not ready",
-        description: "Please wait for the preview to load before capturing screenshot",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      console.log('[Screenshot] Sending URL to backend:', previewUrl);
-
-      // Send preview URL to backend for screenshot capture
-      const response = await fetch(`${API_URL}/projects/${projectId}/thumbnail`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: previewUrl }),
-      });
-
-      if (response.ok) {
-        console.log('[Screenshot] Thumbnail saved successfully');
-
-        // Invalidate queries to refresh the project data
-        queryClient.invalidateQueries({ queryKey: ['projects'] });
-        queryClient.invalidateQueries({ queryKey: ['projects', 'detail', Number(projectId)] });
-
-        if (showToastOnSuccess) {
-          toast({
-            title: "📸 Screenshot saved",
-            description: "Project thumbnail has been captured",
-            duration: 3000,
-          });
-        }
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || 'Failed to capture screenshot');
-      }
-    } catch (error) {
-      console.error('[Screenshot] Failed to capture:', error);
-      toast({
-        title: "Screenshot failed",
-        description: error instanceof Error ? error.message : "There was an error capturing the screenshot. Please try again.",
-        variant: "destructive",
-      });
-    }
-  };
-
+  // Screenshot is now handled automatically by PreviewPanelWithWebContainer
+  // using postMessage communication with the iframe
   const handleManualScreenshot = () => {
-    captureScreenshot(true);
+    toast({
+      title: "Auto-capture enabled",
+      description: "Screenshots are captured automatically when the preview loads",
+      duration: 3000,
+    });
   };
 
   const handleDownloadProject = async () => {
@@ -419,19 +377,8 @@ const Editor = () => {
   };
 
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
-    // Only capture screenshot on successful commit if project doesn't have a thumbnail yet
-    if (!data.success || !previewUrl) return;
-
-    // Check if project already has a thumbnail
-    if (project?.thumbnail) return;
-
-    try {
-      // Wait a bit for the preview to be fully rendered
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await captureScreenshot(false);
-    } catch (error) {
-      console.error('[Screenshot] Failed to capture:', error);
-    }
+    // Screenshot is now handled automatically by PreviewPanelWithWebContainer
+    // No need to manually trigger screenshot capture
   };
 
   if (projectLoading) {
