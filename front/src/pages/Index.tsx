@@ -102,46 +102,48 @@ const Index = () => {
             </div>
 
             {/* Headline */}
-            <h1 className="text-5xl md:text-7xl font-extrabold leading-tight mb-6 animate-fade-in-up">
+            <h1 className="text-4xl md:text-5xl font-extrabold leading-tight mb-6 animate-fade-in-up">
               What can I{" "}
               <span className="text-gradient">build</span>{" "}
               for you?
             </h1>
 
             {/* Subheadline */}
-            <p className="text-xl md:text-2xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in-up delay-200">
+            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 animate-fade-in-up delay-200">
               Describe what you want to build, and watch AI transform your ideas into
               production-ready applications in minutes.
             </p>
 
             {/* Input Box */}
-            <div className="w-full max-w-3xl mx-auto mb-8 animate-fade-in-up delay-300">
-              <div className="glass rounded-2xl glow-accent flex items-center gap-3 p-4 hover:border-primary/50 transition-all">
+            <div className="w-full max-w-5xl mx-auto mb-8 animate-fade-in-up delay-300">
+              <div className="glass rounded-3xl glow-accent flex items-start gap-4 p-6 hover:border-primary/50 transition-all">
                 <button
-                  className="w-9 h-9 rounded-full border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors shrink-0"
+                  className="w-11 h-11 rounded-full border border-border bg-background hover:bg-muted flex items-center justify-center transition-colors shrink-0 mt-1"
                   onClick={() => {/* Add attachment functionality */}}
                 >
-                  <Plus className="w-5 h-5 text-muted-foreground" />
+                  <Plus className="w-6 h-6 text-muted-foreground" />
                 </button>
 
-                <input
-                  type="text"
+                <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="Describe your project or ask anything..."
-                  className="flex-1 bg-transparent border-none outline-none text-base text-foreground placeholder:text-muted-foreground"
+                  rows={4}
+                  className="flex-1 bg-transparent border-none outline-none text-lg text-foreground placeholder:text-muted-foreground resize-none"
                 />
 
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse shrink-0" />
+                <div className="flex flex-col items-center gap-3 shrink-0 mt-1">
+                  <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse" />
 
-                <button
-                  onClick={handleSubmit}
-                  disabled={!message.trim() || createProject.isPending}
-                  className="w-9 h-9 rounded-full bg-gradient-primary hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center transition-all shrink-0 glow-primary"
-                >
-                  <ArrowUp className="w-5 h-5 text-primary-foreground" />
-                </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!message.trim() || createProject.isPending}
+                    className="w-11 h-11 rounded-full bg-gradient-primary hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center transition-all glow-primary"
+                  >
+                    <ArrowUp className="w-6 h-6 text-primary-foreground" />
+                  </button>
+                </div>
               </div>
             </div>
 
