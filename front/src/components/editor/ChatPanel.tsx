@@ -105,11 +105,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     // Expose sendMessage method to parent
     useImperativeHandle(ref, () => ({
       sendMessage: (message: string) => {
-        setInput(message);
-        // Trigger send automatically after a brief delay to ensure state is updated
-        setTimeout(() => {
-          handleSend();
-        }, 100);
+        handleSend(message);
       },
     }));
 

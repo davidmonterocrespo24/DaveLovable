@@ -40,18 +40,35 @@ const Index = () => {
     }
 
     try {
-      const project = await createProject.mutateAsync({
-        name: message.substring(0, 50),
-        description: message,
+      // Call the new endpoint that uses AI to generate project metadata
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'}/projects/from-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: message.substring(0, 1000),
+        }),
       });
+
+      if (!response.ok) {
+        throw new Error('Failed to create project');
+      }
+
+      const data = await response.json();
+      const project = data.project;
+      const initialMessage = data.initial_message;
 
       toast({
         title: "Project created!",
         description: "Redirecting to editor...",
       });
 
+      // Navigate to editor with the initial message in state
       setTimeout(() => {
-        navigate(`/editor/${project.id}`);
+        navigate(`/editor/${project.id}`, {
+          state: { initialMessage }
+        });
       }, 500);
     } catch (error) {
       toast({
