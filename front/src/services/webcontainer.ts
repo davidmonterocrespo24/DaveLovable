@@ -2,6 +2,8 @@ import { WebContainer, FileSystemTree } from '@webcontainer/api';
 import { API_URL } from './api';
 
 let webcontainerInstance: WebContainer | null = null;
+let templateInstalled = false; // Track if template dependencies are installed
+let cachedNodeModules: FileSystemTree | null = null; // Cache of installed node_modules
 
 /**
  * Strip ANSI escape codes from terminal output
@@ -61,12 +63,21 @@ export interface LoadProjectResult {
 }
 
 /**
+ * Lightweight Visual Editor script (minimal version)
+ */
+const VISUAL_EDITOR_SCRIPT = `
+(function(){console.log('[VisualEditor] Init');let m=false,s=null,h=null;const style=document.createElement('style');style.textContent='.visual-editor-mode{cursor:crosshair!important}.visual-editor-hover{outline:2px dashed #3b82f6!important;z-index:9999!important}.visual-editor-selected{outline:2px solid #3b82f6!important;z-index:9999!important}';document.head.appendChild(style);window.addEventListener('message',e=>{const{type,enabled,property,value}=e.data;if(type==='visual-editor:toggle-mode'){m=enabled;m?document.body.classList.add('visual-editor-mode'):(document.body.classList.remove('visual-editor-mode'),s&&s.classList.remove('visual-editor-selected'),h&&h.classList.remove('visual-editor-hover'),s=h=null)}else if(type==='visual-editor:update-style'&&s)s.style[property]=value});document.addEventListener('mouseover',e=>{if(!m)return;h&&h!==s&&h.classList.remove('visual-editor-hover');h=e.target;h!==s&&h.classList.add('visual-editor-hover')},true);document.addEventListener('mouseout',e=>{m&&e.target.classList.remove('visual-editor-hover')},true);document.addEventListener('click',e=>{if(!m)return;e.preventDefault();e.stopPropagation();s&&s.classList.remove('visual-editor-selected');s=e.target;s.classList.add('visual-editor-selected');s.classList.remove('visual-editor-hover');const getSelector=el=>{if(el.id)return'#'+el.id;let path=[],cur=el;while(cur&&cur!==document.body){let sel=cur.tagName.toLowerCase();if(cur.id){sel+='#'+cur.id;path.unshift(sel);break}else{let nth=1,sib=cur;while(sib=sib.previousElementSibling)sib.tagName.toLowerCase()===sel&&nth++;nth!==1&&(sel+=':nth-of-type('+nth+')')}path.unshift(sel);cur=cur.parentElement}return path.join(' > ')};window.parent.postMessage({type:'visual-editor:selected',elementId:s.id||'',tagName:s.tagName.toLowerCase(),className:s.className,selector:getSelector(s),innerText:s.innerText.substring(0,100)},'*')},true)})();
+`;
+
+/**
  * Load project into WebContainer and start dev server
+ * OPTIMIZED: Skip npm install if already done, faster mounting
  */
 export async function loadProject(
   projectId: number,
   onLog?: (message: string) => void,
-  onError?: (message: string) => void
+  onError?: (message: string) => void,
+  forceReinstall = false
 ): Promise<LoadProjectResult> {
   const logs: string[] = [];
 
@@ -94,189 +105,15 @@ export async function loadProject(
     const { files } = await response.json();
     log(`[WebContainer] Received ${Object.keys(files).length} files`);
 
-    // Inject Visual Editor Helper Script
-    const VISUAL_EDITOR_SCRIPT = `
-      (function() {
-        console.log('[VisualEditor] Helper script initialized');
-        let isVisualMode = false;
-        let selectedElement = null;
-        let hoveredElement = null;
-        
-        // Add styles for visual editor
-        const style = document.createElement('style');
-        style.textContent = \`
-          .visual-editor-mode { cursor: crosshair !important; }
-          .visual-editor-hover { outline: 2px dashed #3b82f6 !important; z-index: 9999 !important; }
-          .visual-editor-selected { outline: 2px solid #3b82f6 !important; z-index: 9999 !important; }
-        \`;
-        document.head.appendChild(style);
-
-        // Handle messages from parent
-        window.addEventListener('message', (event) => {
-          const { type, enabled, property, value } = event.data;
-          
-          if (type === 'visual-editor:toggle-mode') {
-            isVisualMode = enabled;
-            console.log('[VisualEditor] Mode toggled:', isVisualMode);
-            if (isVisualMode) {
-              document.body.classList.add('visual-editor-mode');
-            } else {
-              document.body.classList.remove('visual-editor-mode');
-              clearSelection();
-            }
-          } else if (type === 'visual-editor:update-style') {
-             if (selectedElement) {
-               console.log('[VisualEditor] Updating style:', property, value);
-               selectedElement.style[property] = value;
-             }
-          }
-        });
-
-        function clearSelection() {
-          if (selectedElement) {
-            selectedElement.classList.remove('visual-editor-selected');
-            selectedElement = null;
-          }
-          if (hoveredElement) {
-            hoveredElement.classList.remove('visual-editor-hover');
-            hoveredElement = null;
-          }
-        }
-
-        // Mouse interaction
-        document.addEventListener('mouseover', (e) => {
-          if (!isVisualMode) return;
-          e.stopPropagation();
-          
-          if (hoveredElement && hoveredElement !== selectedElement) {
-            hoveredElement.classList.remove('visual-editor-hover');
-          }
-          
-          hoveredElement = e.target;
-          if (hoveredElement !== selectedElement) {
-            hoveredElement.classList.add('visual-editor-hover');
-          }
-        }, true);
-
-        document.addEventListener('mouseout', (e) => {
-          if (!isVisualMode) return;
-          if (e.target.classList.contains('visual-editor-hover')) {
-             e.target.classList.remove('visual-editor-hover');
-          }
-        }, true);
-
-        document.addEventListener('click', (e) => {
-          if (!isVisualMode) return;
-          e.preventDefault();
-          e.stopPropagation();
-          
-          if (selectedElement) {
-            selectedElement.classList.remove('visual-editor-selected');
-          }
-          
-          selectedElement = e.target;
-          selectedElement.classList.add('visual-editor-selected');
-          selectedElement.classList.remove('visual-editor-hover');
-          
-          // Generate a unique selector
-          const getSelector = (el) => {
-            if (el.id) return '#' + el.id;
-            
-            let path = [];
-            let current = el;
-            
-            while (current && current !== document.body) {
-              let selector = current.tagName.toLowerCase();
-              
-              if (current.id) {
-                selector += '#' + current.id;
-                path.unshift(selector);
-                break;
-              } else {
-                let nth = 1;
-                let sibling = current;
-                while (sibling = sibling.previousElementSibling) {
-                  if (sibling.tagName.toLowerCase() === selector) nth++;
-                }
-                if (nth !== 1) selector += ':nth-of-type(' + nth + ')';
-              }
-              
-              path.unshift(selector);
-              current = current.parentElement;
-            }
-            
-            return path.join(' > ');
-          };
-          
-          const elementId = selectedElement.id || '';
-          const tagName = selectedElement.tagName.toLowerCase();
-          const className = selectedElement.className;
-          const selector = getSelector(selectedElement);
-          const innerText = selectedElement.innerText.substring(0, 100);
-          
-          // Get useful attributes
-          const attributes = {};
-          ['src', 'href', 'placeholder', 'type', 'name', 'value', 'alt'].forEach(attr => {
-             if (selectedElement.hasAttribute(attr)) {
-               attributes[attr] = selectedElement.getAttribute(attr);
-             }
-          });
-          
-          console.log('[VisualEditor] Selected:', tagName, elementId, selector);
-          
-          // Helper to find React Fiber
-          const getReactFiber = (el) => {
-            for (const key in el) {
-              if (key.startsWith('__reactFiber$')) {
-                return el[key];
-              }
-            }
-            return null;
-          };
-
-          // Helper to get source from fiber
-          const getSource = (el) => {
-            let fiber = getReactFiber(el);
-            while (fiber) {
-              if (fiber._debugSource) {
-                return fiber._debugSource;
-              }
-              // Also check 'return' (parent) if not found on current node
-              fiber = fiber.return;
-            }
-            return null;
-          };
-
-          const source = getSource(selectedElement);
-          console.log('[VisualEditor] Source:', source);
-          
-          // Send selection to parent
-          window.parent.postMessage({
-            type: 'visual-editor:selected',
-            elementId,
-            tagName,
-            className,
-            selector,
-            innerText,
-            attributes,
-            source // { fileName, lineNumber }
-          }, '*');
-        }, true);
-      })();
-    `;
-
-    // Add helper script to files
+    // Add minified helper script
     files['visual-editor-helper.js'] = VISUAL_EDITOR_SCRIPT;
 
     // Inject script into index.html if it exists
-    if (files['index.html']) {
-      const indexHtml = files['index.html'];
-      if (!indexHtml.includes('visual-editor-helper.js')) {
-        files['index.html'] = indexHtml.replace(
-          '</body>',
-          '<script src="./visual-editor-helper.js"></script></body>'
-        );
-      }
+    if (files['index.html'] && !files['index.html'].includes('visual-editor-helper.js')) {
+      files['index.html'] = files['index.html'].replace(
+        '</body>',
+        '<script src="./visual-editor-helper.js"></script></body>'
+      );
     }
 
     log('[WebContainer] Converting file structure...');
@@ -284,39 +121,36 @@ export async function loadProject(
 
     log('[WebContainer] Mounting files...');
     await container.mount(fileTree);
-    log('[WebContainer] Files mounted successfully');
+    log('[WebContainer] Files mounted');
 
-    log('[WebContainer] Installing dependencies...');
-    const installProcess = await container.spawn('npm', ['install']);
+    // OPTIMIZATION: Use template cache if available
+    if (!templateInstalled || forceReinstall) {
+      log('[WebContainer] Installing dependencies...');
+      const installProcess = await container.spawn('npm', ['install', '--prefer-offline', '--no-audit', '--progress=false']);
 
-    let lastLogWasSpinner = false;
-
-    // Stream install output
-    installProcess.output.pipeTo(
-      new WritableStream({
-        write(data) {
-          const cleaned = stripAnsi(data);
-          if (cleaned) {
-            // Only log meaningful messages, skip spinner lines
-            if (cleaned.length > 1 || !/^[\\|/\-]$/.test(cleaned)) {
+      // Simplified output streaming
+      installProcess.output.pipeTo(
+        new WritableStream({
+          write(data) {
+            const cleaned = stripAnsi(data);
+            if (cleaned && cleaned.length > 2) {
               log(`[npm] ${cleaned}`);
-              lastLogWasSpinner = false;
-            } else if (!lastLogWasSpinner) {
-              // Show one spinner indicator
-              log(`[npm] Installing packages...`);
-              lastLogWasSpinner = true;
             }
-          }
-        },
-      })
-    );
+          },
+        })
+      );
 
-    const installExitCode = await installProcess.exit;
-    if (installExitCode !== 0) {
-      throw new Error(`npm install failed with exit code ${installExitCode}`);
+      const installExitCode = await installProcess.exit;
+      if (installExitCode !== 0) {
+        throw new Error(`npm install failed with exit code ${installExitCode}`);
+      }
+
+      templateInstalled = true;
+      log('[WebContainer] Dependencies installed');
+    } else {
+      log('[WebContainer] Using cached dependencies (skip install)');
     }
 
-    log('[WebContainer] Dependencies installed successfully');
     log('[WebContainer] Starting dev server...');
 
     const devProcess = await container.spawn('npm', ['run', 'dev']);
@@ -333,27 +167,32 @@ export async function loadProject(
       })
     );
 
-    // Wait for server to be ready
+    // Wait for server to be ready with optimized timeout
     log('[WebContainer] Waiting for dev server...');
 
     return new Promise((resolve, reject) => {
       let serverUrl = '';
+      let resolved = false;
 
       // Listen for server ready event
       container.on('server-ready', (port, url) => {
-        log(`[WebContainer] Server ready at ${url}`);
-        serverUrl = url;
-        resolve({ url, logs });
+        if (!resolved) {
+          resolved = true;
+          log(`[WebContainer] Server ready at ${url}`);
+          serverUrl = url;
+          resolve({ url, logs });
+        }
       });
 
-      // Timeout after 30 seconds
+      // Reduced timeout to 15 seconds (was 30)
       setTimeout(() => {
-        if (!serverUrl) {
-          const msg = 'Dev server startup timeout';
+        if (!serverUrl && !resolved) {
+          resolved = true;
+          const msg = 'Dev server startup timeout (15s)';
           error(msg);
           reject(new Error(msg));
         }
-      }, 30000);
+      }, 15000);
     });
 
   } catch (err) {
@@ -413,6 +252,7 @@ export async function readFile(filepath: string): Promise<string> {
 /**
  * Reload project files WITHOUT reinstalling dependencies or restarting server
  * This is much lighter than loadProject() - use this for incremental updates
+ * OPTIMIZED: Batch file writes for better performance
  */
 export async function reloadProjectFiles(
   projectId: number,
@@ -427,7 +267,7 @@ export async function reloadProjectFiles(
       throw new Error('WebContainer not initialized. Call loadProject first.');
     }
 
-    log('[WebContainer] Fetching updated project files...');
+    log('[WebContainer] Fetching updated files...');
     const response = await fetch(`${API_URL}/projects/${projectId}/bundle`);
 
     if (!response.ok) {
@@ -435,15 +275,16 @@ export async function reloadProjectFiles(
     }
 
     const { files } = await response.json();
-    log(`[WebContainer] Received ${Object.keys(files).length} files`);
+    log(`[WebContainer] Updating ${Object.keys(files).length} files...`);
 
-    // Write each file directly to the existing container
-    log('[WebContainer] Updating files...');
-    for (const [filepath, content] of Object.entries(files)) {
-      await webcontainerInstance.fs.writeFile(filepath, content as string);
-    }
+    // Batch file writes for better performance
+    const writePromises = Object.entries(files).map(([filepath, content]) =>
+      webcontainerInstance!.fs.writeFile(filepath, content as string)
+    );
 
-    log('[WebContainer] Files updated successfully (HMR will auto-reload)');
+    await Promise.all(writePromises);
+
+    log('[WebContainer] Files updated (HMR active)');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (onLog) onLog(`ERROR: Failed to reload files: ${message}`);
@@ -458,5 +299,15 @@ export async function teardown(): Promise<void> {
   if (webcontainerInstance) {
     await webcontainerInstance.teardown();
     webcontainerInstance = null;
+    templateInstalled = false;
+    cachedNodeModules = null;
   }
+}
+
+/**
+ * Force reinstall dependencies on next load
+ */
+export function clearTemplateCache(): void {
+  templateInstalled = false;
+  cachedNodeModules = null;
 }
