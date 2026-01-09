@@ -1,4 +1,5 @@
 import { WebContainer, FileSystemTree } from '@webcontainer/api';
+import { API_URL } from './api';
 
 let webcontainerInstance: WebContainer | null = null;
 
@@ -84,7 +85,7 @@ export async function loadProject(
     const container = await getWebContainer();
 
     log('[WebContainer] Fetching project files...');
-    const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/bundle`);
+    const response = await fetch(`${API_URL}/projects/${projectId}/bundle`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
@@ -427,7 +428,7 @@ export async function reloadProjectFiles(
     }
 
     log('[WebContainer] Fetching updated project files...');
-    const response = await fetch(`http://localhost:8000/api/v1/projects/${projectId}/bundle`);
+    const response = await fetch(`${API_URL}/projects/${projectId}/bundle`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);

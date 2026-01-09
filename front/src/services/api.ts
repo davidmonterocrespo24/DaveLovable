@@ -1,6 +1,7 @@
 // API service layer for backend communication
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+// Centralized API URL configuration - used across the entire application
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 // Types matching backend schemas
 export interface Project {
