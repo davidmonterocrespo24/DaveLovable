@@ -1,6 +1,3 @@
-from src.utils.linter import lint_code_check
-from src.utils.llm_edit_fixer import _llm_fix_edit
-
 """
 File System Operations - Smart Edit v2 (With Auto-Correction)
 """
@@ -8,6 +5,9 @@ import hashlib
 import os
 import re
 from pathlib import Path
+
+from app.utils.linter import lint_code_check
+from app.utils.llm_edit_fixer import _llm_fix_edit
 
 # --- Helper Functions ---
 

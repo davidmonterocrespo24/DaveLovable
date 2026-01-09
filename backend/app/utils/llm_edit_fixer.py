@@ -4,9 +4,7 @@ import httpx
 from autogen_core.models import SystemMessage, UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
-from src.config import get_settings
-from src.utils.deepseek_fix import should_use_reasoning_client
-from src.utils.deepseek_reasoning_client import DeepSeekReasoningClient
+from app.core.config import settings
 
 # --- Prompt Configuration ---
 EDIT_SYS_PROMPT = """
@@ -82,31 +80,19 @@ async def _llm_fix_edit(
         current_content=file_content,
     )
 
-    settings = get_settings()
-
     # Create http client
-    http_client = httpx.AsyncClient(verify=settings.ssl_verify)
+    http_client = httpx.AsyncClient()
 
     try:
-        if should_use_reasoning_client(settings):
-            client = DeepSeekReasoningClient(
-                model=settings.model,
-                base_url=settings.base_url,
-                api_key=settings.api_key,
-                model_capabilities=settings.get_model_capabilities(),
-                http_client=http_client,
-                enable_thinking=None,
-                response_format={"type": "json_object"},
-            )
-        else:
-            client = OpenAIChatCompletionClient(
-                model=settings.model,
-                base_url=settings.base_url,
-                api_key=settings.api_key,
-                model_capabilities=settings.get_model_capabilities(),
-                http_client=http_client,
-                response_format={"type": "json_object"},
-            )
+        # Use OpenAI client with settings from app config
+        client = OpenAIChatCompletionClient(
+            model=settings.OPENAI_MODEL,
+            base_url=settings.OPENAI_API_BASE_URL,
+            api_key=settings.OPENAI_API_KEY,
+            model_capabilities=settings.get_model_capabilities(),
+            http_client=http_client,
+            response_format={"type": "json_object"},
+        )
 
         messages = [
             SystemMessage(content=EDIT_SYS_PROMPT),
