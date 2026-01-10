@@ -33,7 +33,7 @@ interface Message {
 
 const initialMessages: Message[] = [
   {
-    id: '1',
+    id: 'welcome-message',
     role: 'assistant',
     content: 'Hello! I\'m your development assistant. I can help you create and modify your application. What would you like to build today?',
     timestamp: new Date(),
