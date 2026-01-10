@@ -114,7 +114,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
         console.error('[Screenshot Helper] Capture failed:', error);
         window.parent.postMessage({
           type: 'screenshot-error',
-          error: error.message
+          error: error instanceof Error ? error.message : String(error)
         }, '*');
       }
     }
