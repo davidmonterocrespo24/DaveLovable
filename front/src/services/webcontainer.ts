@@ -192,7 +192,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
           windowWidth: 1280,
           windowHeight: 720,
           onclone: (clonedDoc) => {
-            console.log('[Screenshot Helper] Document cloned, replacing external images...');
+            log('[Screenshot Helper] Document cloned, replacing external images...');
 
             // Replace external images with data URLs or placeholders
             const images = clonedDoc.querySelectorAll('img');
@@ -225,7 +225,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
               }
             });
 
-            console.log('[Screenshot Helper] Images replaced:', replacedCount, 'Placeholders:', placeholderCount);
+            log('[Screenshot Helper] Images replaced:', replacedCount, 'Placeholders:', placeholderCount);
           }
         });
 
@@ -236,7 +236,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
           throw new Error('Canvas has no dimensions');
         }
 
-        console.log('[Screenshot Helper] Capture successful:', {
+        log('[Screenshot Helper] Capture successful:', {
           width: canvas.width,
           height: canvas.height,
           dataLength: dataUrl.length
@@ -248,7 +248,10 @@ const SCREENSHOT_HELPER_SCRIPT = `
           data: dataUrl
         }, '*');
       } catch (error) {
-        console.error('[Screenshot Helper] Capture failed:', error);
+        // Only log errors - these are important
+        if (DEBUG) {
+          console.error('[Screenshot Helper] Capture failed:', error);
+        }
         window.parent.postMessage({
           type: 'screenshot-error',
           error: error instanceof Error ? error.message : String(error)
@@ -257,7 +260,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
     }
   });
 
-  console.log('[Screenshot Helper] Ready');
+  log('[Screenshot Helper] Ready');
 })();
 `;
 
