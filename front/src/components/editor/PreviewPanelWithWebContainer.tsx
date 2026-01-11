@@ -139,30 +139,10 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         return null;
       }
 
-      // Check if iframe is actually loaded by trying to access its document
-      try {
-        // This will throw if iframe is not from same origin or not loaded
-        const iframeDoc = iframeRef.current.contentDocument;
-        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
-          console.log('[Screenshot] Waiting for iframe to be fully loaded...');
-          // Wait for iframe load
-          await new Promise<void>((resolve) => {
-            const checkLoad = () => {
-              if (iframeRef.current?.contentDocument?.readyState === 'complete') {
-                resolve();
-              } else {
-                setTimeout(checkLoad, 100);
-              }
-            };
-            checkLoad();
-          });
-        }
-      } catch (e) {
-        // Cross-origin iframe - can't check readyState
-        // Just wait a bit
-        console.log('[Screenshot] Cross-origin iframe, waiting 2s...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
+      // For WebContainer iframe (cross-origin), we can't check readyState
+      // Just wait a moment to ensure it's ready
+      console.log('[Screenshot] Waiting 2s for iframe content to load...');
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
       try {
         console.log('[Screenshot] Requesting screenshot from WebContainer via postMessage...');
