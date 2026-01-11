@@ -52,6 +52,7 @@ interface ConsoleLog {
 export interface PreviewPanelRef {
   reload: () => void;
   updateStyle: (property: string, value: string) => void;
+  captureAndSendScreenshot: () => Promise<boolean>;
 }
 
 export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
@@ -342,6 +343,15 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           property,
           value
         }, '*');
+      },
+      captureAndSendScreenshot: async () => {
+        console.log('[PreviewPanel] Manual screenshot capture requested');
+        const screenshot = await captureScreenshot();
+        if (screenshot) {
+          await sendScreenshotToBackend(screenshot);
+          return true;
+        }
+        return false;
       }
     }));
 

@@ -376,9 +376,35 @@ const Editor = () => {
     }
   };
 
-  const handleGitCommit = async (data: { success: boolean; error?: string; message?: string }) => {
-    // Screenshot is now handled automatically by PreviewPanelWithWebContainer
-    // No need to manually trigger screenshot capture
+  const handleGitCommit = async (data: { success: boolean; error?: string; message?: string; commit_count?: number }) => {
+    // Capture screenshot on first user commit (commit_count == 2)
+    // commit_count == 1 is the initial "Project created" commit
+    // commit_count == 2 is the first actual code commit
+    if (data.success && data.commit_count === 2) {
+      console.log('[Editor] First commit detected - capturing screenshot');
+      toast({
+        title: "📸 Capturing project thumbnail",
+        description: "Taking a screenshot of your project...",
+        duration: 3000,
+      });
+
+      // Wait a moment for the preview to be fully rendered after commit
+      setTimeout(async () => {
+        if (previewPanelRef.current) {
+          const success = await previewPanelRef.current.captureAndSendScreenshot();
+          if (success) {
+            console.log('[Editor] Screenshot captured and saved successfully');
+            toast({
+              title: "✅ Thumbnail saved",
+              description: "Project thumbnail has been updated",
+              duration: 3000,
+            });
+          } else {
+            console.warn('[Editor] Failed to capture screenshot');
+          }
+        }
+      }, 2000); // Wait 2 seconds after commit to ensure preview is updated
+    }
   };
 
   if (projectLoading) {
