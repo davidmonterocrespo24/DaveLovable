@@ -70,12 +70,60 @@ const SCREENSHOT_HELPER_SCRIPT = `
 (function() {
   console.log('[Screenshot Helper] Initializing...');
 
+  // Wait for app to be fully rendered before allowing screenshots
+  let isAppReady = false;
+
+  // Check if app is ready (React root has content)
+  const checkAppReady = () => {
+    const root = document.querySelector('#root');
+    if (root && root.children.length > 0) {
+      // Check if there's actual content (not just loading spinner)
+      const hasContent = root.textContent && root.textContent.trim().length > 100;
+      if (hasContent) {
+        isAppReady = true;
+        console.log('[Screenshot Helper] App is ready for capture');
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // Monitor for app ready state
+  const observer = new MutationObserver(() => {
+    if (!isAppReady) {
+      checkAppReady();
+    }
+  });
+
+  // Observe the root element for changes
+  const root = document.querySelector('#root');
+  if (root) {
+    observer.observe(root, { childList: true, subtree: true });
+  }
+
+  // Check immediately
+  setTimeout(() => checkAppReady(), 1000);
+
   // Listen for screenshot requests from parent
   window.addEventListener('message', async (event) => {
     if (event.data.type === 'capture-screenshot') {
       console.log('[Screenshot Helper] Received capture request');
 
       try {
+        // Wait for app to be ready
+        if (!isAppReady) {
+          console.log('[Screenshot Helper] Waiting for app to be ready...');
+          let attempts = 0;
+          while (!isAppReady && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            checkAppReady();
+            attempts++;
+          }
+          if (!isAppReady) {
+            throw new Error('App did not become ready in time');
+          }
+        }
+
         // Dynamically import html2canvas
         if (!window.html2canvas) {
           console.log('[Screenshot Helper] Loading html2canvas...');
@@ -93,17 +141,20 @@ const SCREENSHOT_HELPER_SCRIPT = `
 
         console.log('[Screenshot Helper] Capturing DOM with html2canvas...');
 
-        // Wait a bit for any animations/renders to complete
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Wait a bit more for any animations/renders to complete
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
-        const canvas = await window.html2canvas(document.body, {
+        // Capture the #root element (where React app lives)
+        const targetElement = document.querySelector('#root') || document.body;
+
+        const canvas = await window.html2canvas(targetElement, {
           allowTaint: true,
           useCORS: false,
           logging: true,
           scale: 1,
           backgroundColor: '#ffffff',
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: Math.max(window.innerWidth, 1280),
+          height: Math.max(window.innerHeight, 720),
           windowWidth: 1280,
           windowHeight: 720,
           onclone: (clonedDoc) => {
