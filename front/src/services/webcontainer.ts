@@ -148,8 +148,8 @@ const SCREENSHOT_HELPER_SCRIPT = `
         const targetElement = document.querySelector('#root') || document.body;
 
         const canvas = await window.html2canvas(targetElement, {
-          allowTaint: true,
-          useCORS: false,
+          allowTaint: false,  // CRITICAL: Must be false to export canvas
+          useCORS: true,      // Try to use CORS for external images
           logging: true,
           scale: 1,
           backgroundColor: '#ffffff',
@@ -157,8 +157,32 @@ const SCREENSHOT_HELPER_SCRIPT = `
           height: Math.max(window.innerHeight, 720),
           windowWidth: 1280,
           windowHeight: 720,
+          ignoreElements: (element) => {
+            // Skip external images that cause CORS issues
+            if (element.tagName === 'IMG') {
+              const src = element.getAttribute('src') || '';
+              if (src.startsWith('http') && !src.includes(window.location.hostname)) {
+                console.log('[Screenshot Helper] Skipping external image:', src);
+                return true;
+              }
+            }
+            return false;
+          },
           onclone: (clonedDoc) => {
             console.log('[Screenshot Helper] Document cloned for capture');
+
+            // Replace external images with placeholders to avoid CORS taint
+            const images = clonedDoc.querySelectorAll('img');
+            images.forEach(img => {
+              const src = img.getAttribute('src') || '';
+              if (src.startsWith('http') && !src.includes(window.location.hostname)) {
+                // Replace with a placeholder color or remove
+                img.style.backgroundColor = '#e5e7eb';
+                img.style.border = '1px solid #d1d5db';
+                img.removeAttribute('src');
+                img.alt = 'Image';
+              }
+            });
           }
         });
 
