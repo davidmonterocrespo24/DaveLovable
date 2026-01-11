@@ -4,32 +4,32 @@ import { Button } from "@/components/ui/button";
 const DocsSection = () => {
   const resources = [
     {
-      icon: Book,
-      title: "Documentation",
-      description: "Complete guides and API references to help you make the most of DaveLovable.",
+      icon: MessageCircle,
+      title: "AI Agents System",
+      description: "Understand how the Orchestrator and Coder agents collaborate to transform your natural language prompts into production-ready code.",
       link: "#",
-      linkText: "Read the docs",
-    },
-    {
-      icon: Video,
-      title: "Video Tutorials",
-      description: "Step-by-step video guides covering everything from basics to advanced features.",
-      link: "#",
-      linkText: "Watch tutorials",
+      linkText: "Learn about Agents",
     },
     {
       icon: FileCode,
-      title: "Code Examples",
-      description: "Real-world examples and starter templates to kickstart your projects.",
+      title: "Modern Architecture",
+      description: "Built on a robust stack: React + Vite frontend for a responsive UI, and FastAPI backend for high-performance agent processing.",
       link: "#",
-      linkText: "Browse examples",
+      linkText: "View Architecture",
     },
     {
-      icon: MessageCircle,
-      title: "Community",
-      description: "Join our active community of developers to get help and share your creations.",
+      icon: Book,
+      title: "Project Workflow",
+      description: "From idea to deployment: 1. You Prompt -> 2. Orchestrator Plans -> 3. Coder Implements -> 4. Live Preview.",
       link: "#",
-      linkText: "Join community",
+      linkText: "See Workflow",
+    },
+    {
+      icon: Video,
+      title: "Developer Guide",
+      description: "Dive deep into the codebase. Learn how to extend the agents, add new tools, or customize the UI components.",
+      link: "#",
+      linkText: "Read Developer Docs",
     },
   ];
 
@@ -56,11 +56,10 @@ const DocsSection = () => {
             <span className="text-sm text-muted-foreground">Documentation</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-extrabold mb-6">
-            Learn how to build with{" "}
-            <span className="text-gradient">DaveLovable</span>
+            Understand the <span className="text-gradient">DaveLovable System</span>
           </h2>
           <p className="text-xl text-muted-foreground">
-            Everything you need to master AI-powered development.
+            A powerful multi-agent architecture designed to build software autonomously.
           </p>
         </div>
 
