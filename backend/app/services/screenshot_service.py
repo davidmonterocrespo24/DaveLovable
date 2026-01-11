@@ -1,11 +1,14 @@
 """
 Screenshot capture service using Playwright
 """
-import base64
+
 import asyncio
+import base64
 import logging
 from typing import Optional
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeoutError
+
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
+from playwright.async_api import async_playwright
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -28,9 +31,9 @@ class ScreenshotService:
         Returns:
             Base64 encoded PNG image with data URI prefix, or None if capture fails
         """
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info("📸 SCREENSHOT CAPTURE SERVICE - START")
-        logger.info("="*80)
+        logger.info("=" * 80)
         logger.info(f"🌐 Target URL: {url}")
         logger.info(f"📐 Viewport: {width}x{height}")
 
@@ -69,46 +72,47 @@ class ScreenshotService:
 
                 # Convert to base64 with data URI prefix
                 logger.info("🔄 Converting to base64...")
-                base64_image = base64.b64encode(screenshot_bytes).decode('utf-8')
+                base64_image = base64.b64encode(screenshot_bytes).decode("utf-8")
                 data_uri = f"data:image/png;base64,{base64_image}"
                 logger.info(f"✅ Conversion complete (total size: {len(data_uri)} bytes)")
-                logger.info("="*80)
+                logger.info("=" * 80)
                 logger.info("✅ SCREENSHOT CAPTURE SERVICE - SUCCESS")
-                logger.info("="*80)
+                logger.info("=" * 80)
                 return data_uri
 
         except PlaywrightTimeoutError as e:
-            logger.error("="*80)
+            logger.error("=" * 80)
             logger.error("❌ SCREENSHOT CAPTURE FAILED - TIMEOUT")
-            logger.error("="*80)
+            logger.error("=" * 80)
             logger.error(f"URL: {url}")
             logger.error(f"Error: Timeout while loading {url}")
-            logger.error(f"Details: {str(e)}")
+            logger.error(f"Details: {e!s}")
             logger.error("Possible causes:")
             logger.error("  - URL is not accessible")
             logger.error("  - WebContainer hasn't started yet")
             logger.error("  - Network issues preventing page load")
-            logger.error("="*80)
+            logger.error("=" * 80)
             return None
         except Exception as e:
-            logger.error("="*80)
+            logger.error("=" * 80)
             logger.error("❌ SCREENSHOT CAPTURE FAILED - EXCEPTION")
-            logger.error("="*80)
+            logger.error("=" * 80)
             logger.error(f"URL: {url}")
             logger.error(f"Error type: {type(e).__name__}")
-            logger.error(f"Error message: {str(e)}")
-            logger.error("="*80)
+            logger.error(f"Error message: {e!s}")
+            logger.error("=" * 80)
 
             import traceback
+
             logger.error("Full traceback:")
             logger.error(traceback.format_exc())
-            logger.error("="*80)
+            logger.error("=" * 80)
 
             logger.error("Possible causes:")
             logger.error("  - Playwright not installed: pip install playwright")
             logger.error("  - Chromium not installed: playwright install chromium")
             logger.error("  - System missing dependencies")
-            logger.error("="*80)
+            logger.error("=" * 80)
             return None
 
     @staticmethod
@@ -129,8 +133,6 @@ class ScreenshotService:
         asyncio.set_event_loop(loop)
 
         try:
-            return loop.run_until_complete(
-                ScreenshotService.capture_screenshot(url, width, height)
-            )
+            return loop.run_until_complete(ScreenshotService.capture_screenshot(url, width, height))
         finally:
             loop.close()

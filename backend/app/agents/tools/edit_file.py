@@ -1,6 +1,7 @@
 """
 File System Operations - Smart Edit v2 (With Auto-Correction)
 """
+
 import os
 import re
 from pathlib import Path
@@ -116,9 +117,7 @@ def _calculate_regex_replacement(current_content: str, old_string: str, new_stri
 # --- Main Tool Function ---
 
 
-async def edit_file(
-    target_file: str, old_string: str, new_string: str, instructions: str = ""
-) -> str:
+async def edit_file(target_file: str, old_string: str, new_string: str, instructions: str = "") -> str:
     """
     Replaces a specific string in a file with a new string using smart matching strategies.
 
@@ -139,7 +138,7 @@ async def edit_file(
     """
     try:
         # GUARDRAIL: Block internal agent state files
-        forbidden_files = ['.agent_state.json', 'agent_state.json']
+        forbidden_files = [".agent_state.json", "agent_state.json"]
         if any(forbidden in target_file for forbidden in forbidden_files):
             return f"""🚨 FILE BLOCKED 🚨
 
@@ -155,9 +154,7 @@ BLOCKED FILES:
 These files are for internal agent memory only and must not be edited in the project."""
 
         workspace = Path(os.getcwd()).resolve()
-        target = (
-            workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
-        )
+        target = workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
 
         if not target.exists():
             # Support creating new file if old_string is empty
@@ -199,9 +196,7 @@ These files are for internal agent memory only and must not be edited in the pro
             error_msg = "Could not find the 'old_string' using exact, flexible, or regex matching."
 
             # Intentar arreglar con LLM
-            correction = await _llm_fix_edit(
-                instructions, norm_old, norm_new, error_msg, current_content
-            )
+            correction = await _llm_fix_edit(instructions, norm_old, norm_new, error_msg, current_content)
 
             if correction:
                 fixed_old, fixed_new = correction
@@ -242,4 +237,4 @@ These files are for internal agent memory only and must not be edited in the pro
         return f"Successfully edited {target_file} using {strategy_used} strategy. ({count} replacements)"
 
     except Exception as e:
-        return f"System Error during edit: {str(e)}"
+        return f"System Error during edit: {e!s}"

@@ -1,12 +1,15 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
+
+from pydantic import BaseModel
+
 from app.models.project import ProjectStatus
 
 if TYPE_CHECKING:
     from app.schemas.file import ProjectFile as ProjectFileType
 else:
-    ProjectFileType = 'ProjectFile'
+    ProjectFileType = "ProjectFile"
+
 
 class ProjectBase(BaseModel):
     name: str
@@ -14,8 +17,10 @@ class ProjectBase(BaseModel):
     template: str = "react-vite"
     framework: str = "react"
 
+
 class ProjectCreate(ProjectBase):
     pass
+
 
 class ProjectUpdate(BaseModel):
     name: Optional[str] = None
@@ -23,6 +28,7 @@ class ProjectUpdate(BaseModel):
     status: Optional[ProjectStatus] = None
     template: Optional[str] = None
     framework: Optional[str] = None
+
 
 class ProjectInDB(ProjectBase):
     id: int
@@ -35,8 +41,10 @@ class ProjectInDB(ProjectBase):
     class Config:
         from_attributes = True
 
+
 class Project(ProjectInDB):
     pass
+
 
 class ProjectWithFiles(Project):
     files: List[ProjectFileType] = []

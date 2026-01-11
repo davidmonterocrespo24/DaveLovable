@@ -8,19 +8,20 @@ Run with: pytest backend/tests/test_multiagent_system.py -v
 Run specific test: pytest backend/tests/test_multiagent_system.py::test_orchestrator_initialization -v
 """
 
-import pytest
 import os
-import tempfile
 import shutil
+import tempfile
 from pathlib import Path
-from unittest.mock import Mock, patch, AsyncMock
+from unittest.mock import AsyncMock, Mock, patch
+
+import pytest
 
 from app.agents.orchestrator import AgentOrchestrator, get_orchestrator
-from app.services.chat_service import ChatService
-from app.schemas import ChatRequest
-from app.models import MessageRole, Project
-from app.db.database import SessionLocal, Base, engine
 from app.core.config import settings
+from app.db.database import Base, SessionLocal, engine
+from app.models import MessageRole, Project
+from app.schemas import ChatRequest
+from app.services.chat_service import ChatService
 
 
 class TestOrchestratorInitialization:
@@ -39,10 +40,10 @@ class TestOrchestratorInitialization:
         orchestrator = get_orchestrator()
 
         # Check agents exist
-        assert hasattr(orchestrator, 'coder_agent')
-        assert hasattr(orchestrator, 'planning_agent')
-        assert hasattr(orchestrator, 'main_team')
-        assert hasattr(orchestrator, 'model_client')
+        assert hasattr(orchestrator, "coder_agent")
+        assert hasattr(orchestrator, "planning_agent")
+        assert hasattr(orchestrator, "main_team")
+        assert hasattr(orchestrator, "model_client")
 
         # Check agent names
         assert orchestrator.coder_agent.name == "Coder"
@@ -59,11 +60,11 @@ class TestOrchestratorInitialization:
         tool_names = [tool.__name__ for tool in orchestrator.coder_tools]
 
         essential_tools = [
-            'write_file',
-            'read_file',
-            'edit_file',
-            'delete_file',
-            'list_dir',
+            "write_file",
+            "read_file",
+            "edit_file",
+            "delete_file",
+            "list_dir",
         ]
 
         for tool in essential_tools:
@@ -154,7 +155,7 @@ class TestChatServiceIntegration:
             id=999,  # Use high ID to avoid conflicts
             name="Test Multiagent Project",
             description="Test project for multi-agent system",
-            user_id=1
+            user_id=1,
         )
         db_session.add(project)
         db_session.commit()
@@ -192,29 +193,27 @@ class TestChatServiceIntegration:
         mock_result.messages = [mock_message]
 
         # Mock the orchestrator
-        with patch('app.services.chat_service.get_orchestrator') as mock_get_orch:
+        with patch("app.services.chat_service.get_orchestrator") as mock_get_orch:
             mock_orchestrator = Mock()
             mock_orchestrator.main_team.run = AsyncMock(return_value=mock_result)
             mock_get_orch.return_value = mock_orchestrator
 
             # Create chat request
-            chat_request = ChatRequest(
-                message="Create a simple Button component",
-                session_id=None
-            )
+            chat_request = ChatRequest(message="Create a simple Button component", session_id=None)
 
             # Process message
             result = await ChatService.process_chat_message(
-                db=db_session,
-                project_id=test_project.id,
-                chat_request=chat_request
+                db=db_session, project_id=test_project.id, chat_request=chat_request
             )
 
             # Verify result
             assert "session_id" in result
             assert "message" in result
             assert result["message"].role == MessageRole.ASSISTANT
-            assert "created the component" in result["message"].content.lower() or "task_completed" in result["message"].content.lower()
+            assert (
+                "created the component" in result["message"].content.lower()
+                or "task_completed" in result["message"].content.lower()
+            )
 
     @pytest.mark.asyncio
     async def test_working_directory_context(self, db_session, test_project):
@@ -237,21 +236,14 @@ class TestChatServiceIntegration:
             mock_result.messages = [mock_message]
             return mock_result
 
-        with patch('app.services.chat_service.get_orchestrator') as mock_get_orch:
+        with patch("app.services.chat_service.get_orchestrator") as mock_get_orch:
             mock_orchestrator = Mock()
             mock_orchestrator.main_team.run = mock_run
             mock_get_orch.return_value = mock_orchestrator
 
-            chat_request = ChatRequest(
-                message="Test working directory",
-                session_id=None
-            )
+            chat_request = ChatRequest(message="Test working directory", session_id=None)
 
-            await ChatService.process_chat_message(
-                db=db_session,
-                project_id=test_project.id,
-                chat_request=chat_request
-            )
+            await ChatService.process_chat_message(db=db_session, project_id=test_project.id, chat_request=chat_request)
 
             # Verify working directory was set to project directory during execution
             expected_dir = Path(settings.PROJECTS_BASE_DIR) / f"project_{test_project.id}"
@@ -290,12 +282,7 @@ class TestEndToEndMultiAgent:
         """Create test project"""
         from app.services.filesystem_service import FileSystemService
 
-        project = Project(
-            id=998,
-            name="E2E Test Project",
-            description="End-to-end test project",
-            user_id=1
-        )
+        project = Project(id=998, name="E2E Test Project", description="End-to-end test project", user_id=1)
         db_session.add(project)
         db_session.commit()
         db_session.refresh(project)
@@ -314,15 +301,12 @@ class TestEndToEndMultiAgent:
         """Test real multi-agent system with a simple task"""
 
         chat_request = ChatRequest(
-            message="Create a simple file called hello.txt with the content 'Hello from agents!'",
-            session_id=None
+            message="Create a simple file called hello.txt with the content 'Hello from agents!'", session_id=None
         )
 
         # This will use the real orchestrator and agents
         result = await ChatService.process_chat_message(
-            db=db_session,
-            project_id=test_project.id,
-            chat_request=chat_request
+            db=db_session, project_id=test_project.id, chat_request=chat_request
         )
 
         # Verify response was created
@@ -332,6 +316,7 @@ class TestEndToEndMultiAgent:
 
         # Check if file was created by agents
         from app.services.filesystem_service import FileSystemService
+
         project_dir = FileSystemService.get_project_dir(test_project.id)
         hello_file = project_dir / "hello.txt"
 
@@ -362,12 +347,7 @@ class TestErrorHandling:
         """Create test project"""
         from app.services.filesystem_service import FileSystemService
 
-        project = Project(
-            id=997,
-            name="Error Test Project",
-            description="Project for error testing",
-            user_id=1
-        )
+        project = Project(id=997, name="Error Test Project", description="Project for error testing", user_id=1)
         db_session.add(project)
         db_session.commit()
         db_session.refresh(project)
@@ -385,20 +365,15 @@ class TestErrorHandling:
         """Test that errors from orchestrator are handled gracefully"""
 
         # Mock orchestrator to raise an error
-        with patch('app.services.chat_service.get_orchestrator') as mock_get_orch:
+        with patch("app.services.chat_service.get_orchestrator") as mock_get_orch:
             mock_orchestrator = Mock()
             mock_orchestrator.main_team.run = AsyncMock(side_effect=Exception("Simulated agent error"))
             mock_get_orch.return_value = mock_orchestrator
 
-            chat_request = ChatRequest(
-                message="This will cause an error",
-                session_id=None
-            )
+            chat_request = ChatRequest(message="This will cause an error", session_id=None)
 
             result = await ChatService.process_chat_message(
-                db=db_session,
-                project_id=test_project.id,
-                chat_request=chat_request
+                db=db_session, project_id=test_project.id, chat_request=chat_request
             )
 
             # Should return error message instead of crashing
@@ -411,16 +386,13 @@ class TestErrorHandling:
         """Test handling when OpenAI API key is not configured"""
 
         # Mock get_orchestrator to raise ValueError (like when API key is missing)
-        with patch('app.services.chat_service.get_orchestrator', side_effect=ValueError("OpenAI API key not configured")):
-            chat_request = ChatRequest(
-                message="Test message",
-                session_id=None
-            )
+        with patch(
+            "app.services.chat_service.get_orchestrator", side_effect=ValueError("OpenAI API key not configured")
+        ):
+            chat_request = ChatRequest(message="Test message", session_id=None)
 
             result = await ChatService.process_chat_message(
-                db=db_session,
-                project_id=test_project.id,
-                chat_request=chat_request
+                db=db_session, project_id=test_project.id, chat_request=chat_request
             )
 
             # Should return error message

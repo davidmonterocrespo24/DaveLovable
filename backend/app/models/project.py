@@ -1,13 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Enum as SQLEnum
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from app.db.database import Base
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
+
+from app.db.database import Base
+
 
 class ProjectStatus(str, enum.Enum):
     DRAFT = "draft"
     ACTIVE = "active"
     ARCHIVED = "archived"
+
 
 class Project(Base):
     __tablename__ = "projects"

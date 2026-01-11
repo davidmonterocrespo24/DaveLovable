@@ -15,9 +15,7 @@ def _check_pandas():
     return pd
 
 
-async def read_csv(
-    filepath: str, delimiter: str = ",", encoding: str = "utf-8", max_rows: int = None
-) -> str:
+async def read_csv(filepath: str, delimiter: str = ",", encoding: str = "utf-8", max_rows: int = None) -> str:
     """
     Reads a CSV file and returns its contents.
 
@@ -47,14 +45,12 @@ async def read_csv(
         return output
 
     except Exception as e:
-        error_msg = f"Error reading CSV {filepath}: {str(e)}"
+        error_msg = f"Error reading CSV {filepath}: {e!s}"
         logging.error(error_msg)
         return error_msg
 
 
-async def write_csv(
-    filepath: str, data: str, delimiter: str = ",", mode: str = "w", encoding: str = "utf-8"
-) -> str:
+async def write_csv(filepath: str, data: str, delimiter: str = ",", mode: str = "w", encoding: str = "utf-8") -> str:
     """
     Writes data to a CSV file.
 
@@ -78,7 +74,7 @@ async def write_csv(
         return f"✓ Data written to {filepath}"
 
     except Exception as e:
-        error_msg = f"Error writing CSV {filepath}: {str(e)}"
+        error_msg = f"Error writing CSV {filepath}: {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -125,14 +121,12 @@ async def csv_info(filepath: str, delimiter: str = ",", encoding: str = "utf-8")
         return output
 
     except Exception as e:
-        error_msg = f"Error getting CSV info {filepath}: {str(e)}"
+        error_msg = f"Error getting CSV info {filepath}: {e!s}"
         logging.error(error_msg)
         return error_msg
 
 
-async def filter_csv(
-    filepath: str, column: str, value: str, output_file: str = None, delimiter: str = ","
-) -> str:
+async def filter_csv(filepath: str, column: str, value: str, output_file: str = None, delimiter: str = ",") -> str:
     """
     Filters a CSV by a column value.
 
@@ -169,14 +163,12 @@ async def filter_csv(
             return output
 
     except Exception as e:
-        error_msg = f"Error filtering CSV: {str(e)}"
+        error_msg = f"Error filtering CSV: {e!s}"
         logging.error(error_msg)
         return error_msg
 
 
-async def merge_csv_files(
-    file1: str, file2: str, output_file: str, on_column: str = None, how: str = "inner"
-) -> str:
+async def merge_csv_files(file1: str, file2: str, output_file: str, on_column: str = None, how: str = "inner") -> str:
     """
     Merges two CSV files.
 
@@ -215,7 +207,7 @@ async def merge_csv_files(
         return f"✓ Files merged ({operation})\n  Result: {len(result)} rows x {len(result.columns)} columns\n  Saved to: {output_file}"
 
     except Exception as e:
-        error_msg = f"Error merging CSVs: {str(e)}"
+        error_msg = f"Error merging CSVs: {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -241,14 +233,12 @@ async def csv_to_json(csv_file: str, json_file: str, orient: str = "records") ->
         return f"✓ CSV converted to JSON\n  {len(df)} rows exported to {json_file}"
 
     except Exception as e:
-        error_msg = f"Error converting CSV to JSON: {str(e)}"
+        error_msg = f"Error converting CSV to JSON: {e!s}"
         logging.error(error_msg)
         return error_msg
 
 
-async def sort_csv(
-    filepath: str, column: str, output_file: str = None, ascending: bool = True
-) -> str:
+async def sort_csv(filepath: str, column: str, output_file: str = None, ascending: bool = True) -> str:
     """
     Sorts a CSV file by a column.
 
@@ -278,6 +268,6 @@ async def sort_csv(
         return f"✓ CSV ordenado por '{column}' ({direction})\n  Guardado en: {output}"
 
     except Exception as e:
-        error_msg = f"Error ordenando CSV: {str(e)}"
+        error_msg = f"Error ordenando CSV: {e!s}"
         logging.error(error_msg)
         return error_msg

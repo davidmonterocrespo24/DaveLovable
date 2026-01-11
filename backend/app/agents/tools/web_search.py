@@ -70,12 +70,14 @@ async def web_search(search_term: str, explanation: str = "", max_results: int =
         for i, result in enumerate(results[:max_results], 1):
             formatted_results += f"{i}. **{result['title']}**\n"
             formatted_results += f"   URL: {result['url']}\n"
-            formatted_results += f"   Snippet: {result['snippet'][:200]}{'...' if len(result['snippet']) > 200 else ''}\n\n"
+            formatted_results += (
+                f"   Snippet: {result['snippet'][:200]}{'...' if len(result['snippet']) > 200 else ''}\n\n"
+            )
 
         return formatted_results
 
     except Exception as e:
-        return f"Error in web search: {str(e)}"
+        return f"Error in web search: {e!s}"
 
 
 def _search_duckduckgo(query: str, headers: dict, max_results: int) -> list[dict]:
@@ -104,9 +106,7 @@ def _search_duckduckgo(query: str, headers: dict, max_results: int) -> list[dict
                 snippet = snippet_elem.get_text(strip=True)
 
                 if title and url:
-                    results.append(
-                        {"title": title, "url": url, "snippet": snippet or "No snippet available"}
-                    )
+                    results.append({"title": title, "url": url, "snippet": snippet or "No snippet available"})
         except Exception:
             continue
 
@@ -137,11 +137,7 @@ def _search_bing(query: str, headers: dict, max_results: int) -> list[dict]:
                     url = link_elem.get("href", "")
 
                     snippet_elem = div.find("p") or div.find("div", class_="b_caption")
-                    snippet = (
-                        snippet_elem.get_text(strip=True)
-                        if snippet_elem
-                        else "No snippet available"
-                    )
+                    snippet = snippet_elem.get_text(strip=True) if snippet_elem else "No snippet available"
 
                     if title and url:
                         results.append({"title": title, "url": url, "snippet": snippet})
@@ -178,12 +174,8 @@ def _search_google_simple(query: str, headers: dict, max_results: int) -> list[d
                 url = link_elem.get("href", "")
 
                 # Try to find snippet
-                snippet_elem = div.find("span", {"data-content-id": True}) or div.find(
-                    "div", class_="VwiC3b"
-                )
-                snippet = (
-                    snippet_elem.get_text(strip=True) if snippet_elem else "No snippet available"
-                )
+                snippet_elem = div.find("span", {"data-content-id": True}) or div.find("div", class_="VwiC3b")
+                snippet = snippet_elem.get_text(strip=True) if snippet_elem else "No snippet available"
 
                 if title and url and not url.startswith("/search"):
                     results.append({"title": title, "url": url, "snippet": snippet})
@@ -208,17 +200,14 @@ async def web_search_news(query: str, max_results: int = 5) -> str:
         try:
             from duckduckgo_search import DDGS
         except ImportError:
-            return (
-                "ERROR: duckduckgo_search is not installed.\n"
-                "Install with: pip install duckduckgo-search"
-            )
+            return "ERROR: duckduckgo_search is not installed.\nInstall with: pip install duckduckgo-search"
 
         try:
             with DDGS() as ddgs:
                 results = list(ddgs.news(query, max_results=max_results))
         except Exception as search_error:
             logging.error(f"Error in news search: {search_error}")
-            return f"ERROR searching for news '{query}': {str(search_error)}"
+            return f"ERROR searching for news '{query}': {search_error!s}"
 
         if not results:
             return f"No news found for '{query}'"
@@ -242,6 +231,6 @@ async def web_search_news(query: str, max_results: int = 5) -> str:
         return output
 
     except Exception as e:
-        error_msg = f"Error en web_search_news: {str(e)}"
+        error_msg = f"Error en web_search_news: {e!s}"
         logging.error(error_msg)
         return error_msg

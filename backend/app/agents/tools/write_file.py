@@ -3,6 +3,7 @@ from pathlib import Path
 from app.agents.tools.common import get_workspace
 from app.utils.linter import lint_code_check
 
+
 async def write_file(target_file: str, file_content: str) -> str:
     """
     Writes content to a file.
@@ -15,7 +16,7 @@ async def write_file(target_file: str, file_content: str) -> str:
     """
     try:
         # GUARDRAIL: Block internal agent state files
-        forbidden_files = ['.agent_state.json', 'agent_state.json']
+        forbidden_files = [".agent_state.json", "agent_state.json"]
         if any(forbidden in target_file for forbidden in forbidden_files):
             return f"""🚨 FILE BLOCKED 🚨
 
@@ -31,9 +32,7 @@ BLOCKED FILES:
 These files are for internal agent memory only and must not be written to the project."""
 
         workspace = get_workspace()
-        target = (
-            workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
-        )
+        target = workspace / target_file if not Path(target_file).is_absolute() else Path(target_file)
         # AUTOMATICALLY create all parent directories (like mkdir -p)
         target.parent.mkdir(parents=True, exist_ok=True)
         # Syntax Guardrail
@@ -61,4 +60,4 @@ These files are for internal agent memory only and must not be written to the pr
             f.write(file_content)
         return f"Successfully wrote {len(file_content)} characters to {target}"
     except Exception as e:
-        return f"Error writing file: {str(e)}"
+        return f"Error writing file: {e!s}"

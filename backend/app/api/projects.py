@@ -1,31 +1,32 @@
-from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status, Body
-from fastapi.responses import StreamingResponse
-from sqlalchemy.orm import Session
-import zipfile
 import io
-from pathlib import Path
 import json
-import httpx
-from pydantic import BaseModel
+import zipfile
+from pathlib import Path
+from typing import List
 
+import httpx
+from autogen_core.models import SystemMessage, UserMessage
+from autogen_ext.models.openai import OpenAIChatCompletionClient
+from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
 from app.db import get_db
 from app.schemas import (
     Project,
     ProjectCreate,
-    ProjectUpdate,
-    ProjectWithFiles,
     ProjectFile,
     ProjectFileCreate,
     ProjectFileUpdate,
+    ProjectUpdate,
+    ProjectWithFiles,
 )
 from app.services import ProjectService
 from app.services.filesystem_service import FileSystemService
 from app.services.git_service import GitService
 from app.services.screenshot_service import ScreenshotService
-from app.core.config import settings
-from autogen_core.models import SystemMessage, UserMessage
-from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 router = APIRouter()
 
@@ -43,10 +44,7 @@ class ProjectFromMessageResponse(BaseModel):
 
 
 @router.post("/from-message", response_model=ProjectFromMessageResponse, status_code=status.HTTP_201_CREATED)
-async def create_project_from_message(
-    request: ProjectFromMessageRequest,
-    db: Session = Depends(get_db)
-):
+async def create_project_from_message(request: ProjectFromMessageRequest, db: Session = Depends(get_db)):
     """
     Create a new project from a user message.
     Uses AI to generate project name and description from the message.
@@ -121,43 +119,27 @@ Remember to return ONLY the JSON object, nothing else."""
         await http_client.aclose()
 
     # Create the project
-    project_data = ProjectCreate(
-        name=project_name,
-        description=project_description
-    )
+    project_data = ProjectCreate(name=project_name, description=project_description)
 
     project = ProjectService.create_project(db, project_data, MOCK_USER_ID)
 
-    return ProjectFromMessageResponse(
-        project=project,
-        initial_message=user_message
-    )
+    return ProjectFromMessageResponse(project=project, initial_message=user_message)
 
 
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
-def create_project(
-    project: ProjectCreate,
-    db: Session = Depends(get_db)
-):
+def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
     """Create a new project"""
     return ProjectService.create_project(db, project, MOCK_USER_ID)
 
 
 @router.get("", response_model=List[Project])
-def get_projects(
-    skip: int = 0,
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
+def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     """Get all projects for the current user"""
     return ProjectService.get_projects(db, MOCK_USER_ID, skip, limit)
 
 
 @router.get("/{project_id}", response_model=ProjectWithFiles)
-def get_project(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_project(project_id: int, db: Session = Depends(get_db)):
     """Get a specific project with its files (read from filesystem)"""
     project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
 
@@ -183,30 +165,20 @@ def get_project(
 
 
 @router.put("/{project_id}", response_model=Project)
-def update_project(
-    project_id: int,
-    project_update: ProjectUpdate,
-    db: Session = Depends(get_db)
-):
+def update_project(project_id: int, project_update: ProjectUpdate, db: Session = Depends(get_db)):
     """Update a project"""
     return ProjectService.update_project(db, project_id, MOCK_USER_ID, project_update)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def delete_project(project_id: int, db: Session = Depends(get_db)):
     """Delete a project"""
     ProjectService.delete_project(db, project_id, MOCK_USER_ID)
     return None
 
 
 @router.get("/{project_id}/files", response_model=List[ProjectFile])
-def get_project_files(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_project_files(project_id: int, db: Session = Depends(get_db)):
     """Get all files for a project (read from filesystem)"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
@@ -216,11 +188,7 @@ def get_project_files(
 
 
 @router.post("/{project_id}/files", response_model=ProjectFile, status_code=status.HTTP_201_CREATED)
-def add_file_to_project(
-    project_id: int,
-    file_data: ProjectFileCreate,
-    db: Session = Depends(get_db)
-):
+def add_file_to_project(project_id: int, file_data: ProjectFileCreate, db: Session = Depends(get_db)):
     """Add a file to a project (writes to filesystem only)"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
@@ -230,6 +198,7 @@ def add_file_to_project(
 
     # Get file timestamps from filesystem
     from datetime import datetime
+
     project_dir = FileSystemService.get_project_dir(project_id)
     file_path = project_dir / file_data.filepath
     stat = file_path.stat()
@@ -251,10 +220,7 @@ def add_file_to_project(
 
 @router.put("/{project_id}/files/{file_id}", response_model=ProjectFile)
 def update_file(
-    project_id: int,
-    file_id: int,
-    file_update: ProjectFileUpdate = Body(...),
-    db: Session = Depends(get_db)
+    project_id: int, file_id: int, file_update: ProjectFileUpdate = Body(...), db: Session = Depends(get_db)
 ):
     """Update a file's content (writes to filesystem only)"""
     # Verify project exists
@@ -262,14 +228,15 @@ def update_file(
 
     # Get the filepath - we need to find it by file_id
     # Since we're not using DB anymore, we need filepath from the update
-    if not hasattr(file_update, 'filepath') or not file_update.filepath:
+    if not hasattr(file_update, "filepath") or not file_update.filepath:
         raise HTTPException(status_code=400, detail="filepath is required for filesystem-based updates")
 
-    content = file_update.content or ''
+    content = file_update.content or ""
     FileSystemService.write_file(project_id, file_update.filepath, content)
 
     # Get file timestamps from filesystem
     from datetime import datetime
+
     project_dir = FileSystemService.get_project_dir(project_id)
     file_path = project_dir / file_update.filepath
     stat = file_path.stat()
@@ -282,19 +249,14 @@ def update_file(
         "filename": Path(file_update.filepath).name,
         "filepath": file_update.filepath,
         "content": content,
-        "language": getattr(file_update, 'language', 'text'),
+        "language": getattr(file_update, "language", "text"),
         "created_at": created_at,
         "updated_at": updated_at,
     }
 
 
 @router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_file(
-    project_id: int,
-    file_id: int,
-    filepath: str = Body(..., embed=True),
-    db: Session = Depends(get_db)
-):
+def delete_file(project_id: int, file_id: int, filepath: str = Body(..., embed=True), db: Session = Depends(get_db)):
     """Delete a file from a project (deletes from filesystem only)"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
@@ -305,10 +267,7 @@ def delete_file(
 
 
 @router.get("/{project_id}/bundle")
-def get_project_bundle(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_project_bundle(project_id: int, db: Session = Depends(get_db)):
     """
     Get all project files as a bundle for WebContainers
     Returns: { "files": { "path": "content", ... } }
@@ -320,10 +279,9 @@ def get_project_bundle(
     files_list = FileSystemService.get_all_files(project_id)
 
     # Filter out internal agent state files before sending to WebContainer
-    forbidden_files = ['.agent_state.json', 'agent_state.json']
+    forbidden_files = [".agent_state.json", "agent_state.json"]
     filtered_files = [
-        file for file in files_list
-        if not any(forbidden in file["path"] for forbidden in forbidden_files)
+        file for file in files_list if not any(forbidden in file["path"] for forbidden in forbidden_files)
     ]
 
     # Convert to WebContainers format: { "path": "content" }
@@ -334,12 +292,9 @@ def get_project_bundle(
 
 # ===== GIT ENDPOINTS =====
 
+
 @router.get("/{project_id}/git/history")
-def get_git_history(
-    project_id: int,
-    limit: int = 20,
-    db: Session = Depends(get_db)
-):
+def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_db)):
     """
     Get Git commit history for a project
 
@@ -358,19 +313,11 @@ def get_git_history(
 
     commits = GitService.get_commit_history(project_id, limit)
 
-    return {
-        "project_id": project_id,
-        "commits": commits,
-        "total": len(commits)
-    }
+    return {"project_id": project_id, "commits": commits, "total": len(commits)}
 
 
 @router.get("/{project_id}/git/diff")
-def get_git_diff(
-    project_id: int,
-    filepath: str = None,
-    db: Session = Depends(get_db)
-):
+def get_git_diff(project_id: int, filepath: str = None, db: Session = Depends(get_db)):
     """
     Get Git diff of uncommitted changes
 
@@ -386,20 +333,11 @@ def get_git_diff(
 
     diff_output = GitService.get_diff(project_id, filepath)
 
-    return {
-        "project_id": project_id,
-        "filepath": filepath,
-        "diff": diff_output
-    }
+    return {"project_id": project_id, "filepath": filepath, "diff": diff_output}
 
 
 @router.get("/{project_id}/git/file/{commit_hash}")
-def get_file_at_commit(
-    project_id: int,
-    commit_hash: str,
-    filepath: str,
-    db: Session = Depends(get_db)
-):
+def get_file_at_commit(project_id: int, commit_hash: str, filepath: str, db: Session = Depends(get_db)):
     """
     Get file content at a specific commit
 
@@ -418,24 +356,14 @@ def get_file_at_commit(
 
     if content is None:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"File '{filepath}' not found at commit {commit_hash}"
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"File '{filepath}' not found at commit {commit_hash}"
         )
 
-    return {
-        "project_id": project_id,
-        "commit_hash": commit_hash,
-        "filepath": filepath,
-        "content": content
-    }
+    return {"project_id": project_id, "commit_hash": commit_hash, "filepath": filepath, "content": content}
 
 
 @router.post("/{project_id}/git/restore/{commit_hash}")
-def restore_to_commit(
-    project_id: int,
-    commit_hash: str,
-    db: Session = Depends(get_db)
-):
+def restore_to_commit(project_id: int, commit_hash: str, db: Session = Depends(get_db)):
     """
     Restore project to a specific commit (creates a new commit)
 
@@ -452,59 +380,40 @@ def restore_to_commit(
     success = GitService.restore_commit(project_id, commit_hash)
 
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to restore to commit"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to restore to commit")
 
     return {
         "success": True,
         "message": f"Restored to commit {commit_hash[:7]}",
         "project_id": project_id,
-        "commit_hash": commit_hash
+        "commit_hash": commit_hash,
     }
 
 
 @router.get("/{project_id}/git/branch")
-def get_current_branch(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_current_branch(project_id: int, db: Session = Depends(get_db)):
     """Get current Git branch for a project"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
 
     branch = GitService.get_current_branch(project_id)
 
-    return {
-        "project_id": project_id,
-        "branch": branch
-    }
+    return {"project_id": project_id, "branch": branch}
 
 
 @router.get("/{project_id}/git/config")
-def get_git_config(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_git_config(project_id: int, db: Session = Depends(get_db)):
     """Get Git remote configuration for a project"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
 
     config = GitService.get_remote_config(project_id)
 
-    return {
-        "project_id": project_id,
-        **config
-    }
+    return {"project_id": project_id, **config}
 
 
 @router.post("/{project_id}/git/config")
-def set_git_config(
-    project_id: int,
-    config: dict,
-    db: Session = Depends(get_db)
-):
+def set_git_config(project_id: int, config: dict, db: Session = Depends(get_db)):
     """Set or update Git remote configuration for a project"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
@@ -525,33 +434,23 @@ def set_git_config(
         "message": f"Remote '{remote_name}' configured successfully",
         "project_id": project_id,
         "remote_name": remote_name,
-        "remote_url": remote_url
+        "remote_url": remote_url,
     }
 
 
 @router.post("/{project_id}/git/sync")
-def sync_with_remote(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def sync_with_remote(project_id: int, db: Session = Depends(get_db)):
     """Sync project with remote repository (fetch, pull, commit, push)"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
 
     result = GitService.sync_with_remote(project_id)
 
-    return {
-        "project_id": project_id,
-        **result
-    }
+    return {"project_id": project_id, **result}
 
 
 @router.post("/{project_id}/thumbnail")
-def update_project_thumbnail(
-    project_id: int,
-    data: dict = Body(...),
-    db: Session = Depends(get_db)
-):
+def update_project_thumbnail(project_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
     """
     Update project thumbnail by capturing screenshot of preview URL (DEPRECATED - use /thumbnail/upload)
 
@@ -575,8 +474,7 @@ def update_project_thumbnail(
 
     if not thumbnail_data:
         raise HTTPException(
-            status_code=500,
-            detail="Failed to capture screenshot. Please ensure the preview URL is accessible."
+            status_code=500, detail="Failed to capture screenshot. Please ensure the preview URL is accessible."
         )
 
     # Update project thumbnail
@@ -584,19 +482,11 @@ def update_project_thumbnail(
     db.commit()
     db.refresh(project)
 
-    return {
-        "success": True,
-        "message": "Thumbnail updated successfully",
-        "project_id": project_id
-    }
+    return {"success": True, "message": "Thumbnail updated successfully", "project_id": project_id}
 
 
 @router.post("/{project_id}/thumbnail/upload")
-def upload_project_thumbnail(
-    project_id: int,
-    data: dict = Body(...),
-    db: Session = Depends(get_db)
-):
+def upload_project_thumbnail(project_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
     """
     Upload project thumbnail from frontend (base64 screenshot)
 
@@ -608,6 +498,7 @@ def upload_project_thumbnail(
         Success status and project_id
     """
     import logging
+
     logger = logging.getLogger(__name__)
 
     logger.info(f"📸 Receiving thumbnail upload for project {project_id}")
@@ -639,16 +530,12 @@ def upload_project_thumbnail(
         "success": True,
         "message": "Thumbnail uploaded successfully",
         "project_id": project_id,
-        "thumbnail_size": len(thumbnail_data)
+        "thumbnail_size": len(thumbnail_data),
     }
 
 
 @router.post("/{project_id}/visual-edit")
-def apply_visual_edit(
-    project_id: int,
-    edit_data: dict = Body(...),
-    db: Session = Depends(get_db)
-):
+def apply_visual_edit(project_id: int, edit_data: dict = Body(...), db: Session = Depends(get_db)):
     """
     Apply visual style changes directly to a component file.
 
@@ -667,28 +554,15 @@ def apply_visual_edit(
     style_changes = edit_data.get("style_changes")
 
     if not filepath or not element_selector or not style_changes:
-        raise HTTPException(
-            status_code=400,
-            detail="filepath, element_selector, and style_changes are required"
-        )
+        raise HTTPException(status_code=400, detail="filepath, element_selector, and style_changes are required")
 
-    result = ProjectService.apply_visual_edits(
-        db,
-        project_id,
-        MOCK_USER_ID,
-        filepath,
-        element_selector,
-        style_changes
-    )
+    result = ProjectService.apply_visual_edits(db, project_id, MOCK_USER_ID, filepath, element_selector, style_changes)
 
     return result
 
 
 @router.get("/{project_id}/download")
-def download_project(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def download_project(project_id: int, db: Session = Depends(get_db)):
     """
     Download project as ZIP file
 
@@ -705,20 +579,17 @@ def download_project(
     project_dir = Path(__file__).parent.parent.parent / "projects" / f"project_{project_id}"
 
     if not project_dir.exists():
-        raise HTTPException(
-            status_code=404,
-            detail="Project files not found on disk"
-        )
+        raise HTTPException(status_code=404, detail="Project files not found on disk")
 
     # Create ZIP file in memory
     zip_buffer = io.BytesIO()
 
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
         # Walk through project directory and add all files
-        for file_path in project_dir.rglob('*'):
+        for file_path in project_dir.rglob("*"):
             if file_path.is_file():
                 # Skip .git directory and node_modules
-                if '.git' in file_path.parts or 'node_modules' in file_path.parts:
+                if ".git" in file_path.parts or "node_modules" in file_path.parts:
                     continue
 
                 # Add file to ZIP with relative path
@@ -729,14 +600,10 @@ def download_project(
     zip_buffer.seek(0)
 
     # Create safe filename
-    safe_project_name = "".join(c for c in project.name if c.isalnum() or c in (' ', '-', '_')).strip()
+    safe_project_name = "".join(c for c in project.name if c.isalnum() or c in (" ", "-", "_")).strip()
     filename = f"{safe_project_name or 'project'}.zip"
 
     # Return ZIP file as streaming response
     return StreamingResponse(
-        zip_buffer,
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        zip_buffer, media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )

@@ -1,7 +1,10 @@
-from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, List
+from typing import List, Optional
+
+from pydantic import BaseModel
+
 from app.models.chat import MessageRole
+
 
 class ChatMessageBase(BaseModel):
     role: MessageRole
@@ -9,8 +12,10 @@ class ChatMessageBase(BaseModel):
     agent_name: Optional[str] = None
     message_metadata: Optional[str] = None
 
+
 class ChatMessageCreate(ChatMessageBase):
     session_id: int
+
 
 class ChatMessageInDB(ChatMessageBase):
     id: int
@@ -20,6 +25,7 @@ class ChatMessageInDB(ChatMessageBase):
     class Config:
         from_attributes = True
 
+
 class ChatMessage(ChatMessageInDB):
     agent_interactions: Optional[List[dict]] = None
 
@@ -27,6 +33,7 @@ class ChatMessage(ChatMessageInDB):
     def from_db_message(cls, db_message):
         """Convert database message to ChatMessage with parsed agent_interactions"""
         import json
+
         agent_interactions = None
 
         if db_message.message_metadata:
@@ -44,14 +51,17 @@ class ChatMessage(ChatMessageInDB):
             agent_name=db_message.agent_name,
             message_metadata=db_message.message_metadata,
             created_at=db_message.created_at,
-            agent_interactions=agent_interactions
+            agent_interactions=agent_interactions,
         )
+
 
 class ChatSessionBase(BaseModel):
     title: Optional[str] = "New Chat"
 
+
 class ChatSessionCreate(ChatSessionBase):
     project_id: int
+
 
 class ChatSessionInDB(ChatSessionBase):
     id: int
@@ -62,15 +72,19 @@ class ChatSessionInDB(ChatSessionBase):
     class Config:
         from_attributes = True
 
+
 class ChatSession(ChatSessionInDB):
     pass
+
 
 class ChatSessionWithMessages(ChatSession):
     messages: List[ChatMessage] = []
 
+
 class ChatRequest(BaseModel):
     message: str
     session_id: Optional[int] = None
+
 
 class AgentInteraction(BaseModel):
     agent_name: str
@@ -79,6 +93,7 @@ class AgentInteraction(BaseModel):
     tool_name: Optional[str] = None
     tool_arguments: Optional[dict] = None
     timestamp: datetime
+
 
 class ChatResponse(BaseModel):
     session_id: int

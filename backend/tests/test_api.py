@@ -9,13 +9,15 @@ Run with: pytest backend/tests/test_api.py
 
 import pytest
 from fastapi.testclient import TestClient
-from app.main import app
-from app.db.database import SessionLocal, Base, engine
-from app.models import User
+
 from app.core.security import get_password_hash
+from app.db.database import Base, SessionLocal, engine
+from app.main import app
+from app.models import User
 
 # Create test client
 client = TestClient(app)
+
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_test_db():
@@ -33,7 +35,7 @@ def setup_test_db():
                 email="test@example.com",
                 username="testuser",
                 hashed_password=get_password_hash("testpass123"),
-                is_active=True
+                is_active=True,
             )
             db.add(test_user)
             db.commit()
@@ -51,10 +53,7 @@ class TestProjectAPI:
 
     def test_create_project(self):
         """Test creating a new project"""
-        response = client.post(
-            "/api/v1/projects",
-            json={"name": "Test Project", "description": "A test project"}
-        )
+        response = client.post("/api/v1/projects", json={"name": "Test Project", "description": "A test project"})
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Test Project"
@@ -73,10 +72,7 @@ class TestProjectAPI:
     def test_get_project(self):
         """Test getting a specific project"""
         # First create a project
-        create_response = client.post(
-            "/api/v1/projects",
-            json={"name": "Get Test Project"}
-        )
+        create_response = client.post("/api/v1/projects", json={"name": "Get Test Project"})
         project_id = create_response.json()["id"]
 
         # Get the project
@@ -89,17 +85,11 @@ class TestProjectAPI:
     def test_update_project(self):
         """Test updating a project"""
         # Create project
-        create_response = client.post(
-            "/api/v1/projects",
-            json={"name": "Update Test"}
-        )
+        create_response = client.post("/api/v1/projects", json={"name": "Update Test"})
         project_id = create_response.json()["id"]
 
         # Update project
-        response = client.put(
-            f"/api/v1/projects/{project_id}",
-            json={"name": "Updated Name"}
-        )
+        response = client.put(f"/api/v1/projects/{project_id}", json={"name": "Updated Name"})
         assert response.status_code == 200
         data = response.json()
         assert data["name"] == "Updated Name"
@@ -107,10 +97,7 @@ class TestProjectAPI:
     def test_delete_project(self):
         """Test deleting a project"""
         # Create project
-        create_response = client.post(
-            "/api/v1/projects",
-            json={"name": "Delete Test"}
-        )
+        create_response = client.post("/api/v1/projects", json={"name": "Delete Test"})
         project_id = create_response.json()["id"]
 
         # Delete project
@@ -128,10 +115,7 @@ class TestFileAPI:
     @pytest.fixture
     def project_id(self):
         """Create a test project"""
-        response = client.post(
-            "/api/v1/projects",
-            json={"name": "File Test Project"}
-        )
+        response = client.post("/api/v1/projects", json={"name": "File Test Project"})
         return response.json()["id"]
 
     def test_create_file(self, project_id):
@@ -142,8 +126,8 @@ class TestFileAPI:
                 "filename": "test.tsx",
                 "filepath": "/src/test.tsx",
                 "content": "export const Test = () => <div>Test</div>",
-                "language": "typescript"
-            }
+                "language": "typescript",
+            },
         )
         assert response.status_code == 200
         data = response.json()
@@ -166,16 +150,13 @@ class TestFileAPI:
                 "filename": "update.tsx",
                 "filepath": "/src/update.tsx",
                 "content": "old content",
-                "language": "typescript"
-            }
+                "language": "typescript",
+            },
         )
         file_id = create_response.json()["id"]
 
         # Update file
-        response = client.put(
-            f"/api/v1/projects/{project_id}/files/{file_id}",
-            json={"content": "new content"}
-        )
+        response = client.put(f"/api/v1/projects/{project_id}/files/{file_id}", json={"content": "new content"})
         assert response.status_code == 200
         data = response.json()
         assert data["content"] == "new content"
@@ -189,8 +170,8 @@ class TestFileAPI:
                 "filename": "delete.tsx",
                 "filepath": "/src/delete.tsx",
                 "content": "content",
-                "language": "typescript"
-            }
+                "language": "typescript",
+            },
         )
         file_id = create_response.json()["id"]
 
@@ -205,20 +186,14 @@ class TestChatAPI:
     @pytest.fixture
     def project_id(self):
         """Create a test project"""
-        response = client.post(
-            "/api/v1/projects",
-            json={"name": "Chat Test Project"}
-        )
+        response = client.post("/api/v1/projects", json={"name": "Chat Test Project"})
         return response.json()["id"]
 
     def test_send_message(self, project_id):
         """Test sending a chat message"""
         # Note: This test may fail if OPENAI_API_KEY is not set
         # or if you want to avoid actual API calls
-        response = client.post(
-            f"/api/v1/chat/{project_id}",
-            json={"message": "Create a simple button component"}
-        )
+        response = client.post(f"/api/v1/chat/{project_id}", json={"message": "Create a simple button component"})
 
         # Accept both success and error for API key issues
         assert response.status_code in [200, 500]

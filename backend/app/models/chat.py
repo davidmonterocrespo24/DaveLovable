@@ -1,13 +1,18 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Enum as SQLEnum
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from app.db.database import Base
 import enum
+from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Enum as SQLEnum
+from sqlalchemy.orm import relationship
+
+from app.db.database import Base
+
 
 class MessageRole(str, enum.Enum):
     USER = "user"
     ASSISTANT = "assistant"
     SYSTEM = "system"
+
 
 class ChatSession(Base):
     __tablename__ = "chat_sessions"
@@ -21,6 +26,7 @@ class ChatSession(Base):
     # Relationships
     project = relationship("Project", back_populates="chat_sessions")
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"

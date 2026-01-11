@@ -136,7 +136,7 @@ async def read_file_with_encoding(file_path: str) -> str:
             return full.decode("latin-1")
 
     except Exception as e:
-        raise OSError(f"Failed to read file {file_path}: {str(e)}")
+        raise OSError(f"Failed to read file {file_path}: {e!s}")
 
 
 def get_specific_mime_type(file_path: str) -> str | None:
@@ -186,7 +186,7 @@ async def is_binary_file(file_path: str) -> bool:
         return (non_printable_count / len(buf)) > 0.3
 
     except Exception as e:
-        logger.warning(f"Failed to check if file is binary: {file_path} - {str(e)}")
+        logger.warning(f"Failed to check if file is binary: {file_path} - {e!s}")
         return False
 
 
@@ -300,11 +300,15 @@ async def process_single_file_content(
 
             return_display = ""
             if content_range_truncated:
-                return_display = f"Read lines {actual_start_line + 1}-{end_line} of {original_line_count} from {relative_path}"
+                return_display = (
+                    f"Read lines {actual_start_line + 1}-{end_line} of {original_line_count} from {relative_path}"
+                )
                 if lines_truncated_in_length:
                     return_display += " (some lines were shortened)"
             elif lines_truncated_in_length:
-                return_display = f"Read all {original_line_count} lines from {relative_path} (some lines were shortened)"
+                return_display = (
+                    f"Read all {original_line_count} lines from {relative_path} (some lines were shortened)"
+                )
 
             return {
                 "llmContent": llm_content,

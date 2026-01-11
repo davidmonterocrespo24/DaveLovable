@@ -75,7 +75,7 @@ Untracked files: {untracked}
         return result
 
     except Exception as e:
-        return f"ERROR executing git status: {str(e)}"
+        return f"ERROR executing git status: {e!s}"
 
 
 async def git_add(files: str | list[str], path: str | None = None) -> str:
@@ -111,7 +111,7 @@ async def git_add(files: str | list[str], path: str | None = None) -> str:
         return f"✓ Files added successfully: {', '.join(files)}"
 
     except Exception as e:
-        return f"ERROR executing git add: {str(e)}"
+        return f"ERROR executing git add: {e!s}"
 
 
 async def git_commit(message: str, path: str | None = None) -> str:
@@ -146,12 +146,10 @@ async def git_commit(message: str, path: str | None = None) -> str:
         return f"✓ Commit created successfully:\n{output}"
 
     except Exception as e:
-        return f"ERROR executing git commit: {str(e)}"
+        return f"ERROR executing git commit: {e!s}"
 
 
-async def git_push(
-    remote: str = "origin", branch: str | None = None, path: str | None = None
-) -> str:
+async def git_push(remote: str = "origin", branch: str | None = None, path: str | None = None) -> str:
     """
     Pushes commits to the remote repository.
 
@@ -184,12 +182,10 @@ async def git_push(
         return f"✓ Push successful:\n{output}"
 
     except Exception as e:
-        return f"ERROR executing git push: {str(e)}"
+        return f"ERROR executing git push: {e!s}"
 
 
-async def git_pull(
-    remote: str = "origin", branch: str | None = None, path: str | None = None
-) -> str:
+async def git_pull(remote: str = "origin", branch: str | None = None, path: str | None = None) -> str:
     """
     Pulls changes from the remote repository.
 
@@ -221,7 +217,7 @@ async def git_pull(
         return f"✓ Pull successful:\n{output}"
 
     except Exception as e:
-        return f"ERROR executing git pull: {str(e)}"
+        return f"ERROR executing git pull: {e!s}"
 
 
 async def git_log(limit: int = 10, path: str | None = None) -> str:
@@ -257,12 +253,10 @@ async def git_log(limit: int = 10, path: str | None = None) -> str:
         return f"Last {limit} commits:\n{output}"
 
     except Exception as e:
-        return f"ERROR executing git log: {str(e)}"
+        return f"ERROR executing git log: {e!s}"
 
 
-async def git_branch(
-    operation: str = "list", branch_name: str | None = None, path: str | None = None
-) -> str:
+async def git_branch(operation: str = "list", branch_name: str | None = None, path: str | None = None) -> str:
     """
     Manages git branches.
 
@@ -300,7 +294,7 @@ async def git_branch(
         return output if output else f"✓ Operation '{operation}' completed"
 
     except Exception as e:
-        return f"ERROR executing git branch: {str(e)}"
+        return f"ERROR executing git branch: {e!s}"
 
 
 async def git_diff(cached: bool = False, path: str | None = None) -> str:
@@ -336,4 +330,4 @@ async def git_diff(cached: bool = False, path: str | None = None) -> str:
         return f"Differences {'(staged)' if cached else '(working tree)'}:\n{output}"
 
     except Exception as e:
-        return f"ERROR executing git diff: {str(e)}"
+        return f"ERROR executing git diff: {e!s}"

@@ -146,4 +146,4 @@ async def glob_search(
         return f'Found {total_count} file(s) matching "{pattern}" within {search_dir}, sorted by modification time (newest first):\n{file_list}{truncated_msg}'
 
     except Exception as e:
-        return f"Error during glob search operation: {str(e)}"
+        return f"Error during glob search operation: {e!s}"

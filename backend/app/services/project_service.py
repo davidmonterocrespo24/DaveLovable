@@ -1,9 +1,11 @@
 from typing import List, Optional
-from sqlalchemy.orm import Session
-from app.models import Project, ProjectFile
-from app.schemas import ProjectCreate, ProjectUpdate, ProjectFileCreate
-from app.services.filesystem_service import FileSystemService
+
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.models import Project, ProjectFile
+from app.schemas import ProjectCreate, ProjectFileCreate, ProjectUpdate
+from app.services.filesystem_service import FileSystemService
 
 
 class ProjectService:
@@ -30,16 +32,10 @@ class ProjectService:
     def get_project(db: Session, project_id: int, owner_id: int) -> Optional[Project]:
         """Get a project by ID"""
 
-        project = db.query(Project).filter(
-            Project.id == project_id,
-            Project.owner_id == owner_id
-        ).first()
+        project = db.query(Project).filter(Project.id == project_id, Project.owner_id == owner_id).first()
 
         if not project:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Project not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
 
         return project
 
@@ -47,17 +43,10 @@ class ProjectService:
     def get_projects(db: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Project]:
         """Get all projects for a user"""
 
-        return db.query(Project).filter(
-            Project.owner_id == owner_id
-        ).offset(skip).limit(limit).all()
+        return db.query(Project).filter(Project.owner_id == owner_id).offset(skip).limit(limit).all()
 
     @staticmethod
-    def update_project(
-        db: Session,
-        project_id: int,
-        owner_id: int,
-        project_update: ProjectUpdate
-    ) -> Project:
+    def update_project(db: Session, project_id: int, owner_id: int, project_update: ProjectUpdate) -> Project:
         """Update a project"""
 
         project = ProjectService.get_project(db, project_id, owner_id)
@@ -91,34 +80,29 @@ class ProjectService:
         ProjectService.get_project(db, project_id, owner_id)
 
         # Get file metadata from database
-        db_files = db.query(ProjectFile).filter(
-            ProjectFile.project_id == project_id
-        ).all()
+        db_files = db.query(ProjectFile).filter(ProjectFile.project_id == project_id).all()
 
         # Read content from filesystem
         files_with_content = []
         for db_file in db_files:
             content = FileSystemService.read_file(project_id, db_file.filepath)
-            files_with_content.append({
-                "id": db_file.id,
-                "project_id": db_file.project_id,
-                "filename": db_file.filename,
-                "filepath": db_file.filepath,
-                "content": content or "",
-                "language": db_file.language,
-                "created_at": db_file.created_at,
-                "updated_at": db_file.updated_at,
-            })
+            files_with_content.append(
+                {
+                    "id": db_file.id,
+                    "project_id": db_file.project_id,
+                    "filename": db_file.filename,
+                    "filepath": db_file.filepath,
+                    "content": content or "",
+                    "language": db_file.language,
+                    "created_at": db_file.created_at,
+                    "updated_at": db_file.updated_at,
+                }
+            )
 
         return files_with_content
 
     @staticmethod
-    def add_file_to_project(
-        db: Session,
-        project_id: int,
-        owner_id: int,
-        file_data: ProjectFileCreate
-    ) -> dict:
+    def add_file_to_project(db: Session, project_id: int, owner_id: int, file_data: ProjectFileCreate) -> dict:
         """Add a file to a project"""
         from app.services.git_service import GitService
 
@@ -126,11 +110,11 @@ class ProjectService:
         ProjectService.get_project(db, project_id, owner_id)
 
         # Extract content from file_data
-        content = file_data.content if hasattr(file_data, 'content') else ""
+        content = file_data.content if hasattr(file_data, "content") else ""
 
         # Create file metadata in database (without content)
         file_dict = file_data.model_dump()
-        file_dict.pop('content', None)  # Remove content if present
+        file_dict.pop("content", None)  # Remove content if present
 
         db_file = ProjectFile(**file_dict)
         db.add(db_file)
@@ -141,11 +125,7 @@ class ProjectService:
         FileSystemService.write_file(project_id, db_file.filepath, content)
 
         # Commit to Git
-        GitService.commit_changes(
-            project_id,
-            f"Add file: {db_file.filepath}",
-            [db_file.filepath]
-        )
+        GitService.commit_changes(project_id, f"Add file: {db_file.filepath}", [db_file.filepath])
 
         return {
             "id": db_file.id,
@@ -159,42 +139,27 @@ class ProjectService:
         }
 
     @staticmethod
-    def update_file(
-        db: Session,
-        file_id: int,
-        project_id: int,
-        owner_id: int,
-        content: str
-    ) -> dict:
+    def update_file(db: Session, file_id: int, project_id: int, owner_id: int, content: str) -> dict:
         """Update a file's content"""
         from app.services.git_service import GitService
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
 
-        file = db.query(ProjectFile).filter(
-            ProjectFile.id == file_id,
-            ProjectFile.project_id == project_id
-        ).first()
+        file = db.query(ProjectFile).filter(ProjectFile.id == file_id, ProjectFile.project_id == project_id).first()
 
         if not file:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
         # Update filesystem
         FileSystemService.write_file(project_id, file.filepath, content)
 
         # Commit to Git
-        GitService.commit_changes(
-            project_id,
-            f"Update file: {file.filepath}",
-            [file.filepath]
-        )
+        GitService.commit_changes(project_id, f"Update file: {file.filepath}", [file.filepath])
 
         # Update timestamp in database
         from datetime import datetime
+
         file.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(file)
@@ -218,16 +183,10 @@ class ProjectService:
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
 
-        file = db.query(ProjectFile).filter(
-            ProjectFile.id == file_id,
-            ProjectFile.project_id == project_id
-        ).first()
+        file = db.query(ProjectFile).filter(ProjectFile.id == file_id, ProjectFile.project_id == project_id).first()
 
         if not file:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="File not found"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
 
         filepath = file.filepath
 
@@ -239,21 +198,13 @@ class ProjectService:
         db.commit()
 
         # Commit deletion to Git
-        GitService.commit_changes(
-            project_id,
-            f"Delete file: {filepath}"
-        )
+        GitService.commit_changes(project_id, f"Delete file: {filepath}")
 
         return True
 
     @staticmethod
     def apply_visual_edits(
-        db: Session,
-        project_id: int,
-        owner_id: int,
-        filepath: str,
-        element_selector: str,
-        style_changes: dict
+        db: Session, project_id: int, owner_id: int, filepath: str, element_selector: str, style_changes: dict
     ) -> dict:
         """
         Apply visual style changes directly to a component file.
@@ -269,8 +220,8 @@ class ProjectService:
         Returns:
             Dict with success status and updated file info
         """
+
         from app.services.git_service import GitService
-        import re
 
         # Verify ownership
         ProjectService.get_project(db, project_id, owner_id)
@@ -278,24 +229,17 @@ class ProjectService:
         # Read current file content
         content = FileSystemService.read_file(project_id, filepath)
         if not content:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"File not found: {filepath}"
-            )
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"File not found: {filepath}")
 
         # Convert style_changes to Tailwind classes or inline styles
-        modified_content = ProjectService._apply_styles_to_jsx(
-            content,
-            element_selector,
-            style_changes
-        )
+        modified_content = ProjectService._apply_styles_to_jsx(content, element_selector, style_changes)
 
         if modified_content == content:
             # No changes made
             return {
                 "success": False,
                 "message": "No matching element found or styles already applied",
-                "filepath": filepath
+                "filepath": filepath,
             }
 
         # Write modified content back to filesystem
@@ -303,16 +247,14 @@ class ProjectService:
 
         # Commit to Git
         GitService.commit_changes(
-            project_id,
-            f"Visual edit: Apply styles to {element_selector} in {filepath}",
-            [filepath]
+            project_id, f"Visual edit: Apply styles to {element_selector} in {filepath}", [filepath]
         )
 
         return {
             "success": True,
             "message": f"Applied visual edits to {filepath}",
             "filepath": filepath,
-            "styles_applied": style_changes
+            "styles_applied": style_changes,
         }
 
     @staticmethod
@@ -334,17 +276,17 @@ class ProjectService:
         # Convert CSS property names to camelCase for React inline styles
         def to_camel_case(prop):
             """Convert CSS property to camelCase (e.g., background-color -> backgroundColor)"""
-            parts = prop.split('-')
-            return parts[0] + ''.join(word.capitalize() for word in parts[1:])
+            parts = prop.split("-")
+            return parts[0] + "".join(word.capitalize() for word in parts[1:])
 
         react_styles = {to_camel_case(k): v for k, v in style_changes.items()}
 
         # Build style string for inline styles
-        style_string = ', '.join([f"{k}: '{v}'" for k, v in react_styles.items()])
+        style_string = ", ".join([f"{k}: '{v}'" for k, v in react_styles.items()])
 
         # Pattern to find JSX elements with the given tag name
         # Matches: <Button ... > or <Button ... />
-        tag_pattern = rf'(<{element_selector}(?:\s+[^>]*?)?)((?:\s+style={{[^}}]*}})?)((?:\s+[^>]*?)?(?:>|/>))'
+        tag_pattern = rf"(<{element_selector}(?:\s+[^>]*?)?)((?:\s+style={{[^}}]*}})?)((?:\s+[^>]*?)?(?:>|/>))"
 
         def replace_style(match):
             opening = match.group(1)  # <Button ...
@@ -354,17 +296,17 @@ class ProjectService:
             if existing_style:
                 # Merge with existing styles
                 # Extract existing style object content
-                style_content_match = re.search(r'style={{([^}}]*)}}', existing_style)
+                style_content_match = re.search(r"style={{([^}}]*)}}", existing_style)
                 if style_content_match:
                     existing_style_content = style_content_match.group(1).strip()
                     # Merge styles (new styles override existing ones)
                     merged_styles = f"{existing_style_content}, {style_string}"
-                    new_style = f' style={{{{{merged_styles}}}}}'
+                    new_style = f" style={{{{{merged_styles}}}}}"
                 else:
-                    new_style = f' style={{{{{style_string}}}}}'
+                    new_style = f" style={{{{{style_string}}}}}"
             else:
                 # Add new style attribute
-                new_style = f' style={{{{{style_string}}}}}'
+                new_style = f" style={{{{{style_string}}}}}"
 
             return f"{opening}{new_style}{closing}"
 

@@ -41,9 +41,7 @@ def _is_git_repo(path: Path) -> bool:
     return (path / ".git").exists()
 
 
-def _run_git_grep(
-    query: str, path: Path, include: str | None = None, case_sensitive: bool = False
-) -> str | None:
+def _run_git_grep(query: str, path: Path, include: str | None = None, case_sensitive: bool = False) -> str | None:
     """Executes optimized 'git grep'."""
     if not shutil.which("git"):
         return None
@@ -66,9 +64,7 @@ def _run_git_grep(
 
     try:
         # Execute in target directory
-        result = subprocess.run(
-            cmd, cwd=str(path), capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )
+        result = subprocess.run(cmd, cwd=str(path), capture_output=True, text=True, encoding="utf-8", errors="replace")
 
         if result.returncode == 0:
             return result.stdout
@@ -81,9 +77,7 @@ def _run_git_grep(
         return None
 
 
-def _python_grep_fallback(
-    query: str, root_path: Path, include_pattern: str | None, case_sensitive: bool
-) -> str:
+def _python_grep_fallback(query: str, root_path: Path, include_pattern: str | None, case_sensitive: bool) -> str:
     """Pure Python implementation (slow but safe)."""
     results = []
     flags = 0 if case_sensitive else re.IGNORECASE

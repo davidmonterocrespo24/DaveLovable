@@ -1,13 +1,17 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
 from datetime import datetime
+
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy.orm import relationship
+
 from app.db.database import Base
+
 
 class ProjectFile(Base):
     """
     ProjectFile model - stores only metadata.
     Actual file content is stored in the filesystem and versioned with Git.
     """
+
     __tablename__ = "project_files"
 
     id = Column(Integer, primary_key=True, index=True)

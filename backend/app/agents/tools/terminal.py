@@ -19,26 +19,26 @@ async def run_terminal_cmd(
         # GUARDRAIL: Block forbidden development server commands AND build commands
         # These commands won't work because Node.js runs in WebContainer (browser), not in this backend
         forbidden_patterns = [
-            'npm run dev',
-            'npm run build',
-            'npm start',
-            'yarn dev',
-            'yarn build',
-            'yarn start',
-            'pnpm dev',
-            'pnpm build',
-            'pnpm start',
-            'vite',
-            'vite dev',
-            'vite build',
-            'vite preview',
-            'tsc',
-            'npx tsc',
-            'react-scripts start',
-            'react-scripts build',
-            'next dev',
-            'next build',
-            'next start',
+            "npm run dev",
+            "npm run build",
+            "npm start",
+            "yarn dev",
+            "yarn build",
+            "yarn start",
+            "pnpm dev",
+            "pnpm build",
+            "pnpm start",
+            "vite",
+            "vite dev",
+            "vite build",
+            "vite preview",
+            "tsc",
+            "npx tsc",
+            "react-scripts start",
+            "react-scripts build",
+            "next dev",
+            "next build",
+            "next start",
         ]
 
         command_lower = command.lower().strip()
@@ -81,7 +81,7 @@ VERIFICATION STRATEGY:
 The WebContainer environment handles all Node.js operations automatically."""
 
         # Check for background process attempts (commands with &)
-        if '&' in command and not command.strip().endswith('&&'):
+        if "&" in command and not command.strip().endswith("&&"):
             return f"""🚨 BACKGROUND COMMAND BLOCKED 🚨
 
 Command: {command}
@@ -92,16 +92,25 @@ The WebContainer handles all server processes automatically."""
 
         # Fix common Unix commands for Windows compatibility
         import platform
-        if platform.system() == 'Windows':
+
+        if platform.system() == "Windows":
             # Replace pwd with cd (shows current directory on Windows)
-            if command.strip() == 'pwd':
-                command = 'cd'
+            if command.strip() == "pwd":
+                command = "cd"
             # Replace ls with dir
-            elif command.strip().startswith('ls'):
-                command = command.replace('ls', 'dir', 1)
+            elif command.strip().startswith("ls"):
+                command = command.replace("ls", "dir", 1)
 
         # Detect commands that might take a long time
-        long_running_commands = ['tsc', 'npx tsc', 'npm audit', 'npm outdated', 'npm run build', 'yarn build', 'pnpm build']
+        long_running_commands = [
+            "tsc",
+            "npx tsc",
+            "npm audit",
+            "npm outdated",
+            "npm run build",
+            "yarn build",
+            "pnpm build",
+        ]
         is_long_running = any(cmd in command_lower for cmd in long_running_commands)
 
         # Set timeout: 15 seconds for normal commands, 60 for build/check commands
@@ -144,4 +153,4 @@ ALTERNATIVES:
 
 The preview panel already provides real-time feedback on your code."""
     except Exception as e:
-        return f"Error executing command: {str(e)}"
+        return f"Error executing command: {e!s}"

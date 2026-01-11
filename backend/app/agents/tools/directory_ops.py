@@ -21,4 +21,4 @@ async def list_dir(target_dir: str = ".") -> str:
                 result += f"  [FILE] {item.name} ({item.stat().st_size} bytes)\n"
         return result
     except Exception as e:
-        return f"Error listing directory: {str(e)}"
+        return f"Error listing directory: {e!s}"

@@ -46,7 +46,7 @@ async def wiki_search(query: str, max_results: int = 10) -> str:
             return output
 
     except Exception as e:
-        error_msg = f"Error searching Wikipedia '{query}': {str(e)}"
+        error_msg = f"Error searching Wikipedia '{query}': {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -78,7 +78,7 @@ async def wiki_summary(title: str, sentences: int = 5) -> str:
         return f"ERROR: Page '{title}' not found on Wikipedia"
 
     except Exception as e:
-        error_msg = f"Error getting summary of '{title}': {str(e)}"
+        error_msg = f"Error getting summary of '{title}': {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -119,7 +119,7 @@ async def wiki_content(title: str, max_chars: int = 5000) -> str:
         return f"ERROR: Page '{title}' not found on Wikipedia"
 
     except Exception as e:
-        error_msg = f"Error getting content of '{title}': {str(e)}"
+        error_msg = f"Error getting content of '{title}': {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -165,7 +165,7 @@ async def wiki_page_info(title: str) -> str:
         return f"ERROR: Page '{title}' not found on Wikipedia"
 
     except Exception as e:
-        error_msg = f"Error getting information of '{title}': {str(e)}"
+        error_msg = f"Error getting information of '{title}': {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -194,7 +194,7 @@ async def wiki_random(count: int = 1) -> str:
             return output
 
     except Exception as e:
-        error_msg = f"Error getting random pages: {str(e)}"
+        error_msg = f"Error getting random pages: {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -215,6 +215,6 @@ async def wiki_set_language(language: str) -> str:
         return f"✓ Wikipedia language changed to: {language}"
 
     except Exception as e:
-        error_msg = f"Error changing language to '{language}': {str(e)}"
+        error_msg = f"Error changing language to '{language}': {e!s}"
         logging.error(error_msg)
         return error_msg

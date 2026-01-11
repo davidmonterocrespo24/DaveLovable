@@ -23,7 +23,7 @@ async def read_json(filepath: str, encoding: str = "utf-8") -> dict[str, Any] | 
             data = json.load(f)
         return data
     except Exception as e:
-        error_msg = f"Error reading JSON file {filepath}: {str(e)}"
+        error_msg = f"Error reading JSON file {filepath}: {e!s}"
         logging.error(error_msg)
         return {"error": error_msg}
 
@@ -53,14 +53,12 @@ async def write_json(
             json.dump(data, f, indent=indent, ensure_ascii=ensure_ascii)
         return f"✓ JSON file saved successfully to {filepath}"
     except Exception as e:
-        error_msg = f"Error writing JSON file {filepath}: {str(e)}"
+        error_msg = f"Error writing JSON file {filepath}: {e!s}"
         logging.error(error_msg)
         return error_msg
 
 
-async def merge_json_files(
-    file1: str, file2: str, output_file: str, overwrite_duplicates: bool = True
-) -> str:
+async def merge_json_files(file1: str, file2: str, output_file: str, overwrite_duplicates: bool = True) -> str:
     """
     Merges two JSON files.
 
@@ -102,7 +100,7 @@ async def merge_json_files(
         return await write_json(output_file, result)
 
     except Exception as e:
-        error_msg = f"Error merging JSON files: {str(e)}"
+        error_msg = f"Error merging JSON files: {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -122,9 +120,9 @@ async def validate_json(filepath: str) -> str:
             json.load(f)
         return f"✓ {filepath} is a valid JSON"
     except json.JSONDecodeError as e:
-        return f"ERROR: Invalid JSON in {filepath}: {str(e)}"
+        return f"ERROR: Invalid JSON in {filepath}: {e!s}"
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"
 
 
 async def format_json(filepath: str, indent: int = 2) -> str:
@@ -148,7 +146,7 @@ async def format_json(filepath: str, indent: int = 2) -> str:
         return await write_json(filepath, data, indent=indent)
 
     except Exception as e:
-        error_msg = f"Error formatting JSON: {str(e)}"
+        error_msg = f"Error formatting JSON: {e!s}"
         logging.error(error_msg)
         return error_msg
 
@@ -191,7 +189,7 @@ async def json_get_value(filepath: str, key_path: str) -> str:
         return f"Value at '{key_path}': {json.dumps(current, indent=2, ensure_ascii=False)}"
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"
 
 
 async def json_set_value(filepath: str, key_path: str, value: str) -> str:
@@ -241,7 +239,7 @@ async def json_set_value(filepath: str, key_path: str, value: str) -> str:
         return await write_json(filepath, data)
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"
 
 
 async def json_to_text(filepath: str, pretty: bool = True) -> str:
@@ -266,4 +264,4 @@ async def json_to_text(filepath: str, pretty: bool = True) -> str:
             return json.dumps(data, ensure_ascii=False)
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"

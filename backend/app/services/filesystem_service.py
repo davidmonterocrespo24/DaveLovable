@@ -1,10 +1,12 @@
-import os
 import json
+import os
 import shutil
 import stat
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Dict, List, Optional
+
 from app.core.config import settings
+
 
 class FileSystemService:
     """Service for managing physical project files on disk"""
@@ -56,11 +58,7 @@ class FileSystemService:
             "version": "0.1.0",
             "private": True,
             "type": "module",
-            "scripts": {
-                "dev": "vite",
-                "build": "tsc && vite build",
-                "preview": "vite preview"
-            },
+            "scripts": {"dev": "vite", "build": "tsc && vite build", "preview": "vite preview"},
             "dependencies": {
                 "react": "^18.3.1",
                 "react-dom": "^18.3.1",
@@ -73,7 +71,7 @@ class FileSystemService:
                 "@tanstack/react-query": "^5.0.0",
                 "framer-motion": "^11.0.0",
                 "react-hook-form": "^7.51.0",
-                "zod": "^3.22.0"
+                "zod": "^3.22.0",
             },
             "devDependencies": {
                 "@types/react": "^18.3.12",
@@ -83,8 +81,8 @@ class FileSystemService:
                 "vite": "^5.4.11",
                 "tailwindcss": "^3.4.17",
                 "autoprefixer": "^10.4.20",
-                "postcss": "^8.4.49"
-            }
+                "postcss": "^8.4.49",
+            },
         }
 
         # Create vite.config.ts
@@ -117,10 +115,10 @@ export default defineConfig({
                 "strict": True,
                 "noUnusedLocals": True,
                 "noUnusedParameters": True,
-                "noFallthroughCasesInSwitch": True
+                "noFallthroughCasesInSwitch": True,
             },
             "include": ["src"],
-            "references": [{"path": "./tsconfig.node.json"}]
+            "references": [{"path": "./tsconfig.node.json"}],
         }
 
         # Create tsconfig.node.json
@@ -130,9 +128,9 @@ export default defineConfig({
                 "skipLibCheck": True,
                 "module": "ESNext",
                 "moduleResolution": "bundler",
-                "allowSyntheticDefaultImports": True
+                "allowSyntheticDefaultImports": True,
             },
-            "include": ["vite.config.ts"]
+            "include": ["vite.config.ts"],
         }
 
         # Create tailwind.config.js
@@ -161,7 +159,7 @@ export default {
         # Read console logger script template
         console_logger_path = Path(__file__).parent.parent / "templates" / "console_logger.js"
         try:
-            with open(console_logger_path, 'r', encoding='utf-8') as f:
+            with open(console_logger_path, encoding="utf-8") as f:
                 console_logger_script = f.read()
         except FileNotFoundError:
             console_logger_script = "// Console logger not found"
@@ -199,14 +197,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
 """
 
         # Create src/App.tsx
-        app_tsx = """import React from 'react'
+        app_tsx = (
+            """import React from 'react'
 
 function App() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Welcome to """ + project_name + """
+          Welcome to """
+            + project_name
+            + """
         </h1>
         <p className="text-lg text-gray-600">
           Start building your amazing application!
@@ -218,6 +219,7 @@ function App() {
 
 export default App
 """
+        )
 
         # Create src/index.css
         index_css = """@tailwind base;
@@ -287,7 +289,7 @@ code {
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Write file
-        file_path.write_text(content, encoding='utf-8')
+        file_path.write_text(content, encoding="utf-8")
 
     @staticmethod
     def read_file(project_id: int, filepath: str) -> Optional[str]:
@@ -298,7 +300,7 @@ code {
         if not file_path.exists():
             return None
 
-        return file_path.read_text(encoding='utf-8')
+        return file_path.read_text(encoding="utf-8")
 
     @staticmethod
     def delete_file(project_id: int, filepath: str) -> bool:
@@ -334,29 +336,29 @@ code {
 
         # Directories to exclude from bundle (node_modules, .git, build artifacts, etc.)
         excluded_dirs = {
-            'node_modules',
-            '.git',
-            'dist',
-            'build',
-            '.vite',
-            'coverage',
-            '.turbo',
-            '.next',
-            '.cache',
-            '__pycache__',
-            '.pytest_cache',
-            '.mypy_cache',
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".vite",
+            "coverage",
+            ".turbo",
+            ".next",
+            ".cache",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
         }
 
         # File patterns to exclude
         excluded_files = {
-            '.DS_Store',
-            'Thumbs.db',
-            '.env',
-            '.env.local',
-            'package-lock.json',
-            'yarn.lock',
-            'pnpm-lock.yaml',
+            ".DS_Store",
+            "Thumbs.db",
+            ".env",
+            ".env.local",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
         }
 
         files = []
@@ -373,11 +375,8 @@ code {
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8')
-                    files.append({
-                        "path": str(relative_path).replace("\\", "/"),
-                        "content": content
-                    })
+                    content = file_path.read_text(encoding="utf-8")
+                    files.append({"path": str(relative_path).replace("\\", "/"), "content": content})
                 except Exception:
                     # Skip binary files or files that can't be read
                     pass
@@ -397,31 +396,47 @@ code {
 
         # Directories to exclude
         excluded_dirs = {
-            'node_modules', '.git', 'dist', 'build', '.vite', 'coverage',
-            '.turbo', '.next', '.cache', '__pycache__', '.pytest_cache',
-            '.mypy_cache',
+            "node_modules",
+            ".git",
+            "dist",
+            "build",
+            ".vite",
+            "coverage",
+            ".turbo",
+            ".next",
+            ".cache",
+            "__pycache__",
+            ".pytest_cache",
+            ".mypy_cache",
         }
 
         # Files to exclude
         excluded_files = {
-            '.DS_Store', 'Thumbs.db', '.env', '.env.local',
-            'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
-            '.gitignore', '.browser_logs.json', '.agent_state.json',
+            ".DS_Store",
+            "Thumbs.db",
+            ".env",
+            ".env.local",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            ".gitignore",
+            ".browser_logs.json",
+            ".agent_state.json",
         }
 
         # Language mapping by extension
         language_map = {
-            '.tsx': 'tsx',
-            '.ts': 'typescript',
-            '.jsx': 'jsx',
-            '.js': 'javascript',
-            '.css': 'css',
-            '.html': 'html',
-            '.json': 'json',
-            '.md': 'markdown',
-            '.py': 'python',
-            '.yml': 'yaml',
-            '.yaml': 'yaml',
+            ".tsx": "tsx",
+            ".ts": "typescript",
+            ".jsx": "jsx",
+            ".js": "javascript",
+            ".css": "css",
+            ".html": "html",
+            ".json": "json",
+            ".md": "markdown",
+            ".py": "python",
+            ".yml": "yaml",
+            ".yaml": "yaml",
         }
 
         files = []
@@ -442,27 +457,30 @@ code {
                 continue
 
             try:
-                content = file_path.read_text(encoding='utf-8')
+                content = file_path.read_text(encoding="utf-8")
                 filepath_str = str(relative_path).replace("\\", "/")
                 extension = file_path.suffix
-                language = language_map.get(extension, 'text')
+                language = language_map.get(extension, "text")
 
                 # Get file timestamps from filesystem
                 from datetime import datetime
+
                 stat = file_path.stat()
                 created_at = datetime.fromtimestamp(stat.st_ctime)
                 updated_at = datetime.fromtimestamp(stat.st_mtime)
 
-                files.append({
-                    "id": file_id,
-                    "project_id": project_id,
-                    "filename": file_path.name,
-                    "filepath": filepath_str,
-                    "content": content,
-                    "language": language,
-                    "created_at": created_at,
-                    "updated_at": updated_at,
-                })
+                files.append(
+                    {
+                        "id": file_id,
+                        "project_id": project_id,
+                        "filename": file_path.name,
+                        "filepath": filepath_str,
+                        "content": content,
+                        "language": language,
+                        "created_at": created_at,
+                        "updated_at": updated_at,
+                    }
+                )
                 file_id += 1
             except Exception:
                 # Skip binary files or files that can't be read

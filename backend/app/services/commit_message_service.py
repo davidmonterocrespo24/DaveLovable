@@ -1,8 +1,10 @@
-import tiktoken
-import httpx
 import json
+
+import httpx
+import tiktoken
 from autogen_core.models import SystemMessage, UserMessage
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
 from app.core.config import settings
 
 
@@ -46,25 +48,25 @@ class CommitMessageService:
 
         # If too long, truncate by taking first part and last part
         # This gives context about both what was added and the overall scope
-        lines = diff.split('\n')
+        lines = diff.split("\n")
         total_lines = len(lines)
 
         # Take 70% from start, 30% from end
         start_lines = int(total_lines * 0.7)
         end_lines = int(total_lines * 0.3)
 
-        truncated = '\n'.join(lines[:start_lines])
+        truncated = "\n".join(lines[:start_lines])
         truncated += f"\n\n... [Diff truncated: {total_lines - start_lines - end_lines} lines omitted] ...\n\n"
-        truncated += '\n'.join(lines[-end_lines:])
+        truncated += "\n".join(lines[-end_lines:])
 
         # Double check it's under limit
         if CommitMessageService.count_tokens(truncated) > max_tokens:
             # If still too long, be more aggressive
             start_lines = int(total_lines * 0.5)
             end_lines = int(total_lines * 0.2)
-            truncated = '\n'.join(lines[:start_lines])
+            truncated = "\n".join(lines[:start_lines])
             truncated += f"\n\n... [Diff truncated: {total_lines - start_lines - end_lines} lines omitted] ...\n\n"
-            truncated += '\n'.join(lines[-end_lines:])
+            truncated += "\n".join(lines[-end_lines:])
 
         return truncated
 
@@ -134,11 +136,7 @@ Respond in JSON format:
             # Call the model with extra parameters for OpenAI
             result = await client.create(
                 messages,
-                extra_create_args={
-                    "temperature": 0.3,
-                    "max_tokens": 500,
-                    "response_format": {"type": "json_object"}
-                }
+                extra_create_args={"temperature": 0.3, "max_tokens": 500, "response_format": {"type": "json_object"}},
             )
             response_content = result.content
 
@@ -151,7 +149,7 @@ Respond in JSON format:
 
             return {
                 "title": data.get("title", "chore: AI-generated changes"),
-                "body": data.get("body", "Automated commit from AI agent system")
+                "body": data.get("body", "Automated commit from AI agent system"),
             }
 
         except Exception as e:
@@ -159,7 +157,7 @@ Respond in JSON format:
             # Fallback message
             return {
                 "title": "chore: AI-generated changes",
-                "body": f"Automated commit from AI agent system\n\nUser request: {user_request if user_request else 'N/A'}"
+                "body": f"Automated commit from AI agent system\n\nUser request: {user_request if user_request else 'N/A'}",
             }
         finally:
             await http_client.aclose()

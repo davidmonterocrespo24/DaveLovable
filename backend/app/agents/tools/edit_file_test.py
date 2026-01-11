@@ -24,9 +24,7 @@ async def test_edit_file():
 
     # Test 1: Edición exacta
     print("Test 1: Edición exacta")
-    result = await edit_file(
-        test_file, old_string='print("Hello World")', new_string='print("Hello Universe")'
-    )
+    result = await edit_file(test_file, old_string='print("Hello World")', new_string='print("Hello Universe")')
     print(f"Resultado: {result}\n")
 
     # Test 2: Edición con cambio de indentación (flexible)

@@ -25,7 +25,7 @@ async def read_file(
     """
     try:
         # GUARDRAIL: Block internal agent state files
-        forbidden_files = ['.agent_state.json', 'agent_state.json']
+        forbidden_files = [".agent_state.json", "agent_state.json"]
         if any(forbidden in target_file for forbidden in forbidden_files):
             return f"""🚨 FILE BLOCKED 🚨
 
@@ -63,9 +63,7 @@ These files are for internal agent memory only and must not be read from the pro
                     limit = 0
 
         # Call process_single_file_content
-        result = await process_single_file_content(
-            str_path, str_workspace, offset=offset, limit=limit
-        )
+        result = await process_single_file_content(str_path, str_workspace, offset=offset, limit=limit)
 
         # Handle Error
         if result.get("error"):
@@ -98,13 +96,11 @@ These files are for internal agent memory only and must not be read from the pro
         # Normal Text Content
         header = f"File: {target_file}"
         if not should_read_entire_file:
-            end_desc = (
-                end_line_one_indexed_inclusive if end_line_one_indexed_inclusive != -1 else "end"
-            )
+            end_desc = end_line_one_indexed_inclusive if end_line_one_indexed_inclusive != -1 else "end"
             header += f" (lines {start_line_one_indexed}-{end_desc})"
         header += "\n"
 
         return header + llm_content
 
     except Exception as e:
-        return f"Error reading file: {str(e)}"
+        return f"Error reading file: {e!s}"

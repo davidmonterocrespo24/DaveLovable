@@ -32,4 +32,4 @@ async def file_search(query: str, explanation: str = "") -> str:
 
         return f"File search results for '{query}':\n" + "\n".join(matches)
     except Exception as e:
-        return f"Error in file search: {str(e)}"
+        return f"Error in file search: {e!s}"

@@ -6,12 +6,13 @@ Verifies that the multi-agent system is functioning correctly without pytest com
 Run with: python backend/tests/test_multiagent_simple.py
 """
 
-import sys
 import os
+import sys
 from pathlib import Path
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
 
 def test_orchestrator_initialization():
     """Test that orchestrator initializes correctly"""
@@ -27,14 +28,16 @@ def test_orchestrator_initialization():
     print("✓ Orchestrator is a singleton")
 
     # Check components exist
-    assert hasattr(orchestrator, 'coder_agent'), "Missing coder_agent"
-    assert hasattr(orchestrator, 'planning_agent'), "Missing planning_agent"
-    assert hasattr(orchestrator, 'main_team'), "Missing main_team"
+    assert hasattr(orchestrator, "coder_agent"), "Missing coder_agent"
+    assert hasattr(orchestrator, "planning_agent"), "Missing planning_agent"
+    assert hasattr(orchestrator, "main_team"), "Missing main_team"
     print("✓ All components exist")
 
     # Check agent names
     assert orchestrator.coder_agent.name == "Coder", f"Expected 'Coder', got '{orchestrator.coder_agent.name}'"
-    assert orchestrator.planning_agent.name == "Planner", f"Expected 'Planner', got '{orchestrator.planning_agent.name}'"
+    assert orchestrator.planning_agent.name == "Planner", (
+        f"Expected 'Planner', got '{orchestrator.planning_agent.name}'"
+    )
     print(f"✓ Agent names correct: {orchestrator.coder_agent.name}, {orchestrator.planning_agent.name}")
 
     # Check tools
@@ -43,7 +46,7 @@ def test_orchestrator_initialization():
     print(f"✓ Coder has {len(orchestrator.coder_tools)} tools: {', '.join(tool_names[:5])}...")
 
     # Check essential tools
-    essential_tools = ['write_file', 'read_file', 'edit_file', 'delete_file', 'list_dir']
+    essential_tools = ["write_file", "read_file", "edit_file", "delete_file", "list_dir"]
     for tool in essential_tools:
         assert tool in tool_names, f"Missing essential tool: {tool}"
     print("✓ All essential file operation tools present")
@@ -64,10 +67,10 @@ def test_chat_service_integration():
     """Test chat service integration basics"""
     print("\n=== Test 2: Chat Service Integration ===")
 
-    from app.services.chat_service import ChatService
-    from app.schemas import ChatMessageCreate, ChatSessionCreate
-    from app.models import MessageRole
     from app.db.database import SessionLocal
+    from app.models import MessageRole
+    from app.schemas import ChatMessageCreate, ChatSessionCreate
+    from app.services.chat_service import ChatService
 
     db = SessionLocal()
     try:
@@ -76,12 +79,7 @@ def test_chat_service_integration():
         from app.services.filesystem_service import FileSystemService
 
         # Create test project
-        test_project = Project(
-            id=9999,
-            name="Test Project",
-            description="Test",
-            owner_id=1
-        )
+        test_project = Project(id=9999, name="Test Project", description="Test", owner_id=1)
         db.add(test_project)
         db.commit()
         db.refresh(test_project)
@@ -98,11 +96,7 @@ def test_chat_service_integration():
         print(f"✓ Created chat session {session.id}")
 
         # Create message
-        message_data = ChatMessageCreate(
-            session_id=session.id,
-            role=MessageRole.USER,
-            content="Test message"
-        )
+        message_data = ChatMessageCreate(session_id=session.id, role=MessageRole.USER, content="Test message")
         message = ChatService.add_message(db, message_data)
         assert message.id is not None, "Message should have an ID"
         assert message.content == "Test message", "Message content should match"
@@ -129,8 +123,8 @@ def test_working_directory_context():
     """Test that working directory context is set correctly"""
     print("\n=== Test 3: Working Directory Context ===")
 
-    import tempfile
     import shutil
+    import tempfile
     from pathlib import Path
 
     # Use tempfile instead of creating in projects directory
@@ -143,7 +137,9 @@ def test_working_directory_context():
     os.chdir(temp_dir)
     current_dir = str(Path(os.getcwd()).resolve())
     expected_resolved = str(temp_dir.resolve())
-    assert current_dir == expected_resolved, f"Working directory should change. Expected: {expected_resolved}, Got: {current_dir}"
+    assert current_dir == expected_resolved, (
+        f"Working directory should change. Expected: {expected_resolved}, Got: {current_dir}"
+    )
     print("✓ Changed working directory to temp directory")
 
     # Test restoring directory
@@ -165,33 +161,38 @@ def test_architecture_components():
 
     # Check orchestrator file
     from app.agents import orchestrator as orch_module
-    assert hasattr(orch_module, 'AgentOrchestrator'), "Missing AgentOrchestrator class"
-    assert hasattr(orch_module, 'get_orchestrator'), "Missing get_orchestrator function"
+
+    assert hasattr(orch_module, "AgentOrchestrator"), "Missing AgentOrchestrator class"
+    assert hasattr(orch_module, "get_orchestrator"), "Missing get_orchestrator function"
     print("✓ Orchestrator module has required exports")
 
     # Check chat service file
     from app.services import chat_service as chat_module
-    assert hasattr(chat_module, 'ChatService'), "Missing ChatService class"
+
+    assert hasattr(chat_module, "ChatService"), "Missing ChatService class"
     print("✓ Chat service module has required exports")
 
     # Check filesystem service still exists
     from app.services import filesystem_service as fs_module
-    assert hasattr(fs_module, 'FileSystemService'), "Missing FileSystemService class"
+
+    assert hasattr(fs_module, "FileSystemService"), "Missing FileSystemService class"
     print("✓ FileSystemService still exists (as expected)")
 
     # Check prompts
     from app.agents import prompts
-    assert hasattr(prompts, 'AGENT_SYSTEM_PROMPT'), "Missing AGENT_SYSTEM_PROMPT"
-    assert hasattr(prompts, 'CODER_AGENT_DESCRIPTION'), "Missing CODER_AGENT_DESCRIPTION"
-    assert hasattr(prompts, 'PLANNING_AGENT_DESCRIPTION'), "Missing PLANNING_AGENT_DESCRIPTION"
-    assert hasattr(prompts, 'PLANNING_AGENT_SYSTEM_MESSAGE'), "Missing PLANNING_AGENT_SYSTEM_MESSAGE"
+
+    assert hasattr(prompts, "AGENT_SYSTEM_PROMPT"), "Missing AGENT_SYSTEM_PROMPT"
+    assert hasattr(prompts, "CODER_AGENT_DESCRIPTION"), "Missing CODER_AGENT_DESCRIPTION"
+    assert hasattr(prompts, "PLANNING_AGENT_DESCRIPTION"), "Missing PLANNING_AGENT_DESCRIPTION"
+    assert hasattr(prompts, "PLANNING_AGENT_SYSTEM_MESSAGE"), "Missing PLANNING_AGENT_SYSTEM_MESSAGE"
     print("✓ All agent prompts defined")
 
     # Check tools are importable
     from app.agents import tools
-    assert hasattr(tools, 'read_file'), "Missing read_file tool"
-    assert hasattr(tools, 'write_file'), "Missing write_file tool"
-    assert hasattr(tools, 'edit_file'), "Missing edit_file tool"
+
+    assert hasattr(tools, "read_file"), "Missing read_file tool"
+    assert hasattr(tools, "write_file"), "Missing write_file tool"
+    assert hasattr(tools, "edit_file"), "Missing edit_file tool"
     print("✓ Agent tools are importable")
 
     print("\n✅ Test 4 PASSED: All architecture components in place\n")
@@ -200,9 +201,9 @@ def test_architecture_components():
 
 def main():
     """Run all tests"""
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("MULTI-AGENT SYSTEM VERIFICATION")
-    print("="*60)
+    print("=" * 60)
 
     tests = [
         test_orchestrator_initialization,
@@ -221,13 +222,14 @@ def main():
         except Exception as e:
             failed += 1
             print(f"\n❌ Test {test.__name__} FAILED with error:")
-            print(f"   {type(e).__name__}: {str(e)}")
+            print(f"   {type(e).__name__}: {e!s}")
             import traceback
+
             traceback.print_exc()
 
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print(f"RESULTS: {passed} passed, {failed} failed")
-    print("="*60)
+    print("=" * 60)
 
     if failed == 0:
         print("\n✅ ALL TESTS PASSED - Multi-agent system is working correctly!")

@@ -77,7 +77,7 @@ async def analyze_python_file(filepath: str) -> str:
     except SyntaxError as e:
         return f"ERROR: Invalid syntax in {filepath}:\n  Line {e.lineno}: {e.msg}"
     except Exception as e:
-        return f"ERROR analyzing {filepath}: {str(e)}"
+        return f"ERROR analyzing {filepath}: {e!s}"
 
 
 async def find_function_definition(filepath: str, function_name: str) -> str:
@@ -122,7 +122,7 @@ async def find_function_definition(filepath: str, function_name: str) -> str:
         return f"ERROR: Function '{function_name}' not found in {filepath}"
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"
 
 
 async def list_all_functions(filepath: str) -> str:
@@ -162,7 +162,7 @@ async def list_all_functions(filepath: str) -> str:
         return output
 
     except Exception as e:
-        return f"ERROR: {str(e)}"
+        return f"ERROR: {e!s}"
 
 
 def _extract_imports(tree: ast.AST) -> list[dict[str, Any]]:

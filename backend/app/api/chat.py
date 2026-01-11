@@ -1,17 +1,18 @@
+import json
 from typing import List
+
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-import json
 
 from app.db import get_db
 from app.schemas import (
-    ChatSession,
-    ChatSessionCreate,
-    ChatSessionWithMessages,
     ChatMessage,
     ChatRequest,
     ChatResponse,
+    ChatSession,
+    ChatSessionCreate,
+    ChatSessionWithMessages,
 )
 from app.services import ChatService
 
@@ -19,11 +20,7 @@ router = APIRouter()
 
 
 @router.post("/{project_id}/stream")
-async def send_chat_message_stream(
-    project_id: int,
-    chat_request: ChatRequest,
-    db: Session = Depends(get_db)
-):
+async def send_chat_message_stream(project_id: int, chat_request: ChatRequest, db: Session = Depends(get_db)):
     """
     Send a chat message and stream AI response with real-time agent interactions
 
@@ -33,6 +30,7 @@ async def send_chat_message_stream(
     - Tool execution results
     - Final response with code changes
     """
+
     async def event_generator():
         import asyncio
         from datetime import datetime as dt
@@ -59,10 +57,7 @@ async def send_chat_message_stream(
 
         except Exception as e:
             # Send error event
-            error_event = {
-                "type": "error",
-                "data": {"message": str(e)}
-            }
+            error_event = {"type": "error", "data": {"message": str(e)}}
             yield f"data: {json.dumps(error_event)}\n\n"
 
     return StreamingResponse(
@@ -72,16 +67,12 @@ async def send_chat_message_stream(
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
-        }
+        },
     )
 
 
 @router.post("/{project_id}", response_model=ChatResponse)
-async def send_chat_message(
-    project_id: int,
-    chat_request: ChatRequest,
-    db: Session = Depends(get_db)
-):
+async def send_chat_message(project_id: int, chat_request: ChatRequest, db: Session = Depends(get_db)):
     """
     Send a chat message and get AI response (non-streaming, backward compatible)
 
@@ -96,30 +87,19 @@ async def send_chat_message(
 
 
 @router.post("/{project_id}/sessions", response_model=ChatSession, status_code=status.HTTP_201_CREATED)
-def create_chat_session(
-    project_id: int,
-    session_data: ChatSessionCreate,
-    db: Session = Depends(get_db)
-):
+def create_chat_session(project_id: int, session_data: ChatSessionCreate, db: Session = Depends(get_db)):
     """Create a new chat session"""
     return ChatService.create_session(db, session_data)
 
 
 @router.get("/{project_id}/sessions", response_model=List[ChatSession])
-def get_chat_sessions(
-    project_id: int,
-    db: Session = Depends(get_db)
-):
+def get_chat_sessions(project_id: int, db: Session = Depends(get_db)):
     """Get all chat sessions for a project"""
     return ChatService.get_sessions(db, project_id)
 
 
 @router.get("/{project_id}/sessions/{session_id}", response_model=ChatSessionWithMessages)
-def get_chat_session(
-    project_id: int,
-    session_id: int,
-    db: Session = Depends(get_db)
-):
+def get_chat_session(project_id: int, session_id: int, db: Session = Depends(get_db)):
     """Get a specific chat session with all messages"""
     from app.schemas.chat import ChatMessage as ChatMessageSchema
 
@@ -140,12 +120,7 @@ def get_chat_session(
 
 
 @router.get("/{project_id}/sessions/{session_id}/messages", response_model=List[ChatMessage])
-def get_session_messages(
-    project_id: int,
-    session_id: int,
-    limit: int = 100,
-    db: Session = Depends(get_db)
-):
+def get_session_messages(project_id: int, session_id: int, limit: int = 100, db: Session = Depends(get_db)):
     """Get messages for a chat session"""
     # Verify session belongs to project
     ChatService.get_session(db, session_id, project_id)
@@ -154,10 +129,7 @@ def get_session_messages(
 
 @router.get("/{project_id}/sessions/{session_id}/reconnect")
 async def reconnect_to_session(
-    project_id: int,
-    session_id: int,
-    since_message_id: int = 0,
-    db: Session = Depends(get_db)
+    project_id: int, session_id: int, since_message_id: int = 0, db: Session = Depends(get_db)
 ):
     """
     Reconnect to a session and get any new messages since the last known message
@@ -186,16 +158,12 @@ async def reconnect_to_session(
         "project_id": project_id,
         "new_messages": messages,
         "total_messages": len(all_messages),
-        "has_more": len(new_messages) > 0
+        "has_more": len(new_messages) > 0,
     }
 
 
 @router.delete("/{project_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chat_session(
-    project_id: int,
-    session_id: int,
-    db: Session = Depends(get_db)
-):
+def delete_chat_session(project_id: int, session_id: int, db: Session = Depends(get_db)):
     """Delete a chat session"""
     ChatService.delete_session(db, session_id, project_id)
     return None

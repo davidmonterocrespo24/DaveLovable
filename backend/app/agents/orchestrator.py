@@ -1,45 +1,46 @@
+import json
+import logging
+from pathlib import Path
 from typing import Sequence
+
 from autogen_agentchat.agents import AssistantAgent
-from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
-from autogen_agentchat.messages import TextMessage, BaseAgentEvent, BaseChatMessage
+from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage, TextMessage
+from autogen_agentchat.teams import SelectorGroupChat
 from autogen_ext.models.openai import OpenAIChatCompletionClient
+
 from app.agents.prompts import (
     AGENT_SYSTEM_PROMPT,
     CODER_AGENT_DESCRIPTION,
     PLANNING_AGENT_DESCRIPTION,
     PLANNING_AGENT_SYSTEM_MESSAGE,
 )
-
 from app.agents.tools import (
-    read_file,
-    write_file,
-    edit_file,
+    csv_info,
     delete_file,
-    list_dir,
+    edit_file,
+    file_search,
+    filter_csv,
     glob_search,
     grep_search,
-    file_search,
-    run_terminal_cmd,
-    read_json,
-    validate_json,
     json_get_value,
     json_to_text,
+    list_dir,
     read_csv,
-    csv_info,
-    filter_csv,
-    wiki_search,
-    wiki_summary,
+    read_file,
+    read_json,
+    run_terminal_cmd,
+    validate_json,
     wiki_content,
     wiki_page_info,
     wiki_random,
+    wiki_search,
     wiki_set_language,
+    wiki_summary,
+    write_file,
 )
-from app.core.config import settings
 from app.agents.tools.csv_tools import merge_csv_files
-import json
-import logging
-from pathlib import Path
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -49,10 +50,8 @@ class AgentOrchestrator:
 
     def __init__(self):
         # Terminate when Planner says "TERMINATE" or after 50 messages
-        termination_condition = TextMentionTermination(
-            "TERMINATE"
-        ) | MaxMessageTermination(50)
-        
+        termination_condition = TextMentionTermination("TERMINATE") | MaxMessageTermination(50)
+
         self.coder_tools = [
             write_file,
             edit_file,
@@ -79,12 +78,12 @@ class AgentOrchestrator:
             run_terminal_cmd,
         ]
         model_info = {
-                    "vision": True,
-                    "function_calling": True,
-                    "json_output": True,
-                    "family": "unknown",
-                    "structured_output": True,
-                }
+            "vision": True,
+            "function_calling": True,
+            "json_output": True,
+            "family": "unknown",
+            "structured_output": True,
+        }
 
         self.model_client = OpenAIChatCompletionClient(
             model=settings.OPENAI_MODEL,
@@ -98,7 +97,7 @@ class AgentOrchestrator:
             name="Coder",
             description=CODER_AGENT_DESCRIPTION,
             system_message=AGENT_SYSTEM_PROMPT,
-            model_client=self.model_client ,
+            model_client=self.model_client,
             tools=self.coder_tools,  # Includes memory RAG tools
             max_tool_iterations=15,
             reflect_on_tool_use=False,
@@ -119,13 +118,13 @@ class AgentOrchestrator:
             # If no messages, start with Coder
             if not messages:
                 return "Coder"
-            
+
             last_message = messages[-1]
-            
+
             # If Planner just spoke, it's Coder's turn
             if last_message.source == "Planner":
                 return "Coder"
-                
+
             # If Coder just spoke
             if last_message.source == "Coder":
                 # Check for explicit signals in TextMessage
@@ -135,8 +134,8 @@ class AgentOrchestrator:
                     if "SUBTASK_DONE" in last_message.content:
                         return "Planner"
                     if "TERMINATE" in last_message.content:
-                        return None # Let termination condition handle it
-                
+                        return None  # Let termination condition handle it
+
                 # If Coder just sent a tool call (AssistantMessage with tool calls)
                 # We usually want Coder to receive the result.
                 # But here we assume the runtime executes the tool and appends the result.
@@ -147,8 +146,8 @@ class AgentOrchestrator:
             # (FunctionExecutionResultMessage usually has source='user' or the tool name, but definitely not 'Coder'/'Planner')
             # We must verify the type to be sure.
             if type(last_message).__name__ == "FunctionExecutionResultMessage":
-                 # Tool finished, give control back to Coder to handle the output
-                 return "Coder"
+                # Tool finished, give control back to Coder to handle the output
+                return "Coder"
 
             # If the last message is from the User
             if last_message.source == "user":
@@ -156,10 +155,10 @@ class AgentOrchestrator:
                 if "[VISUAL EDIT]" in last_message.content:
                     logger.info("🎨 Visual Edit detected - Routing directly to Coder")
                     return "Coder"
-                
+
                 # Default to Planner for normal requests
                 return "Planner"
-                
+
             return None
 
         # Use SelectorGroupChat with custom selector
@@ -231,6 +230,7 @@ class AgentOrchestrator:
         except Exception as e:
             logger.error(f"❌ Failed to load agent state for project {project_id}: {e}")
             return False
+
 
 # Singleton instance
 _orchestrator = None

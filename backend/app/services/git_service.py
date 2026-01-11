@@ -1,5 +1,5 @@
 import subprocess
-from typing import Optional, List, Dict
+from typing import Dict, List, Optional
 
 
 class GitService:
@@ -20,12 +20,7 @@ class GitService:
 
         try:
             # Initialize git repository
-            subprocess.run(
-                ["git", "init"],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
-            )
+            subprocess.run(["git", "init"], cwd=project_dir, check=True, capture_output=True)
 
             # Create .gitignore
             gitignore_content = """node_modules/
@@ -40,30 +35,19 @@ build/
 
             # Configure git user (for commits)
             subprocess.run(
-                ["git", "config", "user.name", "DaveLovable AI"],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
+                ["git", "config", "user.name", "DaveLovable AI"], cwd=project_dir, check=True, capture_output=True
             )
             subprocess.run(
-                ["git", "config", "user.email", "ai@daveplanet.com"],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
+                ["git", "config", "user.email", "ai@daveplanet.com"], cwd=project_dir, check=True, capture_output=True
             )
 
             # Initial commit
-            subprocess.run(
-                ["git", "add", "."],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
-            )
+            subprocess.run(["git", "add", "."], cwd=project_dir, check=True, capture_output=True)
             subprocess.run(
                 ["git", "commit", "-m", "Initial commit: Project scaffolding"],
                 cwd=project_dir,
                 check=True,
-                capture_output=True
+                capture_output=True,
             )
 
             return True
@@ -95,35 +79,16 @@ build/
             # Add files
             if files:
                 for file in files:
-                    subprocess.run(
-                        ["git", "add", file],
-                        cwd=project_dir,
-                        check=True,
-                        capture_output=True
-                    )
+                    subprocess.run(["git", "add", file], cwd=project_dir, check=True, capture_output=True)
             else:
-                subprocess.run(
-                    ["git", "add", "."],
-                    cwd=project_dir,
-                    check=True,
-                    capture_output=True
-                )
+                subprocess.run(["git", "add", "."], cwd=project_dir, check=True, capture_output=True)
 
             # Check if there are changes to commit
-            result = subprocess.run(
-                ["git", "diff", "--cached", "--quiet"],
-                cwd=project_dir,
-                capture_output=True
-            )
+            result = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project_dir, capture_output=True)
 
             # If exit code is 1, there are changes to commit
             if result.returncode == 1:
-                subprocess.run(
-                    ["git", "commit", "-m", message],
-                    cwd=project_dir,
-                    check=True,
-                    capture_output=True
-                )
+                subprocess.run(["git", "commit", "-m", message], cwd=project_dir, check=True, capture_output=True)
                 return True
 
             # No changes to commit
@@ -150,29 +115,19 @@ build/
         try:
             # Get commit log
             result = subprocess.run(
-                [
-                    "git", "log",
-                    f"-{limit}",
-                    "--pretty=format:%H|%an|%ad|%s",
-                    "--date=iso"
-                ],
+                ["git", "log", f"-{limit}", "--pretty=format:%H|%an|%ad|%s", "--date=iso"],
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                encoding='utf-8',
-                errors='replace'
+                encoding="utf-8",
+                errors="replace",
             )
 
             commits = []
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 if line:
-                    hash, author, date, message = line.split('|', 3)
-                    commits.append({
-                        "hash": hash,
-                        "author": author,
-                        "date": date,
-                        "message": message
-                    })
+                    hash, author, date, message = line.split("|", 3)
+                    commits.append({"hash": hash, "author": author, "date": date, "message": message})
 
             return commits
 
@@ -200,8 +155,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                encoding='utf-8',
-                errors='replace'
+                encoding="utf-8",
+                errors="replace",
             )
 
             return result.stdout
@@ -234,12 +189,7 @@ build/
                 cmd.append(filepath)
 
             result = subprocess.run(
-                cmd,
-                cwd=project_dir,
-                check=True,
-                capture_output=True,
-                encoding='utf-8',
-                errors='replace'
+                cmd, cwd=project_dir, check=True, capture_output=True, encoding="utf-8", errors="replace"
             )
 
             return result.stdout
@@ -264,17 +214,14 @@ build/
         try:
             # Revert to the commit (creates a new commit)
             subprocess.run(
-                ["git", "revert", "--no-commit", commit_hash],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
+                ["git", "revert", "--no-commit", commit_hash], cwd=project_dir, check=True, capture_output=True
             )
 
             subprocess.run(
                 ["git", "commit", "-m", f"Restore to commit {commit_hash[:7]}"],
                 cwd=project_dir,
                 check=True,
-                capture_output=True
+                capture_output=True,
             )
 
             return True
@@ -303,8 +250,8 @@ build/
                 cwd=project_dir,
                 check=True,
                 capture_output=True,
-                encoding='utf-8',
-                errors='replace'
+                encoding="utf-8",
+                errors="replace",
             )
 
             return result.stdout.strip()
@@ -332,15 +279,12 @@ build/
                 ["git", "remote", "get-url", "origin"],
                 cwd=project_dir,
                 capture_output=True,
-                encoding='utf-8',
-                errors='replace'
+                encoding="utf-8",
+                errors="replace",
             )
 
             if result.returncode == 0:
-                return {
-                    "remote_name": "origin",
-                    "remote_url": result.stdout.strip()
-                }
+                return {"remote_name": "origin", "remote_url": result.stdout.strip()}
             else:
                 return {"remote_name": "origin", "remote_url": ""}
 
@@ -369,11 +313,7 @@ build/
 
         try:
             # Check if remote exists
-            result = subprocess.run(
-                ["git", "remote", "get-url", remote_name],
-                cwd=project_dir,
-                capture_output=True
-            )
+            result = subprocess.run(["git", "remote", "get-url", remote_name], cwd=project_dir, capture_output=True)
 
             if result.returncode == 0:
                 # Remote exists, update it
@@ -381,15 +321,12 @@ build/
                     ["git", "remote", "set-url", remote_name, remote_url],
                     cwd=project_dir,
                     check=True,
-                    capture_output=True
+                    capture_output=True,
                 )
             else:
                 # Remote doesn't exist, add it
                 subprocess.run(
-                    ["git", "remote", "add", remote_name, remote_url],
-                    cwd=project_dir,
-                    check=True,
-                    capture_output=True
+                    ["git", "remote", "add", remote_name, remote_url], cwd=project_dir, check=True, capture_output=True
                 )
 
             return True
@@ -423,7 +360,7 @@ build/
             "pull": "",
             "commit": "",
             "push": "",
-            "message": "Sync completed successfully"
+            "message": "Sync completed successfully",
         }
 
         try:
@@ -433,9 +370,9 @@ build/
                     ["git", "fetch", "origin"],
                     cwd=project_dir,
                     capture_output=True,
-                    encoding='utf-8',
-                errors='replace',
-                    timeout=30
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30,
                 )
                 result["fetch"] = "✓ Fetched from remote"
             except subprocess.TimeoutExpired:
@@ -449,9 +386,9 @@ build/
                     ["git", "pull", "origin", GitService.get_current_branch(project_id), "--no-rebase"],
                     cwd=project_dir,
                     capture_output=True,
-                    encoding='utf-8',
-                errors='replace',
-                    timeout=30
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30,
                 )
                 if "Already up to date" in pull_result.stdout:
                     result["pull"] = "✓ Already up to date"
@@ -463,27 +400,15 @@ build/
                 result["pull"] = f"⚠ Pull failed: {e.stderr}"
 
             # 3. Add and commit local changes
-            subprocess.run(
-                ["git", "add", "."],
-                cwd=project_dir,
-                check=True,
-                capture_output=True
-            )
+            subprocess.run(["git", "add", "."], cwd=project_dir, check=True, capture_output=True)
 
             # Check if there are changes to commit
-            diff_result = subprocess.run(
-                ["git", "diff", "--cached", "--quiet"],
-                cwd=project_dir,
-                capture_output=True
-            )
+            diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=project_dir, capture_output=True)
 
             if diff_result.returncode == 1:
                 # There are changes to commit
                 subprocess.run(
-                    ["git", "commit", "-m", commit_message],
-                    cwd=project_dir,
-                    check=True,
-                    capture_output=True
+                    ["git", "commit", "-m", commit_message], cwd=project_dir, check=True, capture_output=True
                 )
                 result["commit"] = "✓ Committed local changes"
             else:
@@ -495,9 +420,9 @@ build/
                     ["git", "push", "origin", GitService.get_current_branch(project_id)],
                     cwd=project_dir,
                     capture_output=True,
-                    encoding='utf-8',
-                errors='replace',
-                    timeout=30
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=30,
                 )
                 result["push"] = "✓ Pushed to remote"
             except subprocess.TimeoutExpired:
@@ -515,9 +440,9 @@ build/
             print(f"Git sync failed: {e}")
             return {
                 "success": False,
-                "message": f"Sync failed: {str(e)}",
+                "message": f"Sync failed: {e!s}",
                 "fetch": result.get("fetch", ""),
                 "pull": result.get("pull", ""),
                 "commit": result.get("commit", ""),
-                "push": result.get("push", "")
+                "push": result.get("push", ""),
             }

@@ -5,8 +5,8 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-import yaml
 
+import yaml
 
 
 def _lint_python(content: str) -> str | None:
@@ -30,7 +30,7 @@ def _lint_yaml(content: str) -> str | None:
         yaml.safe_load(content)
         return None
     except yaml.YAMLError as e:
-        return f"YAML SyntaxError: {str(e)}"
+        return f"YAML SyntaxError: {e!s}"
 
 
 def _lint_javascript(content: str) -> str | None:
@@ -43,9 +43,7 @@ def _lint_javascript(content: str) -> str | None:
 
     # Node requires a physical file for --check (stdin sometimes fails depending on version)
     try:
-        with tempfile.NamedTemporaryFile(
-            suffix=".js", delete=False, mode="w", encoding="utf-8"
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".js", delete=False, mode="w", encoding="utf-8") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
 
@@ -80,9 +78,7 @@ def _lint_bash(content: str) -> str | None:
         return None
 
     try:
-        with tempfile.NamedTemporaryFile(
-            suffix=".sh", delete=False, mode="w", encoding="utf-8"
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=".sh", delete=False, mode="w", encoding="utf-8") as tmp:
             tmp.write(content)
             tmp_path = tmp.name
 
