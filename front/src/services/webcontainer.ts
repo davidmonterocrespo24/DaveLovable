@@ -106,6 +106,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
 
   // Listen for screenshot requests from parent
   window.addEventListener('message', async (event) => {
+    console.log('[Screenshot Helper] Received message:', event.data.type);
     if (event.data.type === 'capture-screenshot') {
       console.log('[Screenshot Helper] Received capture request');
 
