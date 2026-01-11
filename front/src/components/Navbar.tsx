@@ -8,9 +8,9 @@ const Navbar = () => {
   const location = useLocation();
 
   const navLinks = [
-    { label: "Features", href: "#features" },
-    { label: "How it Works", href: "#how-it-works" },
-    { label: "Docs", href: "#docs" },
+    { label: "Features", href: "/#features" },
+    { label: "How it Works", href: "/#how-it-works" },
+    { label: "Docs", href: "/docs" },
   ];
 
   return (
@@ -27,19 +27,15 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => {
-              const href = location.pathname === "/" ? link.href : `/${link.href}`;
-
-              return (
-                <a
-                  key={link.label}
-                  href={href}
-                  className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
-                >
-                  {link.label}
-                </a>
-              );
-            })}
+            {navLinks.map((link) => (
+              <a
+                key={link.label}
+                href={link.href}
+                className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
 
           {/* Desktop CTA */}
