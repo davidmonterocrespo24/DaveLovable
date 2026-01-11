@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Menu, X, GithubIcon } from "lucide-react";
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 
 const Navbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const location = useLocation();
 
   const navLinks = [
     { label: "Features", href: "#features" },
@@ -25,15 +27,19 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link) => {
+              const href = location.pathname === "/" ? link.href : `/${link.href}`;
+
+              return (
+                <a
+                  key={link.label}
+                  href={href}
+                  className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
+                >
+                  {link.label}
+                </a>
+              );
+            })}
           </div>
 
           {/* Desktop CTA */}

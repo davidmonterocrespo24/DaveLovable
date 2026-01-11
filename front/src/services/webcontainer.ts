@@ -68,7 +68,11 @@ export interface LoadProjectResult {
  */
 const SCREENSHOT_HELPER_SCRIPT = `
 (function() {
-  console.log('[Screenshot Helper] Initializing...');
+  // Silent logging - don't pollute user's console
+  const DEBUG = false; // Set to true only for debugging
+  const log = DEBUG ? console.log.bind(console) : () => {};
+
+  log('[Screenshot Helper] Initializing...');
 
   // Wait for app to be fully rendered before allowing screenshots
   let isAppReady = false;
@@ -81,7 +85,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
       const hasContent = root.textContent && root.textContent.trim().length > 100;
       if (hasContent) {
         isAppReady = true;
-        console.log('[Screenshot Helper] App is ready for capture');
+        log('[Screenshot Helper] App is ready for capture');
         return true;
       }
     }
@@ -106,14 +110,13 @@ const SCREENSHOT_HELPER_SCRIPT = `
 
   // Listen for screenshot requests from parent
   window.addEventListener('message', async (event) => {
-    console.log('[Screenshot Helper] Received message:', event.data.type);
     if (event.data.type === 'capture-screenshot') {
-      console.log('[Screenshot Helper] Received capture request');
+      log('[Screenshot Helper] Received capture request');
 
       try {
         // Wait for app to be ready
         if (!isAppReady) {
-          console.log('[Screenshot Helper] Waiting for app to be ready...');
+          log('[Screenshot Helper] Waiting for app to be ready...');
           let attempts = 0;
           while (!isAppReady && attempts < 20) {
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -127,7 +130,7 @@ const SCREENSHOT_HELPER_SCRIPT = `
 
         // Dynamically import html2canvas
         if (!window.html2canvas) {
-          console.log('[Screenshot Helper] Loading html2canvas...');
+          log('[Screenshot Helper] Loading html2canvas...');
           const script = document.createElement('script');
           script.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
           document.head.appendChild(script);
@@ -140,13 +143,13 @@ const SCREENSHOT_HELPER_SCRIPT = `
           });
         }
 
-        console.log('[Screenshot Helper] Capturing DOM with html2canvas...');
+        log('[Screenshot Helper] Capturing DOM with html2canvas...');
 
         // Wait a bit more for any animations/renders to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         // Pre-process images: convert external images to data URLs to avoid CORS issues
-        console.log('[Screenshot Helper] Pre-processing external images...');
+        log('[Screenshot Helper] Pre-processing external images...');
         const externalImages = Array.from(document.querySelectorAll('img')).filter(img => {
           const src = img.getAttribute('src') || '';
           return src.startsWith('http') && !src.includes(window.location.hostname);
@@ -168,9 +171,9 @@ const SCREENSHOT_HELPER_SCRIPT = `
               reader.readAsDataURL(blob);
             });
             imageCache.set(src, dataUrl);
-            console.log('[Screenshot Helper] Converted external image to data URL:', src);
+            log('[Screenshot Helper] Converted external image to data URL:', src);
           } catch (err) {
-            console.warn('[Screenshot Helper] Failed to convert image, will use placeholder:', src, err);
+            log('[Screenshot Helper] Failed to convert image, will use placeholder:', src);
             imageCache.set(src, null); // Mark as failed
           }
         }
