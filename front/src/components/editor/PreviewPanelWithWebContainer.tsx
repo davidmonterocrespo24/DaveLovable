@@ -286,14 +286,18 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
             return;
           }
 
-          console.log('[Screenshot] Iframe ref is available, proceeding with capture');
+          console.log('[Screenshot] Iframe ref is available, waiting 5s for screenshot helper to be ready...');
+          // Wait additional time for screenshot helper to load and register listener
+          await new Promise(resolve => setTimeout(resolve, 5000));
+
+          console.log('[Screenshot] Proceeding with capture');
           const screenshot = await captureScreenshot();
           if (screenshot) {
             await sendScreenshotToBackend(screenshot);
           } else {
             console.log('[Screenshot] Initial capture failed, will try again on next load');
           }
-        }, 3000); // Wait 3 seconds for iframe to be created, then check repeatedly
+        }, 3000); // Wait 3 seconds for iframe to be created, then wait 5 more for helper
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setInitError(errorMsg);
