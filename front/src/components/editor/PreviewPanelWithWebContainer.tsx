@@ -132,9 +132,35 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     }, [onElementSelected]);
 
     const captureScreenshot = async (): Promise<string | null> => {
+      // Wait a bit to ensure iframe is fully loaded
       if (!iframeRef.current?.contentWindow) {
         console.error('[Screenshot] Iframe ref not available');
         return null;
+      }
+
+      // Check if iframe is actually loaded by trying to access its document
+      try {
+        // This will throw if iframe is not from same origin or not loaded
+        const iframeDoc = iframeRef.current.contentDocument;
+        if (!iframeDoc || iframeDoc.readyState !== 'complete') {
+          console.log('[Screenshot] Waiting for iframe to be fully loaded...');
+          // Wait for iframe load
+          await new Promise<void>((resolve) => {
+            const checkLoad = () => {
+              if (iframeRef.current?.contentDocument?.readyState === 'complete') {
+                resolve();
+              } else {
+                setTimeout(checkLoad, 100);
+              }
+            };
+            checkLoad();
+          });
+        }
+      } catch (e) {
+        // Cross-origin iframe - can't check readyState
+        // Just wait a bit
+        console.log('[Screenshot] Cross-origin iframe, waiting 2s...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       try {
@@ -146,7 +172,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
             console.error('[Screenshot] Timeout waiting for response');
             cleanup();
             resolve(null);
-          }, 10000); // 10 second timeout
+          }, 15000); // Increased to 15 second timeout
 
           const handleMessage = (event: MessageEvent) => {
             if (event.data.type === 'screenshot-captured') {
@@ -237,14 +263,16 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         }
 
         // Capture screenshot after preview is fully loaded (for first load)
-        // Wait longer to ensure content is rendered
+        // Wait longer to ensure content is rendered and screenshot helper is loaded
         setTimeout(async () => {
           console.log('[Screenshot] Attempting to capture project thumbnail...');
           const screenshot = await captureScreenshot();
           if (screenshot) {
             await sendScreenshotToBackend(screenshot);
+          } else {
+            console.log('[Screenshot] Initial capture failed, will try again on next load');
           }
-        }, 5000); // Wait 5 seconds after preview is ready
+        }, 8000); // Wait 8 seconds after preview is ready to ensure helper is loaded
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setInitError(errorMsg);
