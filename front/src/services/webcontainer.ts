@@ -92,18 +92,37 @@ const SCREENSHOT_HELPER_SCRIPT = `
         }
 
         console.log('[Screenshot Helper] Capturing DOM with html2canvas...');
+
+        // Wait a bit for any animations/renders to complete
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         const canvas = await window.html2canvas(document.body, {
           allowTaint: true,
-          useCORS: true,
-          logging: false,
+          useCORS: false,
+          logging: true,
+          scale: 1,
+          backgroundColor: '#ffffff',
           width: window.innerWidth,
           height: window.innerHeight,
           windowWidth: 1280,
           windowHeight: 720,
+          onclone: (clonedDoc) => {
+            console.log('[Screenshot Helper] Document cloned for capture');
+          }
         });
 
         const dataUrl = canvas.toDataURL('image/png');
-        console.log('[Screenshot Helper] Capture successful, sending to parent');
+
+        // Validate canvas has content (not blank)
+        if (canvas.width === 0 || canvas.height === 0) {
+          throw new Error('Canvas has no dimensions');
+        }
+
+        console.log('[Screenshot Helper] Capture successful:', {
+          width: canvas.width,
+          height: canvas.height,
+          dataLength: dataUrl.length
+        });
 
         // Send screenshot back to parent
         window.parent.postMessage({
