@@ -166,6 +166,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
 
       try {
         console.log('[Screenshot] Requesting screenshot from WebContainer via postMessage...');
+        console.log('[Screenshot] Iframe URL:', iframeRef.current.src);
 
         // Create a promise that resolves when we receive the screenshot
         const screenshotPromise = new Promise<string | null>((resolve) => {
@@ -176,6 +177,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           }, 15000); // Increased to 15 second timeout
 
           const handleMessage = (event: MessageEvent) => {
+            console.log('[Screenshot] Received message:', event.data.type, 'from:', event.origin);
             if (event.data.type === 'screenshot-captured') {
               console.log('[Screenshot] Received screenshot from WebContainer');
               cleanup();
@@ -193,10 +195,14 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           };
 
           window.addEventListener('message', handleMessage);
-        });
 
-        // Send capture request to iframe
-        iframeRef.current.contentWindow.postMessage({ type: 'capture-screenshot' }, '*');
+          // Send capture request to iframe after listener is set up
+          // Use a small delay to ensure listener is registered
+          setTimeout(() => {
+            console.log('[Screenshot] Sending capture-screenshot message to iframe');
+            iframeRef.current?.contentWindow?.postMessage({ type: 'capture-screenshot' }, '*');
+          }, 100);
+        });
 
         return await screenshotPromise;
       } catch (error) {
@@ -264,16 +270,30 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         }
 
         // Capture screenshot after preview is fully loaded (for first load)
-        // Wait longer to ensure content is rendered and screenshot helper is loaded
+        // Wait for iframe to be available and loaded
         setTimeout(async () => {
           console.log('[Screenshot] Attempting to capture project thumbnail...');
+
+          // Wait for iframe to be available
+          let attempts = 0;
+          while (!iframeRef.current && attempts < 50) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            attempts++;
+          }
+
+          if (!iframeRef.current) {
+            console.error('[Screenshot] Iframe ref not available after waiting');
+            return;
+          }
+
+          console.log('[Screenshot] Iframe ref is available, proceeding with capture');
           const screenshot = await captureScreenshot();
           if (screenshot) {
             await sendScreenshotToBackend(screenshot);
           } else {
             console.log('[Screenshot] Initial capture failed, will try again on next load');
           }
-        }, 8000); // Wait 8 seconds after preview is ready to ensure helper is loaded
+        }, 3000); // Wait 3 seconds for iframe to be created, then check repeatedly
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         setInitError(errorMsg);
