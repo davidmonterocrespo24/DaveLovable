@@ -72,7 +72,6 @@ async def glob_search(
     dir_path: str | None = None,
     case_sensitive: bool = False,
     respect_git_ignore: bool = True,
-    respect_gemini_ignore: bool = True,
 ) -> str:
     """
     Efficiently finds files matching specific glob patterns.

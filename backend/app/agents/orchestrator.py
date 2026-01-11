@@ -232,29 +232,6 @@ class AgentOrchestrator:
             logger.error(f"❌ Failed to load agent state for project {project_id}: {e}")
             return False
 
-    async def reset_state(self, project_id: int) -> None:
-        """
-        Reset the agent team state and delete the saved state file
-
-        Args:
-            project_id: The project ID to reset state for
-        """
-        try:
-            # Reset team state
-            await self.main_team.reset()
-
-            # Delete state file if it exists
-            state_file = Path(settings.PROJECTS_BASE_DIR) / f"project_{project_id}" / ".agent_state.json"
-            if state_file.exists():
-                state_file.unlink()
-                logger.info(f"✅ Deleted agent state file for project {project_id}")
-
-            logger.info(f"✅ Reset agent state for project {project_id}")
-
-        except Exception as e:
-            logger.error(f"❌ Failed to reset agent state for project {project_id}: {e}")
-
-
 # Singleton instance
 _orchestrator = None
 

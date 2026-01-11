@@ -1,7 +1,6 @@
 """
 File System Operations - Smart Edit v2 (With Auto-Correction)
 """
-import hashlib
 import os
 import re
 from pathlib import Path
@@ -24,14 +23,6 @@ def _restore_line_endings(content: str, original_ending: str) -> str:
     if original_ending == "\n":
         return content
     return content.replace("\n", "\r\n")
-
-
-def _escape_regex(s: str) -> str:
-    return re.escape(s)
-
-
-def _hash_content(content: str) -> str:
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 # --- Replacement Strategies ---
