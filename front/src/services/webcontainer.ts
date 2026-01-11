@@ -145,45 +145,84 @@ const SCREENSHOT_HELPER_SCRIPT = `
         // Wait a bit more for any animations/renders to complete
         await new Promise(resolve => setTimeout(resolve, 1000));
 
+        // Pre-process images: convert external images to data URLs to avoid CORS issues
+        console.log('[Screenshot Helper] Pre-processing external images...');
+        const externalImages = Array.from(document.querySelectorAll('img')).filter(img => {
+          const src = img.getAttribute('src') || '';
+          return src.startsWith('http') && !src.includes(window.location.hostname);
+        });
+
+        // Store original sources and convert to data URLs
+        const imageCache = new Map();
+        for (const img of externalImages) {
+          const src = img.src;
+          if (imageCache.has(src)) continue;
+
+          try {
+            // Try to load image through a canvas to convert to data URL
+            const response = await fetch(src, { mode: 'cors' });
+            const blob = await response.blob();
+            const dataUrl = await new Promise((resolve) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            imageCache.set(src, dataUrl);
+            console.log('[Screenshot Helper] Converted external image to data URL:', src);
+          } catch (err) {
+            console.warn('[Screenshot Helper] Failed to convert image, will use placeholder:', src, err);
+            imageCache.set(src, null); // Mark as failed
+          }
+        }
+
         // Capture the #root element (where React app lives)
         const targetElement = document.querySelector('#root') || document.body;
 
         const canvas = await window.html2canvas(targetElement, {
           allowTaint: false,  // CRITICAL: Must be false to export canvas
-          useCORS: true,      // Try to use CORS for external images
-          logging: true,
+          useCORS: false,     // Don't rely on CORS, we've pre-processed images
+          logging: false,     // Reduce console noise
           scale: 1,
           backgroundColor: '#ffffff',
           width: Math.max(window.innerWidth, 1280),
           height: Math.max(window.innerHeight, 720),
           windowWidth: 1280,
           windowHeight: 720,
-          ignoreElements: (element) => {
-            // Skip external images that cause CORS issues
-            if (element.tagName === 'IMG') {
-              const src = element.getAttribute('src') || '';
-              if (src.startsWith('http') && !src.includes(window.location.hostname)) {
-                console.log('[Screenshot Helper] Skipping external image:', src);
-                return true;
-              }
-            }
-            return false;
-          },
           onclone: (clonedDoc) => {
-            console.log('[Screenshot Helper] Document cloned for capture');
+            console.log('[Screenshot Helper] Document cloned, replacing external images...');
 
-            // Replace external images with placeholders to avoid CORS taint
+            // Replace external images with data URLs or placeholders
             const images = clonedDoc.querySelectorAll('img');
+            let replacedCount = 0;
+            let placeholderCount = 0;
+
             images.forEach(img => {
               const src = img.getAttribute('src') || '';
               if (src.startsWith('http') && !src.includes(window.location.hostname)) {
-                // Replace with a placeholder color or remove
-                img.style.backgroundColor = '#e5e7eb';
-                img.style.border = '1px solid #d1d5db';
-                img.removeAttribute('src');
-                img.alt = 'Image';
+                const dataUrl = imageCache.get(src);
+                if (dataUrl) {
+                  // Replace with data URL
+                  img.src = dataUrl;
+                  replacedCount++;
+                } else {
+                  // Create a nice placeholder with the image dimensions
+                  const width = img.width || 200;
+                  const height = img.height || 150;
+                  img.style.width = width + 'px';
+                  img.style.height = height + 'px';
+                  img.style.backgroundColor = '#f3f4f6';
+                  img.style.border = '2px dashed #d1d5db';
+                  img.style.display = 'flex';
+                  img.style.alignItems = 'center';
+                  img.style.justifyContent = 'center';
+                  img.removeAttribute('src');
+                  img.alt = '🖼️';
+                  placeholderCount++;
+                }
               }
             });
+
+            console.log('[Screenshot Helper] Images replaced:', replacedCount, 'Placeholders:', placeholderCount);
           }
         });
 
