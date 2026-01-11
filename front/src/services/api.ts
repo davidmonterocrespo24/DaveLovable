@@ -249,7 +249,7 @@ export const chatApi = {
     callbacks: {
       onStart?: (data: { session_id: number; user_message_id: number }) => void;
       onAgentInteraction?: (interaction: AgentInteraction) => void;
-      onGitCommit?: (data: { success: boolean; message?: string; full_message?: string; error?: string }) => void;
+      onGitCommit?: (data: { success: boolean; message?: string; full_message?: string; error?: string; commit_count?: number }) => void;
       onReloadPreview?: (data: { tool_call_count: number; message: string }) => void;
       onComplete?: (data: SendChatMessageResponse) => void;
       onError?: (error: string) => void;

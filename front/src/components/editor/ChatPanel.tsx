@@ -44,7 +44,7 @@ interface ChatPanelProps {
   projectId: number;
   sessionId?: number;
   onCodeChange?: () => void;
-  onGitCommit?: (data: { success: boolean; error?: string; message?: string }) => void;
+  onGitCommit?: (data: { success: boolean; error?: string; message?: string; commit_count?: number }) => void;
   onReloadPreview?: (data: { message: string }) => void;
   // Visual Editor Props
   onVisualModeChange?: (isVisualMode: boolean) => void;
