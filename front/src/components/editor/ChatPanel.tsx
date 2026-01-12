@@ -13,6 +13,7 @@ import { ToolExecutionBlock } from './ToolExecutionBlock';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { SelectedElementData } from './PreviewPanelWithWebContainer';
+import { fileKeys } from '@/hooks/useFiles'; // Import fileKeys for correct cache invalidation
 
 interface AgentInteractionData {
   agent_name: string;
@@ -387,7 +388,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               console.log('[ChatPanel] 📁 Starting refresh sequence...');
 
               // Invalidate query to mark data as stale
-              queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+              // FIX: Use specific fileKeys list to ensure FileExplorer updates
+              queryClient.invalidateQueries({ queryKey: fileKeys.list(projectId) });
+              queryClient.invalidateQueries({ queryKey: ['project', projectId] }); // Keep this for project details
 
               // Perform a few quick polls to ensure we catch the update (fs writes are fast but async)
               let pollAttempts = 0;
@@ -399,7 +402,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
                 try {
                   // Force refetch
-                  await queryClient.refetchQueries({ queryKey: ['project', projectId] });
+                  await queryClient.refetchQueries({ queryKey: fileKeys.list(projectId) });
 
                   // We consider it a success immediately - no need to check counts
                   // The UI will react to the new data automatically via React Query
@@ -426,31 +429,24 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             },
             onGitCommit: (data) => {
               console.log('[ChatPanel] Git commit event:', data);
+
               if (data.success) {
                 toast({
-                  title: "✅ Changes committed",
-                  description: data.message || "Your changes have been saved to Git history",
-                  duration: 5000,
+                  title: "Git Commit Created",
+                  description: data.message || "Changes have been committed to git.",
+                  duration: 3000,
                 });
-              } else if (data.error) {
+              } else {
                 toast({
-                  title: "⚠️ Commit failed",
-                  description: data.error,
+                  title: "Git Commit Failed",
+                  description: data.error || "Failed to create git commit.",
                   variant: "destructive",
                   duration: 5000,
                 });
               }
-
-              // Call parent callback for screenshot capture
-              if (onGitCommit) {
-                onGitCommit(data);
-              }
             },
             onReloadPreview: (data) => {
-              console.log('[ChatPanel] Reload preview event received - storing for later:', data);
-
-              // Store the reload request to execute AFTER complete event
-              // This prevents interrupting the SSE stream before all messages are processed
+              console.log('[ChatPanel] Reload preview event received:', data);
               pendingReloadRef.current = data;
 
               toast({
@@ -458,6 +454,18 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 description: data.message,
                 duration: 3000,
               });
+
+              // FIX: Trigger reload immediately (with short delay) 
+              // We trust 'files_ready' (which usually comes before) has handled content updates.
+              // Waiting for it creates a race condition where reload never happens.
+
+              if (onReloadPreview && !reloadScheduledRef.current) {
+                console.log('[ChatPanel] 🔄 Triggering delayed WebContainer reload...');
+                reloadScheduledRef.current = true;
+                setTimeout(() => {
+                  setShouldTriggerReload(true);
+                }, 1000);
+              }
             },
             onComplete: (data) => {
               console.log('[ChatPanel] Complete event - updating message content');
