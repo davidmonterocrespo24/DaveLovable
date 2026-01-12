@@ -388,7 +388,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               console.log('[ChatPanel] 📁 Starting to poll for file updates...');
 
               let pollAttempts = 0;
-              const maxPollAttempts = 15; // 15 attempts * 500ms = 7.5 seconds max
+              const maxPollAttempts = 20; // 20 attempts * 500ms = 10 seconds max
+              let filesArrivedFlag = false;
 
               const pollInterval = setInterval(() => {
                 pollAttempts++;
@@ -403,23 +404,41 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   const newData = queryClient.getQueryData(['project', projectId]) as any;
                   const newFileCount = newData?.files?.length || 0;
 
-                  console.log(`[ChatPanel] 📁 File count check: ${currentFileCount} -> ${newFileCount}`);
+                  console.log(`[ChatPanel] 📁 File count: ${currentFileCount} -> ${newFileCount}`);
 
-                  if (newFileCount > currentFileCount || pollAttempts >= maxPollAttempts) {
+                  // SUCCESS: Files arrived if count increased OR if we now have files (handles initial load from 0)
+                  const filesArrived = (newFileCount > currentFileCount) || (currentFileCount === 0 && newFileCount > 0);
+
+                  if (filesArrived && !filesArrivedFlag) {
+                    filesArrivedFlag = true;
                     clearInterval(pollInterval);
+                    console.log('[ChatPanel] 📁 ✅ FILES ARRIVED! Count:', currentFileCount, '→', newFileCount);
 
-                    if (newFileCount > currentFileCount) {
-                      console.log('[ChatPanel] 📁 ✅ FILES ARRIVED! New file count:', newFileCount);
-                    } else {
-                      console.log('[ChatPanel] 📁 ⚠️ Max polling attempts reached, proceeding anyway');
-                    }
+                    // Give FileExplorer time to render, then trigger WebContainer reload
+                    setTimeout(() => {
+                      console.log('[ChatPanel] 📁 Files ready - now triggering WebContainer reload');
+                      if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
+                        reloadScheduledRef.current = true;
+                        setShouldTriggerReload(true);
+                      }
+                    }, 1000); // 1 second delay for FileExplorer to render
+                  } else if (pollAttempts >= maxPollAttempts && !filesArrivedFlag) {
+                    clearInterval(pollInterval);
+                    console.log('[ChatPanel] 📁 ⚠️ Max polling attempts reached - triggering reload anyway');
+                    // Even if files didn't arrive, trigger reload to prevent hanging
+                    setTimeout(() => {
+                      if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
+                        reloadScheduledRef.current = true;
+                        setShouldTriggerReload(true);
+                      }
+                    }, 500);
                   }
-                }, 100); // Wait 100ms for React Query to update cache
+                }, 200); // Wait 200ms for React Query to update cache
               }, 500); // Poll every 500ms
 
               toast({
                 title: "📁 Files ready",
-                description: "Project files have been updated",
+                description: "Downloading project files...",
                 duration: 3000,
               });
             },
@@ -505,20 +524,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 setIsStreaming(false);
               }, 3000);
 
-              // Trigger WebContainer reload when stream completes
-              // Note: Files were already refetched in onFilesReady event
-              if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
-                console.log('[ChatPanel] Stream complete - scheduling WebContainer reload');
-
-                // IMPORTANT: Wait for files to finish downloading before reloading WebContainer
-                // onFilesReady triggers refetch, but HTTP download takes ~2 seconds
-                // We wait 3 seconds to ensure files are fully downloaded
-                reloadScheduledRef.current = true; // Mark to prevent setTimeout from triggering twice
-                setTimeout(() => {
-                  console.log('[ChatPanel] ⚡ Triggering WebContainer reload NOW - files should be ready');
-                  setShouldTriggerReload(true);
-                }, 3000); // 3 seconds: enough time for file download to complete
-              }
+              // WebContainer reload is now handled by onFilesReady callback
+              // which waits for files to actually arrive before triggering reload
+              console.log('[ChatPanel] Stream complete - WebContainer reload will be triggered by onFilesReady');
             },
             onError: (error) => {
               console.error('Streaming error:', error);
