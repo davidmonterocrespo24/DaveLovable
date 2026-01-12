@@ -456,16 +456,18 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               }, 3000);
 
               // ALWAYS refetch files and reload WebContainer when stream completes
-              if (pendingReloadRef.current && onReloadPreview) {
+              if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
                 console.log('[ChatPanel] Stream complete - refreshing files and WebContainer');
 
-                // Step 1: Immediately refetch files to update FileExplorer
-                console.log('[ChatPanel] Step 1: Refetching file list from backend...');
+                // Step 1: Force file list refresh (invalidate + refetch to bypass cache)
+                console.log('[ChatPanel] Step 1: Invalidating cache and refetching files...');
+                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
                 queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
-                  console.log('[ChatPanel] Step 1 Complete: File list updated');
+                  console.log('[ChatPanel] Step 1 Complete: File list forcefully refreshed');
                 });
 
-                // Step 2: After files are ready, trigger WebContainer reload
+                // Step 2: After files are ready, trigger WebContainer reload (PREVENT DUPLICATES)
+                reloadScheduledRef.current = true; // Mark to prevent setTimeout from triggering twice
                 setTimeout(() => {
                   console.log('[ChatPanel] Step 2: Triggering WebContainer reload');
                   setShouldTriggerReload(true);
