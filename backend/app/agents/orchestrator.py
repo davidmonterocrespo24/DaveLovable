@@ -92,6 +92,7 @@ class AgentOrchestrator:
             temperature=0.7,
             model_info=model_info,
             parallel_tool_calls=False,  # Disable parallel tool calls to prevent token limit issues with large files
+            max_tokens=8000,  # DeepSeek max output: 8K tokens (increase to prevent "length" finish reason)
         )
         self.coder_agent = AssistantAgent(
             name="Coder",
