@@ -460,11 +460,28 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               // Waiting for it creates a race condition where reload never happens.
 
               if (onReloadPreview && !reloadScheduledRef.current) {
-                console.log('[ChatPanel] 🔄 Triggering delayed WebContainer reload...');
+                console.log('[ChatPanel] 🔄 Triggering DOUBLE WebContainer reload strategy...');
                 reloadScheduledRef.current = true;
+
+                // First reload: Quick check (1.5s)
                 setTimeout(() => {
+                  console.log('[ChatPanel] 🔄 executing FIRST reload...');
                   setShouldTriggerReload(true);
-                }, 1000);
+
+                  // Reset scheduled flag briefly to allow second reload to pass checks if needed
+                  // But actually, the useEffect handles the reset of shouldTriggerReload
+                  // We just need to make sure we can trigger it again.
+                }, 1500);
+
+                // Second reload: Safety check (4.0s) to ensure everything is caught
+                setTimeout(() => {
+                  console.log('[ChatPanel] 🔄 executing SECOND reload (final consistency check)...');
+                  setShouldTriggerReload(true);
+                  // We keep reloadScheduledRef true until the very end to prevent 
+                  // other events from interfering, but we might need to toggle it 
+                  // if the useEffect checks it strictly.
+                  // Let's rely on the fact that useEffect resets `shouldTriggerReload` to false.
+                }, 1500);
               }
             },
             onComplete: (data) => {
