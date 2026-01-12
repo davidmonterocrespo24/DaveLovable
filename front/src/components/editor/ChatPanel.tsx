@@ -265,16 +265,16 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
         console.log('[ChatPanel] Scheduling WebContainer reload (one-time trigger)');
         reloadScheduledRef.current = true; // Mark as scheduled to prevent duplicates
 
-        // Delay to ensure files are synced to backend
+        // Short delay since files were already refetched via files_ready event
         const reloadTimer = setTimeout(() => {
-          console.log('[ChatPanel] Executing reload now');
+          console.log('[ChatPanel] Executing WebContainer reload now');
           if (onReloadPreview && pendingReloadRef.current) {
             onReloadPreview(pendingReloadRef.current);
             pendingReloadRef.current = null;
             setShouldTriggerReload(false);
             reloadScheduledRef.current = false; // Reset for next time
           }
-        }, 2000); // 2 seconds: files already refetched at stream complete
+        }, 500); // 500ms: minimal delay since files are already ready
 
         return () => {
           clearTimeout(reloadTimer);
@@ -373,6 +373,22 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 return updated;
               });
             },
+            onFilesReady: (data) => {
+              console.log('[ChatPanel] Files ready event - refetching immediately:', data);
+
+              // Files are now written to filesystem and ready to download
+              // Trigger immediate refetch to update FileExplorer
+              queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+              queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
+                console.log('[ChatPanel] ✅ Files refetched successfully after files_ready event');
+              });
+
+              toast({
+                title: "📁 Files ready",
+                description: "Project files have been updated",
+                duration: 3000,
+              });
+            },
             onGitCommit: (data) => {
               console.log('[ChatPanel] Git commit event:', data);
               if (data.success) {
@@ -455,23 +471,17 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 setIsStreaming(false);
               }, 3000);
 
-              // ALWAYS refetch files and reload WebContainer when stream completes
+              // Trigger WebContainer reload when stream completes
+              // Note: Files were already refetched in onFilesReady event
               if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
-                console.log('[ChatPanel] Stream complete - refreshing files and WebContainer');
+                console.log('[ChatPanel] Stream complete - scheduling WebContainer reload');
 
-                // Step 1: Force file list refresh (invalidate + refetch to bypass cache)
-                console.log('[ChatPanel] Step 1: Invalidating cache and refetching files...');
-                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-                queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
-                  console.log('[ChatPanel] Step 1 Complete: File list forcefully refreshed');
-                });
-
-                // Step 2: After files are ready, trigger WebContainer reload (PREVENT DUPLICATES)
+                // Files were already refetched in onFilesReady, just need to reload WebContainer
                 reloadScheduledRef.current = true; // Mark to prevent setTimeout from triggering twice
                 setTimeout(() => {
-                  console.log('[ChatPanel] Step 2: Triggering WebContainer reload');
+                  console.log('[ChatPanel] Triggering WebContainer reload with updated files');
                   setShouldTriggerReload(true);
-                }, 3000); // 3 seconds: enough for file refetch + backend file sync
+                }, 1000); // 1 second: short delay since files are already refetched
               }
             },
             onError: (error) => {
