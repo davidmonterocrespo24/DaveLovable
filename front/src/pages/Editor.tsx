@@ -93,6 +93,25 @@ const Editor = () => {
     fetchBranch();
   }, [projectId]);
 
+  // Auto-select App.tsx when project loads
+  useEffect(() => {
+    if (project?.files && project.files.length > 0 && !selectedFile) {
+      // Try to find App.tsx in src/ folder first
+      const appTsx = project.files.find(file =>
+        file.filepath === 'src/App.tsx' || file.filename === 'App.tsx'
+      );
+
+      if (appTsx) {
+        handleFileSelect({
+          name: appTsx.filename,
+          id: appTsx.id,
+          content: appTsx.content || '',
+          filepath: appTsx.filepath
+        });
+      }
+    }
+  }, [project?.files, selectedFile]);
+
   // Auto-send initial message if provided from homepage
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
