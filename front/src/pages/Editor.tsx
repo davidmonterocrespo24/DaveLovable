@@ -112,7 +112,7 @@ const Editor = () => {
     }
   }, [project?.files, selectedFile]);
 
-  // Auto-send initial message if provided from homepage
+  // Auto-send initial message if provided from homepage (ONE-TIME ONLY)
   useEffect(() => {
     const initialMessage = (location.state as { initialMessage?: string })?.initialMessage;
 
@@ -125,6 +125,10 @@ const Editor = () => {
           console.log('[Editor] Sending initial message to chat panel');
           chatPanelRef.current.sendMessage(initialMessage);
           setInitialMessageSent(true);
+
+          // IMPORTANT: Clear location state to prevent re-sending on page reload
+          window.history.replaceState({}, document.title);
+          console.log('[Editor] Location state cleared to prevent duplicate sends');
         } else {
           console.warn('[Editor] Chat panel ref not ready yet');
         }
