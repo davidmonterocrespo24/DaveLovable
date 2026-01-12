@@ -683,10 +683,13 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 )
 
             # Final save of agent state
+            logger.info("📦 [Save State] Saving agent state to filesystem...")
             await orchestrator.save_state(project_id)
+            logger.info("📦 [Save State] ✅ Agent state saved successfully")
 
             # IMPORTANT: Send files_ready event BEFORE git commit starts
             # Files are already written to filesystem and ready for download
+            logger.info("📁 [Files Ready] 🚀 About to send files_ready event...")
             yield {
                 "type": "files_ready",
                 "data": {
@@ -694,7 +697,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     "project_id": project_id,
                 },
             }
-            logger.info(f"✅ [Files Ready] Files written to filesystem, ready for frontend download")
+            logger.info(f"📁 [Files Ready] ✅ files_ready event SENT - Files written to filesystem, ready for frontend download")
 
             # AUTO-COMMIT: Create Git commit in background (non-blocking)
             # Send immediate notification that commit is starting

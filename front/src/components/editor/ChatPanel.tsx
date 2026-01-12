@@ -374,13 +374,20 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               });
             },
             onFilesReady: (data) => {
-              console.log('[ChatPanel] Files ready event - refetching immediately:', data);
+              console.log('[ChatPanel] 📁📁📁 FILES READY CALLBACK INVOKED! 📁📁📁');
+              console.log('[ChatPanel] 📁 Data received:', data);
+              console.log('[ChatPanel] 📁 Project ID:', projectId);
 
               // Files are now written to filesystem and ready to download
               // Trigger immediate refetch to update FileExplorer
+              console.log('[ChatPanel] 📁 Step 1: Invalidating queries...');
               queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+
+              console.log('[ChatPanel] 📁 Step 2: Refetching queries...');
               queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
-                console.log('[ChatPanel] ✅ Files refetched successfully after files_ready event');
+                console.log('[ChatPanel] 📁 ✅ Files refetched successfully after files_ready event');
+              }).catch((error) => {
+                console.error('[ChatPanel] 📁 ❌ Error refetching files:', error);
               });
 
               toast({

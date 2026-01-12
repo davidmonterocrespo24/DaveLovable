@@ -317,9 +317,10 @@ export const chatApi = {
               if (line.trim().startsWith('data: ')) {
                 try {
                   const jsonStr = line.replace(/^data: /, '').trim();
-                  console.log('[SSE] Parsing event:', jsonStr.substring(0, 100));
+                  console.log('[SSE] Parsing event:', jsonStr.substring(0, 200));
                   const event: SSEEvent = JSON.parse(jsonStr);
-                  console.log('[SSE] Event type:', event.type);
+                  console.log('[SSE] ⚡ Event type received:', event.type);
+                  console.log('[SSE] ⚡ Full event:', JSON.stringify(event));
 
                   switch (event.type) {
                     case 'start':
@@ -331,8 +332,11 @@ export const chatApi = {
                       callbacks.onAgentInteraction?.(event.data);
                       break;
                     case 'files_ready':
-                      console.log('[SSE] Files ready event:', event.data);
+                      console.log('[SSE] 📁📁📁 FILES READY EVENT RECEIVED! 📁📁📁');
+                      console.log('[SSE] 📁 Event data:', event.data);
+                      console.log('[SSE] 📁 Callback exists?', !!callbacks.onFilesReady);
                       callbacks.onFilesReady?.(event.data);
+                      console.log('[SSE] 📁 Callback invoked successfully');
                       break;
                     case 'git_commit':
                       console.log('[SSE] Git commit event:', event.data);
