@@ -633,6 +633,25 @@ Please analyze the request, create a plan if needed, and implement the solution.
                         # Save state after every tool execution
                         await save_incremental_state()
 
+                        # Check if tool was a file modification tool
+                        file_mod_tools = {
+                            "write_file",
+                            "replace_file_content", 
+                            "edit_file", 
+                            "multi_replace_file_content"
+                        }
+                        
+                        tool_names = [r.name for r in message.content]
+                        if any(name in file_mod_tools for name in tool_names):
+                            logger.info(f"📁 [Files Update] Detected file modification tools: {tool_names}")
+                            yield {
+                                "type": "files_ready",
+                                "data": {
+                                    "message": "File updated",
+                                    "project_id": project_id,
+                                },
+                            }
+
                     # TaskResult - Final
                     elif event_type == "TaskResult":
                         result = message

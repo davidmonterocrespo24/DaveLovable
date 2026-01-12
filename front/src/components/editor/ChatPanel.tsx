@@ -378,78 +378,50 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               console.log('[ChatPanel] 📁 Data received:', data);
               console.log('[ChatPanel] 📁 Project ID:', projectId);
 
-              // Get current file count to detect when new files arrive
-              const currentData = queryClient.getQueryData(['project', projectId]) as any;
-              const currentFileCount = currentData?.files?.length || 0;
-              console.log('[ChatPanel] 📁 Current file count BEFORE fetch:', currentFileCount);
+              // -------------------------------------------------------------------------
+              // IMPROVED LOGIC: Trust the event! 
+              // We don't wait for file count to change because EDITS don't change the count.
+              // We simply force a refetch and update the UI.
+              // -------------------------------------------------------------------------
 
-              // Files are now written to filesystem and ready to download
-              // Start polling to detect when files actually arrive
-              console.log('[ChatPanel] 📁 Starting to poll for file updates...');
+              console.log('[ChatPanel] 📁 Starting refresh sequence...');
 
+              // Invalidate query to mark data as stale
+              queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+
+              // Perform a few quick polls to ensure we catch the update (fs writes are fast but async)
               let pollAttempts = 0;
-              const maxPollAttempts = 20; // 20 attempts * 500ms = 10 seconds max
-              let filesArrivedFlag = false;
+              const maxPollAttempts = 5;
 
               const pollInterval = setInterval(async () => {
                 pollAttempts++;
-                console.log(`[ChatPanel] 📁 Poll attempt ${pollAttempts}/${maxPollAttempts}...`);
+                console.log(`[ChatPanel] 📁 Refresh attempt ${pollAttempts}/${maxPollAttempts}...`);
 
                 try {
-                  // Force a REAL HTTP request by invalidating and waiting for fresh data
-                  queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-
-                  // Wait a bit for invalidation to process
-                  await new Promise(resolve => setTimeout(resolve, 100));
-
-                  // Trigger actual fetch
+                  // Force refetch
                   await queryClient.refetchQueries({ queryKey: ['project', projectId] });
 
-                  // Give React Query time to update cache
-                  await new Promise(resolve => setTimeout(resolve, 200));
+                  // We consider it a success immediately - no need to check counts
+                  // The UI will react to the new data automatically via React Query
 
-                  // Check if files have arrived
-                  const newData = queryClient.getQueryData(['project', projectId]) as any;
-                  const newFileCount = newData?.files?.length || 0;
-
-                  console.log(`[ChatPanel] 📁 File count: ${currentFileCount} -> ${newFileCount}`);
-
-                  // SUCCESS: Files arrived if count increased OR if we now have files (handles initial load from 0)
-                  const filesArrived = (newFileCount > currentFileCount) || (currentFileCount === 0 && newFileCount > 0);
-
-                  if (filesArrived && !filesArrivedFlag) {
-                    filesArrivedFlag = true;
+                  if (pollAttempts >= 3) {
                     clearInterval(pollInterval);
-                    console.log('[ChatPanel] 📁 ✅ FILES ARRIVED! Count:', currentFileCount, '→', newFileCount);
+                    console.log('[ChatPanel] 📁 Refresh sequence complete');
 
-                    // Give FileExplorer time to render, then trigger WebContainer reload
-                    setTimeout(() => {
-                      console.log('[ChatPanel] 📁 Files ready - now triggering WebContainer reload');
-                      if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
-                        reloadScheduledRef.current = true;
-                        setShouldTriggerReload(true);
-                      }
-                    }, 1000); // 1 second delay for FileExplorer to render
-                  } else if (pollAttempts >= maxPollAttempts && !filesArrivedFlag) {
-                    clearInterval(pollInterval);
-                    console.log('[ChatPanel] 📁 ⚠️ Max polling attempts reached - triggering reload anyway');
-                    // Even if files didn't arrive, trigger reload to prevent hanging
-                    setTimeout(() => {
-                      if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
-                        reloadScheduledRef.current = true;
-                        setShouldTriggerReload(true);
-                      }
-                    }, 500);
+                    // Trigger onCodeChange to notify parent (important for screenshotting, etc)
+                    if (onCodeChange) {
+                      onCodeChange();
+                    }
                   }
                 } catch (error) {
-                  console.error('[ChatPanel] 📁 Error during poll:', error);
+                  console.error('[ChatPanel] 📁 Error during refresh:', error);
                 }
-              }, 1000); // Poll every 1 second (increased from 500ms to give HTTP more time)
+              }, 500);
 
               toast({
-                title: "📁 Files ready",
-                description: "Downloading project files...",
-                duration: 3000,
+                title: "📁 Files updated",
+                description: "Project files have been updated.",
+                duration: 2000,
               });
             },
             onGitCommit: (data) => {
