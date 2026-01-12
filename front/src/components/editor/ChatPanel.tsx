@@ -80,7 +80,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const abortControllerRef = useRef<AbortController | null>(null);
     const pendingReloadRef = useRef<{ message: string } | null>(null);
     const [shouldTriggerReload, setShouldTriggerReload] = useState(false);
-    const fileRefetchTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const reloadScheduledRef = useRef(false); // Prevent duplicate reload scheduling
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -261,8 +261,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     // Handle WebContainer reload AFTER streaming completes
     // Note: We don't include 'messages' in dependencies to avoid re-triggering loop
     useEffect(() => {
-      if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview) {
+      if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
         console.log('[ChatPanel] Scheduling WebContainer reload (one-time trigger)');
+        reloadScheduledRef.current = true; // Mark as scheduled to prevent duplicates
 
         // Delay to ensure files are synced to backend
         const reloadTimer = setTimeout(() => {
@@ -271,10 +272,14 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onReloadPreview(pendingReloadRef.current);
             pendingReloadRef.current = null;
             setShouldTriggerReload(false);
+            reloadScheduledRef.current = false; // Reset for next time
           }
-        }, 3000); // 3 seconds for file sync
+        }, 2000); // 2 seconds: files already refetched at stream complete
 
-        return () => clearTimeout(reloadTimer);
+        return () => {
+          clearTimeout(reloadTimer);
+          reloadScheduledRef.current = false; // Reset on cleanup
+        };
       }
     }, [shouldTriggerReload, isStreaming, onReloadPreview]); // Removed 'messages' to prevent loop
 
@@ -344,23 +349,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onAgentInteraction: (interaction) => {
               console.log('[ChatPanel] Received agent interaction:', interaction);
 
-              // Refresh file explorer when file tool COMPLETES (debounced to avoid multiple refetches)
-              if (interaction.message_type === 'tool_response' &&
-                  ['write_file', 'edit_file', 'delete_file'].includes(interaction.tool_name || '')) {
-                console.log(`[ChatPanel] ${interaction.tool_name} completed, scheduling file list refetch...`);
-
-                // Clear previous timer to debounce multiple file operations
-                if (fileRefetchTimerRef.current) {
-                  clearTimeout(fileRefetchTimerRef.current);
-                }
-
-                // Wait 500ms after last file operation before refetching
-                fileRefetchTimerRef.current = setTimeout(() => {
-                  console.log('[ChatPanel] Refetching file list now');
-                  queryClient.refetchQueries({ queryKey: ['project', projectId] });
-                  fileRefetchTimerRef.current = null;
-                }, 500);
-              }
+              // Note: File list refetch now happens at stream completion
+              // This ensures it works regardless of which tools the agent uses
 
               // Add interaction to the streaming message in real-time
               setMessages((prev) => {
@@ -465,16 +455,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 setIsStreaming(false);
               }, 3000);
 
-              // Schedule WebContainer reload after messages are stable
+              // ALWAYS refetch files and reload WebContainer when stream completes
               if (pendingReloadRef.current && onReloadPreview) {
-                console.log('[ChatPanel] Stream complete - will trigger WebContainer reload');
-                // Trigger reload after a delay to ensure:
-                // 1. Messages are fully rendered (3s for isStreaming)
-                // 2. Files are synced to filesystem (git commit now runs in background)
+                console.log('[ChatPanel] Stream complete - refreshing files and WebContainer');
+
+                // Step 1: Immediately refetch files to update FileExplorer
+                console.log('[ChatPanel] Step 1: Refetching file list from backend...');
+                queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
+                  console.log('[ChatPanel] Step 1 Complete: File list updated');
+                });
+
+                // Step 2: After files are ready, trigger WebContainer reload
                 setTimeout(() => {
-                  console.log('[ChatPanel] Triggering WebContainer reload now');
+                  console.log('[ChatPanel] Step 2: Triggering WebContainer reload');
                   setShouldTriggerReload(true);
-                }, 3000); // 3 seconds total: Git commit is now async, no need to wait
+                }, 3000); // 3 seconds: enough for file refetch + backend file sync
               }
             },
             onError: (error) => {
