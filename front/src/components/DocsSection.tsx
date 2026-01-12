@@ -152,9 +152,11 @@ const DocsSection = () => {
             <p className="text-muted-foreground mb-6">
               Create your first project in minutes. No credit card required.
             </p>
-            <Button variant="hero" size="lg">
-              Get Started Free
-              <ArrowRight className="w-5 h-5" />
+            <Button variant="hero" size="lg" asChild>
+              <a href="/">
+                Get Started Free
+                <ArrowRight className="w-5 h-5" />
+              </a>
             </Button>
           </div>
         </div>

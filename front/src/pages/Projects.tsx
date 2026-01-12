@@ -45,6 +45,11 @@ const Projects = () => {
   const [deleteProjectId, setDeleteProjectId] = useState<number | null>(null);
   const [deleteProjectName, setDeleteProjectName] = useState('');
 
+  // Sort projects by created_at descending (newest first)
+  const sortedProjects = projects?.slice().sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+
   const handleCreateProject = async () => {
     if (!projectName.trim()) {
       return;
@@ -175,7 +180,7 @@ const Projects = () => {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in-up delay-200">
-                {projects.map((project, index) => (
+                {sortedProjects?.map((project, index) => (
                   <div
                     key={project.id}
                     className="group relative"

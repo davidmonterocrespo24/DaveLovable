@@ -8,6 +8,7 @@ const Navbar = () => {
   const location = useLocation();
 
   const navLinks = [
+    { label: "Projects", href: "/projects" },
     { label: "Features", href: "/#features" },
     { label: "How it Works", href: "/#how-it-works" },
     { label: "Docs", href: "/docs" },
@@ -51,8 +52,10 @@ const Navbar = () => {
             <Button variant="ghost" size="sm">
               Sign in
             </Button>
-            <Button variant="hero" size="sm">
-              Start Building
+            <Button variant="hero" size="sm" asChild>
+              <a href="/">
+                Start Building
+              </a>
             </Button>
           </div>
 
@@ -92,8 +95,10 @@ const Navbar = () => {
                 <Button variant="ghost" size="sm">
                   Sign in
                 </Button>
-                <Button variant="hero" size="sm">
-                  Start Building
+                <Button variant="hero" size="sm" asChild>
+                  <a href="/">
+                    Start Building
+                  </a>
                 </Button>
               </div>
             </div>
