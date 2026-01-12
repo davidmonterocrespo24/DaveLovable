@@ -391,16 +391,24 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               const maxPollAttempts = 20; // 20 attempts * 500ms = 10 seconds max
               let filesArrivedFlag = false;
 
-              const pollInterval = setInterval(() => {
+              const pollInterval = setInterval(async () => {
                 pollAttempts++;
                 console.log(`[ChatPanel] 📁 Poll attempt ${pollAttempts}/${maxPollAttempts}...`);
 
-                // Trigger refetch
-                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
-                queryClient.refetchQueries({ queryKey: ['project', projectId] });
+                try {
+                  // Force a REAL HTTP request by invalidating and waiting for fresh data
+                  queryClient.invalidateQueries({ queryKey: ['project', projectId] });
 
-                // Check if files have arrived (wait a tiny bit for query to update)
-                setTimeout(() => {
+                  // Wait a bit for invalidation to process
+                  await new Promise(resolve => setTimeout(resolve, 100));
+
+                  // Trigger actual fetch
+                  await queryClient.refetchQueries({ queryKey: ['project', projectId] });
+
+                  // Give React Query time to update cache
+                  await new Promise(resolve => setTimeout(resolve, 200));
+
+                  // Check if files have arrived
                   const newData = queryClient.getQueryData(['project', projectId]) as any;
                   const newFileCount = newData?.files?.length || 0;
 
@@ -433,8 +441,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                       }
                     }, 500);
                   }
-                }, 200); // Wait 200ms for React Query to update cache
-              }, 500); // Poll every 500ms
+                } catch (error) {
+                  console.error('[ChatPanel] 📁 Error during poll:', error);
+                }
+              }, 1000); // Poll every 1 second (increased from 500ms to give HTTP more time)
 
               toast({
                 title: "📁 Files ready",
