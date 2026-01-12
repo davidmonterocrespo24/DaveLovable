@@ -385,7 +385,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
               console.log('[ChatPanel] 📁 Step 2: Refetching queries...');
               queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
-                console.log('[ChatPanel] 📁 ✅ Files refetched successfully after files_ready event');
+                console.log('[ChatPanel] 📁 ✅ Files refetch promise resolved (HTTP request started)');
+
+                // IMPORTANT: Wait 2 seconds to ensure HTTP download completes
+                // refetchQueries() resolves when request STARTS, not when it COMPLETES
+                setTimeout(() => {
+                  console.log('[ChatPanel] 📁 ✅ Files should be downloaded now - FileExplorer will update');
+                }, 2000);
               }).catch((error) => {
                 console.error('[ChatPanel] 📁 ❌ Error refetching files:', error);
               });
@@ -483,12 +489,14 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               if (pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
                 console.log('[ChatPanel] Stream complete - scheduling WebContainer reload');
 
-                // Files were already refetched in onFilesReady, just need to reload WebContainer
+                // IMPORTANT: Wait for files to finish downloading before reloading WebContainer
+                // onFilesReady triggers refetch, but HTTP download takes ~2 seconds
+                // We wait 3 seconds to ensure files are fully downloaded
                 reloadScheduledRef.current = true; // Mark to prevent setTimeout from triggering twice
                 setTimeout(() => {
-                  console.log('[ChatPanel] Triggering WebContainer reload with updated files');
+                  console.log('[ChatPanel] ⚡ Triggering WebContainer reload NOW - files should be ready');
                   setShouldTriggerReload(true);
-                }, 1000); // 1 second: short delay since files are already refetched
+                }, 3000); // 3 seconds: enough time for file download to complete
               }
             },
             onError: (error) => {

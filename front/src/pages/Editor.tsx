@@ -69,6 +69,14 @@ const Editor = () => {
     }
   }, [projectId, navigate]);
 
+  // Log when project files are updated (for debugging file sync timing)
+  useEffect(() => {
+    if (project?.files) {
+      console.log('[Editor] 🔄 Project files updated:', project.files.length, 'files');
+      console.log('[Editor] 🔄 File list:', project.files.map(f => f.filename).join(', '));
+    }
+  }, [project?.files]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsPreviewLoading(false);
