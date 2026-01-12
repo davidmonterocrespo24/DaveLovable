@@ -158,7 +158,7 @@ const Documentation = () => {
                                 routes messages between agents, and handles termination conditions (e.g., when the task is complete or if a loop is detected).
                             </p>
                             <div className="bg-muted/50 p-4 rounded-lg font-mono text-sm leading-relaxed">
-                User Prompt -> [Orchestrator] -> Planner (Plan) -> Coder (Execute) -> Planner (Review) -> Output
+                User Prompt → [Orchestrator] → Planner (Plan) → Coder (Execute) → Planner (Review) → Output
                             </div>
                         </section>
 
