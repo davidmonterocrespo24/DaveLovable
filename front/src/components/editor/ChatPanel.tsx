@@ -378,23 +378,44 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               console.log('[ChatPanel] 📁 Data received:', data);
               console.log('[ChatPanel] 📁 Project ID:', projectId);
 
+              // Get current file count to detect when new files arrive
+              const currentData = queryClient.getQueryData(['project', projectId]) as any;
+              const currentFileCount = currentData?.files?.length || 0;
+              console.log('[ChatPanel] 📁 Current file count BEFORE fetch:', currentFileCount);
+
               // Files are now written to filesystem and ready to download
-              // Trigger immediate refetch to update FileExplorer
-              console.log('[ChatPanel] 📁 Step 1: Invalidating queries...');
-              queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+              // Start polling to detect when files actually arrive
+              console.log('[ChatPanel] 📁 Starting to poll for file updates...');
 
-              console.log('[ChatPanel] 📁 Step 2: Refetching queries...');
-              queryClient.refetchQueries({ queryKey: ['project', projectId] }).then(() => {
-                console.log('[ChatPanel] 📁 ✅ Files refetch promise resolved (HTTP request started)');
+              let pollAttempts = 0;
+              const maxPollAttempts = 15; // 15 attempts * 500ms = 7.5 seconds max
 
-                // IMPORTANT: Wait 2 seconds to ensure HTTP download completes
-                // refetchQueries() resolves when request STARTS, not when it COMPLETES
+              const pollInterval = setInterval(() => {
+                pollAttempts++;
+                console.log(`[ChatPanel] 📁 Poll attempt ${pollAttempts}/${maxPollAttempts}...`);
+
+                // Trigger refetch
+                queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                queryClient.refetchQueries({ queryKey: ['project', projectId] });
+
+                // Check if files have arrived (wait a tiny bit for query to update)
                 setTimeout(() => {
-                  console.log('[ChatPanel] 📁 ✅ Files should be downloaded now - FileExplorer will update');
-                }, 2000);
-              }).catch((error) => {
-                console.error('[ChatPanel] 📁 ❌ Error refetching files:', error);
-              });
+                  const newData = queryClient.getQueryData(['project', projectId]) as any;
+                  const newFileCount = newData?.files?.length || 0;
+
+                  console.log(`[ChatPanel] 📁 File count check: ${currentFileCount} -> ${newFileCount}`);
+
+                  if (newFileCount > currentFileCount || pollAttempts >= maxPollAttempts) {
+                    clearInterval(pollInterval);
+
+                    if (newFileCount > currentFileCount) {
+                      console.log('[ChatPanel] 📁 ✅ FILES ARRIVED! New file count:', newFileCount);
+                    } else {
+                      console.log('[ChatPanel] 📁 ⚠️ Max polling attempts reached, proceeding anyway');
+                    }
+                  }
+                }, 100); // Wait 100ms for React Query to update cache
+              }, 500); // Poll every 500ms
 
               toast({
                 title: "📁 Files ready",
