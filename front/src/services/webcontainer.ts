@@ -4,6 +4,7 @@ import { API_URL } from './api';
 let webcontainerInstance: WebContainer | null = null;
 let templateInstalled = false; // Track if template dependencies are installed
 let cachedNodeModules: FileSystemTree | null = null; // Cache of installed node_modules
+let fileContentCache = new Map<string, string>(); // Cache of current files in WebContainer
 
 /**
  * Strip ANSI escape codes from terminal output
@@ -298,7 +299,7 @@ export async function loadProject(
     log('[WebContainer] Initializing...');
     const [container, response] = await Promise.all([
       getWebContainer(),
-      fetch(`${API_URL}/projects/${projectId}/bundle`)
+      fetch(`${API_URL}/projects/${projectId}/bundle?t=${Date.now()}`)
     ]);
 
     if (!response.ok) {
@@ -324,6 +325,12 @@ export async function loadProject(
     // OPTIMIZATION 4: Fast file tree conversion (already optimized)
     log('[WebContainer] Preparing files...');
     const fileTree = convertToWebContainerFiles(files);
+
+    // Initialize cache
+    fileContentCache.clear();
+    Object.entries(files).forEach(([path, content]) => {
+      fileContentCache.set(path, content as string);
+    });
 
     log('[WebContainer] Mounting files...');
     await container.mount(fileTree);
@@ -483,23 +490,70 @@ export async function reloadProjectFiles(
     }
 
     log('[WebContainer] Fetching updated files...');
-    const response = await fetch(`${API_URL}/projects/${projectId}/bundle`);
+    log('[WebContainer] Fetching updated files...');
+    const response = await fetch(`${API_URL}/projects/${projectId}/bundle?t=${Date.now()}`);
 
     if (!response.ok) {
       throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
     }
 
     const { files } = await response.json();
-    log(`[WebContainer] Updating ${Object.keys(files).length} files...`);
+    log(`[WebContainer] Syncing ${Object.keys(files).length} files...`);
 
-    // Batch file writes for better performance
-    const writePromises = Object.entries(files).map(([filepath, content]) =>
-      webcontainerInstance!.fs.writeFile(filepath, content as string)
-    );
+    // Calculate Diff
+    const toUpdate: Record<string, string> = {};
+    const toDelete: string[] = [];
+    const incomingPaths = new Set(Object.keys(files));
 
-    await Promise.all(writePromises);
+    // 1. Find updates/adds
+    Object.entries(files).forEach(([filepath, content]) => {
+      const currentContent = fileContentCache.get(filepath);
+      if (currentContent !== content) {
+        toUpdate[filepath] = content as string;
+      }
+    });
 
-    log('[WebContainer] Files updated (HMR active)');
+    // 2. Find deletions (in cache but not in new files)
+    for (const cachedPath of fileContentCache.keys()) {
+      if (!incomingPaths.has(cachedPath)) {
+        toDelete.push(cachedPath);
+      }
+    }
+
+    const updatesCount = Object.keys(toUpdate).length;
+    const deletesCount = toDelete.length;
+
+    if (updatesCount === 0 && deletesCount === 0) {
+      log('[WebContainer] No changes detected, skipping writes.');
+      return;
+    }
+
+    log(`[WebContainer] Applying changes: ${updatesCount} updates, ${deletesCount} deletions...`);
+
+    // Apply Deletions
+    if (toDelete.length > 0) {
+      await Promise.all(
+        toDelete.map(async (filepath) => {
+          try {
+            await webcontainerInstance!.fs.rm(filepath, { force: true });
+            fileContentCache.delete(filepath);
+          } catch (e) {
+            console.warn(`[WebContainer] Failed to delete ${filepath}:`, e);
+          }
+        })
+      );
+    }
+
+    // Apply Updates
+    if (updatesCount > 0) {
+      const writePromises = Object.entries(toUpdate).map(async ([filepath, content]) => {
+        await webcontainerInstance!.fs.writeFile(filepath, content);
+        fileContentCache.set(filepath, content);
+      });
+      await Promise.all(writePromises);
+    }
+
+    log('[WebContainer] Files synced ⚡');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (onLog) onLog(`ERROR: Failed to reload files: ${message}`);
@@ -516,6 +570,7 @@ export async function teardown(): Promise<void> {
     webcontainerInstance = null;
     templateInstalled = false;
     cachedNodeModules = null;
+    fileContentCache.clear();
   }
 }
 
@@ -525,6 +580,7 @@ export async function teardown(): Promise<void> {
 export function clearTemplateCache(): void {
   templateInstalled = false;
   cachedNodeModules = null;
+  fileContentCache.clear();
 }
 
 /**
