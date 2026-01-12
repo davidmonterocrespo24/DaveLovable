@@ -80,6 +80,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const abortControllerRef = useRef<AbortController | null>(null);
     const pendingReloadRef = useRef<{ message: string } | null>(null);
     const [shouldTriggerReload, setShouldTriggerReload] = useState(false);
+    const fileRefetchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -343,13 +344,21 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onAgentInteraction: (interaction) => {
               console.log('[ChatPanel] Received agent interaction:', interaction);
 
-              // Refresh file explorer when file tools are executed
-              if (interaction.message_type === 'tool_call' &&
+              // Refresh file explorer when file tool COMPLETES (debounced to avoid multiple refetches)
+              if (interaction.message_type === 'tool_response' &&
                   ['write_file', 'edit_file', 'delete_file'].includes(interaction.tool_name || '')) {
-                console.log(`[ChatPanel] ${interaction.tool_name} tool detected, refreshing file explorer...`);
-                // Use setTimeout to delay invalidation slightly to allow backend to write the file
-                setTimeout(() => {
-                  queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+                console.log(`[ChatPanel] ${interaction.tool_name} completed, scheduling file list refetch...`);
+
+                // Clear previous timer to debounce multiple file operations
+                if (fileRefetchTimerRef.current) {
+                  clearTimeout(fileRefetchTimerRef.current);
+                }
+
+                // Wait 500ms after last file operation before refetching
+                fileRefetchTimerRef.current = setTimeout(() => {
+                  console.log('[ChatPanel] Refetching file list now');
+                  queryClient.refetchQueries({ queryKey: ['project', projectId] });
+                  fileRefetchTimerRef.current = null;
                 }, 500);
               }
 
