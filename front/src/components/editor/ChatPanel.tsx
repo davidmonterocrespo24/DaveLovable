@@ -343,9 +343,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onAgentInteraction: (interaction) => {
               console.log('[ChatPanel] Received agent interaction:', interaction);
 
-              // Refresh file explorer when write_file tool is executed
-              if (interaction.message_type === 'tool_call' && interaction.tool_name === 'write_file') {
-                console.log('[ChatPanel] write_file tool detected, refreshing file explorer...');
+              // Refresh file explorer when file tools are executed
+              if (interaction.message_type === 'tool_call' &&
+                  ['write_file', 'edit_file', 'delete_file'].includes(interaction.tool_name || '')) {
+                console.log(`[ChatPanel] ${interaction.tool_name} tool detected, refreshing file explorer...`);
                 // Use setTimeout to delay invalidation slightly to allow backend to write the file
                 setTimeout(() => {
                   queryClient.invalidateQueries({ queryKey: ['project', projectId] });
@@ -460,11 +461,11 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 console.log('[ChatPanel] Stream complete - will trigger WebContainer reload');
                 // Trigger reload after a delay to ensure:
                 // 1. Messages are fully rendered (3s for isStreaming)
-                // 2. Files are synced to filesystem (additional 2s)
+                // 2. Files are synced to filesystem (git commit now runs in background)
                 setTimeout(() => {
                   console.log('[ChatPanel] Triggering WebContainer reload now');
                   setShouldTriggerReload(true);
-                }, 5000); // 5 seconds total: 3s for messages + 2s for file sync
+                }, 3000); // 3 seconds total: Git commit is now async, no need to wait
               }
             },
             onError: (error) => {

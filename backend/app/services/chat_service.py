@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import datetime
 from typing import Dict, List
@@ -684,65 +685,65 @@ Please analyze the request, create a plan if needed, and implement the solution.
             # Final save of agent state
             await orchestrator.save_state(project_id)
 
-            # AUTO-COMMIT: Create Git commit with AI-generated message
-            commit_count = 0
-            try:
-                logger.info("🔄 Creating automatic Git commit...")
+            # AUTO-COMMIT: Create Git commit in background (non-blocking)
+            # Send immediate notification that commit is starting
+            yield {
+                "type": "git_commit",
+                "data": {
+                    "success": True,
+                    "message": "Creating commit...",
+                    "commit_count": 0,  # Will be updated when commit completes
+                },
+            }
 
-                # Get the git diff to see what changed
-                diff_output = GitService.get_diff(project_id)
+            # Start background task for commit (non-blocking)
+            async def background_commit():
+                """Background task to create git commit without blocking response"""
+                try:
+                    logger.info("🔄 [Background] Creating automatic Git commit...")
 
-                if diff_output and diff_output.strip():
-                    # Generate commit message using LLM
-                    commit_info = await CommitMessageService.generate_commit_message(
-                        diff=diff_output, user_request=chat_request.message
-                    )
+                    # Get the git diff to see what changed
+                    diff_output = GitService.get_diff(project_id)
 
-                    # Combine title and body for full commit message
-                    full_commit_message = f"{commit_info['title']}\n\n{commit_info['body']}"
+                    if diff_output and diff_output.strip():
+                        # Generate commit message using LLM
+                        commit_info = await CommitMessageService.generate_commit_message(
+                            diff=diff_output, user_request=chat_request.message
+                        )
 
-                    # Create the commit
-                    commit_success = GitService.commit_changes(
-                        project_id=project_id,
-                        message=full_commit_message,
-                        files=None,  # Commit all changes
-                    )
+                        # Combine title and body for full commit message
+                        full_commit_message = f"{commit_info['title']}\n\n{commit_info['body']}"
 
-                    if commit_success:
-                        logger.info(f"✅ Git commit created: {commit_info['title']}")
+                        # Create the commit (synchronous git operation)
+                        commit_success = GitService.commit_changes(
+                            project_id=project_id,
+                            message=full_commit_message,
+                            files=None,  # Commit all changes
+                        )
 
-                        # Get commit count (excluding initial commit)
-                        commits = GitService.get_commit_history(project_id, limit=100)
-                        commit_count = len(commits)
-                        logger.info(f"📊 Total commits in project: {commit_count}")
+                        if commit_success:
+                            logger.info(f"✅ [Background] Git commit created: {commit_info['title']}")
 
-                        # Yield commit event to frontend
-                        yield {
-                            "type": "git_commit",
-                            "data": {
-                                "success": True,
-                                "message": commit_info["title"],
-                                "full_message": full_commit_message,
-                                "commit_count": commit_count,
-                            },
-                        }
+                            # Get commit count (excluding initial commit)
+                            commits = GitService.get_commit_history(project_id, limit=100)
+                            commit_count = len(commits)
+                            logger.info(f"📊 [Background] Total commits in project: {commit_count}")
+
+                            # Check if this is the first commit for screenshot
+                            if commit_count == 2:
+                                logger.info("=" * 80)
+                                logger.info("📸 FIRST COMMIT DETECTED (Background)")
+                                logger.info("📸 Screenshot will be captured by frontend from WebContainer")
+                                logger.info("=" * 80)
+                        else:
+                            logger.warning("⚠️  [Background] Git commit failed or no changes to commit")
                     else:
-                        logger.warning("⚠️  Git commit failed or no changes to commit")
-                else:
-                    logger.info("ℹ️  No changes detected for Git commit")
-            except Exception as e:
-                logger.error(f"❌ Error creating auto-commit: {e}")
-                # Don't fail the whole request if commit fails
-                yield {"type": "git_commit", "data": {"success": False, "error": str(e)}}
+                        logger.info("ℹ️  [Background] No changes detected for Git commit")
+                except Exception as e:
+                    logger.error(f"❌ [Background] Error creating auto-commit: {e}")
 
-            # NOTE: Screenshot capture is now handled in the frontend (PreviewPanelWithWebContainer.tsx)
-            # The frontend captures the WebContainer iframe directly and uploads to /thumbnail/upload endpoint
-            # This is necessary because WebContainer runs in the browser, not accessible from backend
-            if commit_count == 2:
-                logger.info("=" * 80)
-                logger.info("📸 FIRST COMMIT DETECTED")
-                logger.info("📸 Screenshot will be captured by frontend from WebContainer")
-                logger.info("=" * 80)
+            # Launch background task without awaiting it
+            asyncio.create_task(background_commit())
 
             # Trigger WebContainer reload after agent completes
             logger.info("🔄 Triggering WebContainer reload (agent finished)")
