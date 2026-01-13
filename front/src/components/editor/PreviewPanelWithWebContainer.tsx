@@ -85,6 +85,19 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       setConsoleLogs(prev => [...prev, { type, message, timestamp }]);
     };
 
+    // Helper to filter out benign Vite errors that are expected during normal operation
+    const isIgnorableError = (message: string) => {
+      const ignoredPatterns = [
+        'The build was canceled',  // Vite HMR restart (normal behavior)
+      ];
+      return ignoredPatterns.some(pattern => message.includes(pattern));
+    };
+
+    // Get only reportable errors (exclude ignorable ones)
+    const getReportableErrors = () => {
+      return consoleLogs.filter(log => log.type === 'error' && !isIgnorableError(log.message));
+    };
+
     // Communicate visual mode change to iframe
     // Also re-send when previewUrl changes (when WebContainer reloads)
     useEffect(() => {
@@ -406,7 +419,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     };
 
     const handleReportErrors = () => {
-      const errors = consoleLogs.filter(log => log.type === 'error');
+      const errors = getReportableErrors();
       if (errors.length === 0) {
         return;
       }
@@ -507,7 +520,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
               title="Toggle console"
             >
               <Terminal className="w-4 h-4" />
-              {consoleLogs.some(l => l.type === 'error') && (
+              {getReportableErrors().length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
               )}
             </button>
@@ -592,9 +605,9 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
                   <span className="text-xs px-2 py-0.5 rounded bg-muted/30 text-muted-foreground">
                     All ({consoleLogs.length})
                   </span>
-                  {consoleLogs.filter(l => l.type === 'error').length > 0 && (
+                  {getReportableErrors().length > 0 && (
                     <span className="text-xs px-2 py-0.5 rounded bg-red-500/20 text-red-400">
-                      {consoleLogs.filter(l => l.type === 'error').length} errors
+                      {getReportableErrors().length} errors
                     </span>
                   )}
                   {consoleLogs.filter(l => l.type === 'warn').length > 0 && (
@@ -605,7 +618,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {consoleLogs.filter(l => l.type === 'error').length > 0 && (
+                {getReportableErrors().length > 0 && (
                   <button
                     onClick={handleReportErrors}
                     className="text-xs px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded transition-colors text-red-400 flex items-center gap-1.5 border border-red-500/30 animate-pulse"

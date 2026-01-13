@@ -128,7 +128,7 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
 
 13. **📋 LUCIDE-REACT ICONS - COMMONLY USED SAFE ICONS:**
    - The project uses `lucide-react` for icons. **ONLY use icons that exist in the library!**
-   - **CRITICAL:** Many icon names you might guess DO NOT exist. Verify before using!
+   - **⚠️ CRITICAL:** Many icon names you might guess DO NOT exist. **NEVER use aliases like `import { PawPrint as Paw }`** - if the icon doesn't exist, aliasing won't help!
    - **Common SAFE icons to use:**
      - Navigation: `Home`, `Menu`, `ChevronDown`, `ChevronRight`, `ArrowLeft`, `ArrowRight`
      - Actions: `Plus`, `Minus`, `X`, `Check`, `Save`, `Edit`, `Trash2`, `Download`, `Upload`
@@ -136,12 +136,18 @@ It is *EXTREMELY* important that your generated code can be run immediately by t
      - Files: `File`, `FileText`, `Folder`, `FolderOpen`, `Image`
      - Social: `Github`, `Twitter`, `Linkedin`, `Facebook`
      - General: `Star`, `Heart`, `Eye`, `Lock`, `Unlock`, `Info`, `AlertCircle`, `AlertTriangle`
-   - **Icons that DON'T exist (common mistakes):**
+     - Animals: ❌ NO animal icons exist (no `Paw`, `PawPrint`, `Dog`, `Cat`, etc.) → Use `Heart` or `Circle` instead
+   - **Icons that DON'T exist (common mistakes - NEVER USE THESE):**
+     - ❌ `Paw` or `PawPrint` (for pets) → Use `Heart`, `Circle`, or `Sparkles` instead
+     - ❌ `SortAsc` or `SortDesc` → Use `ArrowUpDown`, `ArrowUp`, or `ArrowDown` instead
      - ❌ `Project` → Use `Folder` or `Layout` instead
      - ❌ `Fork` → Use `GitFork` or `GitBranch`
      - ❌ `Code` → Use `Terminal` or `FileCode`
-   - **If unsure about an icon:** Use generic alternatives like `Circle`, `Square`, or `Layout`
-   - **Better:** Keep UI simple on first pass - add icons later if needed
+     - ❌ `GenderMale` or `GenderFemale` → Use `User` or text labels instead
+     - ❌ `Scale` (for weight) → Use `Activity` or `BarChart` instead
+   - **⚠️ RULE: If you're not 100% certain an icon exists in lucide-react, DON'T use it!**
+   - **If unsure about an icon:** Use generic alternatives like `Circle`, `Square`, `Layout`, or `Sparkles`
+   - **Better approach:** Keep UI simple on first pass - use only icons from the SAFE list above
 </making_code_changes>
 
 <searching_and_reading>
