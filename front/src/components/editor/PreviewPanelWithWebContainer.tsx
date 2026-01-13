@@ -327,7 +327,9 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         if (onReload) {
           onReload();
         }
-        await reloadFiles();
+        // User requested full refresh via handleRefresh logic to resolve import errors
+        // This is a "heavy" reload that ensures a clean state
+        await initializeWebContainer();
 
         // After reload, re-apply visual mode if it's enabled
         // Wait a bit longer to ensure iframe processed the file updates
@@ -339,7 +341,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
               enabled: true
             }, '*');
           }
-        }, 1000); // 1 second delay after reload completes
+        }, 2000); // Increased delay for full reload
       },
       updateStyle: (property: string, value: string) => {
         if (!iframeRef.current?.contentWindow) return;

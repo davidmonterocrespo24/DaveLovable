@@ -580,12 +580,12 @@ export async function updateProjectFiles(
   };
 
   try {
-    const promises = files.map(async (file) => {
+    // Execute writes sequentially to minimize HMR race conditions
+    for (const file of files) {
       await webcontainerInstance!.fs.writeFile(file.path, file.content);
       fileContentCache.set(file.path, file.content);
-    });
+    }
 
-    await Promise.all(promises);
     log(`[WebContainer] Pushed ${files.length} file updates ⚡`);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

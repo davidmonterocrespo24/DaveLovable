@@ -386,11 +386,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 console.log(`[ChatPanel] 🚀 Received ${data.files.length} pushed files. Updating WebContainer immediately.`);
                 if (onFileUpdate) {
                   onFileUpdate(data.files);
-
-                  // Clear any pending reload because we just updated strictly
-                  // This prevents the "Double Reload" from firing unnecessarily if it was scheduled
-                  pendingReloadRef.current = null;
-                  setShouldTriggerReload(false);
+                  // We continue with the standard reload sequence as a backup/consistency check
+                  // This ensures that if the push update caused any transient HMR errors,
+                  // they will be resolved by the full reload that follows.
                 }
               }
 
