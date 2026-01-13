@@ -7,6 +7,7 @@ from autogen_agentchat.agents import AssistantAgent
 from autogen_agentchat.conditions import MaxMessageTermination, TextMentionTermination
 from autogen_agentchat.messages import BaseAgentEvent, BaseChatMessage, TextMessage
 from autogen_agentchat.teams import SelectorGroupChat
+from autogen_core.model_context import BufferedChatCompletionContext
 from autogen_ext.models.openai import OpenAIChatCompletionClient
 
 from app.agents.prompts import (
@@ -94,6 +95,11 @@ class AgentOrchestrator:
             parallel_tool_calls=False,  # Disable parallel tool calls to prevent token limit issues with large files
             max_tokens=8000,  # DeepSeek max output: 8K tokens (increase to prevent "length" finish reason)
         )
+        # Create buffered contexts to prevent token overflow
+        # Keep last 20 messages (~10 exchanges) for context
+        coder_context = BufferedChatCompletionContext(buffer_size=20)
+        planner_context = BufferedChatCompletionContext(buffer_size=20)
+
         self.coder_agent = AssistantAgent(
             name="Coder",
             description=CODER_AGENT_DESCRIPTION,
@@ -102,7 +108,7 @@ class AgentOrchestrator:
             tools=self.coder_tools,  # Includes memory RAG tools
             max_tool_iterations=15,
             reflect_on_tool_use=False,
-            # NO memory parameter - uses RAG tools instead
+            model_context=coder_context,  # Limit context to prevent token overflow
         )
 
         # PlanningAgent (without tools, without memory)
@@ -112,7 +118,7 @@ class AgentOrchestrator:
             system_message=PLANNING_AGENT_SYSTEM_MESSAGE,
             model_client=self.model_client,
             tools=[],  # Planner has no tools, only plans
-            # NO memory parameter
+            model_context=planner_context,  # Limit context to prevent token overflow
         )
 
         def selector_func(messages: Sequence[BaseAgentEvent | BaseChatMessage]) -> str | None:
@@ -218,7 +224,8 @@ class AgentOrchestrator:
 
     async def load_state(self, project_id: int) -> bool:
         """
-        Load the state of the agent team from a JSON file in the project directory
+        Load the state of the agent team from a JSON file in the project directory.
+        Automatically truncates old messages to prevent token overflow.
 
         Args:
             project_id: The project ID to load state for
@@ -237,6 +244,19 @@ class AgentOrchestrator:
             # Load state from file
             with open(state_file, "r", encoding="utf-8") as f:
                 team_state = json.load(f)
+
+            # CRITICAL: Truncate message history to prevent token overflow
+            # Keep only the last 30 messages from the saved state
+            if "message_thread" in team_state and isinstance(team_state["message_thread"], list):
+                original_count = len(team_state["message_thread"])
+                if original_count > 30:
+                    # Keep last 30 messages
+                    team_state["message_thread"] = team_state["message_thread"][-30:]
+                    logger.warning(
+                        f"⚠️  Truncated message history from {original_count} to {len(team_state['message_thread'])} messages to prevent token overflow"
+                    )
+                else:
+                    logger.info(f"ℹ️  Loading {original_count} messages from saved state")
 
             # Load state into team
             await self.main_team.load_state(team_state)
