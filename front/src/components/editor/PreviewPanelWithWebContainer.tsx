@@ -425,7 +425,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       }
 
       const errorReport = errors.map(err => `[${err.timestamp}] ${err.message}`).join('\n');
-      const fullReport = `I found ${errors.length} error(s) in the console:\n\n${errorReport}\n\nPlease help me fix these errors.`;
+      const fullReport = `[BUG FIX] I found ${errors.length} error(s) in the console:\n\n${errorReport}\n\nPlease help me fix these errors.`;
 
       if (onReportError) {
         onReportError(fullReport);

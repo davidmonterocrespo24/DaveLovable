@@ -157,6 +157,11 @@ class AgentOrchestrator:
                     logger.info("🎨 Visual Edit detected - Routing directly to Coder")
                     return "Coder"
 
+                # Check for bug fix tag
+                if "[BUG FIX]" in last_message.content:
+                    logger.info("🐛 Bug Fix detected - Routing directly to Coder")
+                    return "Coder"
+
                 # Default to Planner for normal requests
                 return "Planner"
 
