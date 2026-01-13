@@ -48,7 +48,9 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    pass
+    from app.agents import shutdown_orchestrators
+
+    await shutdown_orchestrators()
 
 
 # Root endpoint

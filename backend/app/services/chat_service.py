@@ -123,7 +123,7 @@ class ChatService:
 
         # Generate AI response using agents
         try:
-            orchestrator = get_orchestrator()
+            orchestrator = await get_orchestrator(project_id)
         except ValueError as e:
             # API key not configured
             error_message = ChatService.add_message(
@@ -398,7 +398,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
         # Generate AI response using agents
         try:
-            orchestrator = get_orchestrator()
+            orchestrator = await get_orchestrator(project_id)
         except ValueError as e:
             # API key not configured
             yield {"type": "error", "data": {"message": str(e)}}
@@ -489,10 +489,7 @@ Please analyze the request, create a plan if needed, and implement the solution.
                 logger.info("🤖 STARTING MULTI-AGENT TEAM EXECUTION (STREAMING)")
                 logger.info("=" * 80)
 
-                # Load saved agent state if it exists
-                state_loaded = await orchestrator.load_state(project_id)
-                if state_loaded:
-                    logger.info("♻️  Restored agent state from previous session")
+                # Note: Agent state is automatically loaded in get_orchestrator(project_id)
 
                 # List to collect all agent interactions for database storage
                 agent_interactions = []

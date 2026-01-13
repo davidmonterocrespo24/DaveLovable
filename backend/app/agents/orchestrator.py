@@ -249,13 +249,111 @@ class AgentOrchestrator:
             return False
 
 
-# Singleton instance
-_orchestrator = None
+import asyncio
+from datetime import datetime, timedelta
+from typing import Dict, Optional
 
 
-def get_orchestrator() -> AgentOrchestrator:
-    """Get or create the agent orchestrator singleton"""
-    global _orchestrator
-    if _orchestrator is None:
-        _orchestrator = AgentOrchestrator()
-    return _orchestrator
+class OrchestratorManager:
+    """Manages orchestrator instances per project with automatic cleanup after inactivity"""
+
+    def __init__(self, inactivity_timeout: int = 1200):  # 20 minutes = 1200 seconds
+        self._orchestrators: Dict[int, tuple[AgentOrchestrator, datetime]] = {}
+        self._locks: Dict[int, asyncio.Lock] = {}
+        self._inactivity_timeout = inactivity_timeout
+        self._cleanup_task: Optional[asyncio.Task] = None
+
+    async def get_orchestrator(self, project_id: int) -> AgentOrchestrator:
+        """Get or create an orchestrator instance for a specific project"""
+        # Create lock for this project if it doesn't exist
+        if project_id not in self._locks:
+            self._locks[project_id] = asyncio.Lock()
+
+        async with self._locks[project_id]:
+            # Update last access time if orchestrator exists
+            if project_id in self._orchestrators:
+                orchestrator, _ = self._orchestrators[project_id]
+                self._orchestrators[project_id] = (orchestrator, datetime.now())
+                logger.info(f"♻️  Reusing existing orchestrator for project {project_id}")
+                return orchestrator
+
+            # Create new orchestrator for this project
+            logger.info(f"🆕 Creating new orchestrator instance for project {project_id}")
+            orchestrator = AgentOrchestrator()
+
+            # Try to load saved state
+            state_loaded = await orchestrator.load_state(project_id)
+            if state_loaded:
+                logger.info(f"✅ Loaded saved state for project {project_id}")
+
+            # Store with current timestamp
+            self._orchestrators[project_id] = (orchestrator, datetime.now())
+
+            # Start cleanup task if not running
+            if self._cleanup_task is None or self._cleanup_task.done():
+                self._cleanup_task = asyncio.create_task(self._cleanup_inactive_orchestrators())
+
+            return orchestrator
+
+    async def release_orchestrator(self, project_id: int) -> None:
+        """Manually release an orchestrator and save its state"""
+        if project_id not in self._locks:
+            return
+
+        async with self._locks[project_id]:
+            if project_id in self._orchestrators:
+                orchestrator, _ = self._orchestrators[project_id]
+                logger.info(f"💾 Saving state for project {project_id} before release")
+                await orchestrator.save_state(project_id)
+                await orchestrator.close()
+                del self._orchestrators[project_id]
+                logger.info(f"🗑️  Released orchestrator for project {project_id}")
+
+    async def _cleanup_inactive_orchestrators(self) -> None:
+        """Background task to cleanup inactive orchestrators"""
+        while True:
+            try:
+                await asyncio.sleep(60)  # Check every minute
+                now = datetime.now()
+                inactive_projects = []
+
+                # Find inactive projects
+                for project_id, (orchestrator, last_access) in list(self._orchestrators.items()):
+                    if now - last_access > timedelta(seconds=self._inactivity_timeout):
+                        inactive_projects.append(project_id)
+
+                # Cleanup inactive projects
+                for project_id in inactive_projects:
+                    logger.info(f"⏰ Project {project_id} inactive for {self._inactivity_timeout}s, cleaning up...")
+                    await self.release_orchestrator(project_id)
+
+            except Exception as e:
+                logger.error(f"❌ Error in orchestrator cleanup task: {e}")
+                await asyncio.sleep(60)  # Continue trying
+
+    async def shutdown(self) -> None:
+        """Shutdown all orchestrators and save their states"""
+        logger.info("🛑 Shutting down all orchestrators...")
+        for project_id in list(self._orchestrators.keys()):
+            await self.release_orchestrator(project_id)
+        if self._cleanup_task and not self._cleanup_task.done():
+            self._cleanup_task.cancel()
+
+
+# Global orchestrator manager instance
+_manager = OrchestratorManager()
+
+
+async def get_orchestrator(project_id: int) -> AgentOrchestrator:
+    """Get or create an orchestrator instance for a specific project"""
+    return await _manager.get_orchestrator(project_id)
+
+
+async def release_orchestrator(project_id: int) -> None:
+    """Release an orchestrator instance and save its state"""
+    await _manager.release_orchestrator(project_id)
+
+
+async def shutdown_orchestrators() -> None:
+    """Shutdown all orchestrators gracefully"""
+    await _manager.shutdown()
