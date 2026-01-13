@@ -496,6 +496,10 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
                 # List to collect all agent interactions for database storage
                 agent_interactions = []
+                
+                # Dictionary to store pending tool calls to retrieve arguments later
+                # Format: {call_id: {name: str, arguments: dict}}
+                pending_tool_calls = {}
 
                 # Track assistant message for incremental updates
                 assistant_message_id = None
@@ -613,6 +617,16 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             # Stream to frontend
                             yield {"type": "agent_interaction", "data": interaction_data}
 
+                            # Store tool call arguments for later use in execution event
+                            # We need this to get the 'content' argument for write_file/update_file tools
+                            try:
+                                pending_tool_calls[tool_call.id] = {
+                                    "name": tool_call.name,
+                                    "arguments": tool_args
+                                }
+                            except Exception as e:
+                                logger.warning(f"⚠️ Failed to store pending tool call: {e}")
+
                     # ToolCallExecutionEvent - Tool results
                     elif event_type == "ToolCallExecutionEvent":
                         for tool_result in message.content:
@@ -644,12 +658,57 @@ Please analyze the request, create a plan if needed, and implement the solution.
                         tool_names = [r.name for r in message.content]
                         if any(name in file_mod_tools for name in tool_names):
                             logger.info(f"📁 [Files Update] Detected file modification tools: {tool_names}")
+                            
+                            # Extract file updates from tool arguments
+                            updated_files = []
+                            
+                            for tool_result in message.content:
+                                if tool_result.name in file_mod_tools:
+                                    # Try to find original call arguments
+                                    call_id = tool_result.call_id
+                                    if call_id and call_id in pending_tool_calls:
+                                        args = pending_tool_calls[call_id]["arguments"]
+                                        
+                                        # Extract file path and content based on tool type
+                                        if tool_result.name == "write_file":
+                                            if "filepath" in args and "content" in args:
+                                                updated_files.append({
+                                                    "path": args["filepath"],
+                                                    "content": args["content"]
+                                                })
+                                        # Note: other tools like replace_file_content are partial edits
+                                        # We can't push partial content easily to WebContainer
+                                        # For those, we might still need to rely on the side-effect (or read from disk)
+                                        # BUT: WebContainers filesystem operations are fast. 
+                                        # If replace_file_content was used, the file on disk IS updated. 
+                                        # We can read it back and push it.
+                                        elif tool_result.name in ["replace_file_content", "edit_file", "multi_replace_file_content"]:
+                                            # For edits, we need the TargetFile/filepath
+                                            target_file = args.get("TargetFile") or args.get("filepath") or args.get("file_path")
+                                            
+                                            if target_file:
+                                                # Read the FULL updated content from disk to ensure correctness
+                                                # This is safe because the tool has already executed (we are in execution event)
+                                                content = FileSystemService.read_file(project_id, target_file)
+                                                if content:
+                                                    updated_files.append({
+                                                        "path": target_file,
+                                                        "content": content
+                                                    })
+                            
+                            # Construct payload
+                            data_payload = {
+                                "message": "File updated",
+                                "project_id": project_id,
+                            }
+                            
+                            if updated_files:
+                                data_payload["files"] = updated_files
+                                logger.info(f"🚀 [Files Push] Pushing {len(updated_files)} files directly to frontend")
+
                             yield {
                                 "type": "files_ready",
-                                "data": {
-                                    "message": "File updated",
-                                    "project_id": project_id,
-                                },
+                                "data": data_payload,
                             }
 
                     # TaskResult - Final

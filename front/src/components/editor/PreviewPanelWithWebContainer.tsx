@@ -15,7 +15,7 @@ import {
   Copy,
   Check
 } from 'lucide-react';
-import { loadProject, reloadProjectFiles } from '@/services/webcontainer';
+import { loadProject, reloadProjectFiles, updateProjectFiles } from '@/services/webcontainer';
 import { initializeLogCapture } from '@/services/browserLogs';
 import { API_URL } from '@/services/api';
 
@@ -53,6 +53,7 @@ export interface PreviewPanelRef {
   reload: () => void;
   updateStyle: (property: string, value: string) => void;
   captureAndSendScreenshot: () => Promise<boolean>;
+  applyFileUpdates: (files: Array<{ path: string, content: string }>) => Promise<void>;
 }
 
 export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
@@ -356,6 +357,29 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           return true;
         }
         return false;
+        return false;
+      },
+      applyFileUpdates: async (files: Array<{ path: string, content: string }>) => {
+        try {
+          await updateProjectFiles(files, (msg) => {
+            if (msg.includes('ERROR')) addLog('error', msg);
+            else addLog('info', msg);
+          });
+
+          // If we're in visual mode, re-send visual mode state after update
+          // to ensure overlays are preserved/re-attached if DOM changed
+          if (isVisualMode && iframeRef.current?.contentWindow) {
+            setTimeout(() => {
+              iframeRef.current?.contentWindow?.postMessage({
+                type: 'visual-editor:toggle-mode',
+                enabled: true
+              }, '*');
+            }, 500);
+          }
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          addLog('error', `[Push] Update failed: ${msg}`);
+        }
       }
     }));
 

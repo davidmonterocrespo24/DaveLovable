@@ -563,6 +563,38 @@ export async function reloadProjectFiles(
 }
 
 /**
+ * Update project files directly (Push model)
+ */
+export async function updateProjectFiles(
+  files: Array<{ path: string, content: string }>,
+  onLog?: (message: string) => void
+): Promise<void> {
+  if (!webcontainerInstance) {
+    if (onLog) onLog('⚠️ WebContainer not initialized, skipping update');
+    return;
+  }
+
+  const log = (msg: string) => {
+    console.log(msg);
+    if (onLog) onLog(msg);
+  };
+
+  try {
+    const promises = files.map(async (file) => {
+      await webcontainerInstance!.fs.writeFile(file.path, file.content);
+      fileContentCache.set(file.path, file.content);
+    });
+
+    await Promise.all(promises);
+    log(`[WebContainer] Pushed ${files.length} file updates ⚡`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (onLog) onLog(`ERROR: Failed to push updates: ${message}`);
+    throw err;
+  }
+}
+
+/**
  * Clean up WebContainer instance
  */
 export async function teardown(): Promise<void> {

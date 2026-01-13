@@ -540,6 +540,7 @@ const Editor = () => {
                   onVisualModeChange={handleVisualModeChange}
                   onStyleUpdate={handleStyleUpdate}
                   selectedElement={selectedElement}
+                  onFileUpdate={handleFileUpdate}
                 />
                 {/* Toggle Chat Button - positioned at right edge of chat panel */}
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-full z-10">

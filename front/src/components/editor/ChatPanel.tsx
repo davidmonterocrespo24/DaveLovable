@@ -50,7 +50,9 @@ interface ChatPanelProps {
   // Visual Editor Props
   onVisualModeChange?: (isVisualMode: boolean) => void;
   onStyleUpdate?: (property: string, value: string) => void;
+
   selectedElement?: SelectedElementData;
+  onFileUpdate?: (files: Array<{ path: string, content: string }>) => void;
 }
 
 export interface ChatPanelRef {
@@ -66,7 +68,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     onReloadPreview,
     onVisualModeChange,
     onStyleUpdate,
-    selectedElement
+    selectedElement,
+    onFileUpdate
   }, ref) => {
     const queryClient = useQueryClient();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -377,6 +380,20 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
               console.log('[ChatPanel] 📁 Starting refresh sequence...');
 
+              // CHECK FOR PUSH UPDATE (Robust Fix)
+              const payload = data as any;
+              if (payload.files && Array.isArray(payload.files) && payload.files.length > 0) {
+                console.log(`[ChatPanel] 🚀 Received ${data.files.length} pushed files. Updating WebContainer immediately.`);
+                if (onFileUpdate) {
+                  onFileUpdate(data.files);
+
+                  // Clear any pending reload because we just updated strictly
+                  // This prevents the "Double Reload" from firing unnecessarily if it was scheduled
+                  pendingReloadRef.current = null;
+                  setShouldTriggerReload(false);
+                }
+              }
+
               // Invalidate query to mark data as stale
               // FIX: Use specific fileKeys list to ensure FileExplorer updates
               queryClient.invalidateQueries({ queryKey: fileKeys.list(projectId) });
@@ -459,18 +476,18 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   }
                 };
 
-                // First reload: Quick check (1.0s)
+                // First reload: Wait longer for FS to settle (2.5s)
                 setTimeout(() => {
                   console.log('[ChatPanel] 🔄 executing FIRST reload...');
                   triggerReload();
-                }, 1000);
+                }, 2500);
 
-                // Second reload: Safety check (4.0s) to ensure everything is caught
+                // Second reload: Safety check (6.0s) to ensure everything is caught
                 setTimeout(() => {
                   console.log('[ChatPanel] 🔄 executing SECOND reload (final consistency check)...');
                   triggerReload();
                   reloadScheduledRef.current = false; // Reset flag after final reload
-                }, 4000);
+                }, 6000);
               }
             },
             onComplete: (data) => {
