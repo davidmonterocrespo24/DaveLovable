@@ -262,27 +262,17 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     // Handle WebContainer reload AFTER streaming completes
     // Note: We don't include 'messages' in dependencies to avoid re-triggering loop
     useEffect(() => {
-      if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview && !reloadScheduledRef.current) {
-        console.log('[ChatPanel] Scheduling WebContainer reload (one-time trigger)');
-        reloadScheduledRef.current = true; // Mark as scheduled to prevent duplicates
-
-        // Short delay since files were already refetched via files_ready event
-        const reloadTimer = setTimeout(() => {
-          console.log('[ChatPanel] Executing WebContainer reload now');
-          if (onReloadPreview && pendingReloadRef.current) {
-            onReloadPreview(pendingReloadRef.current);
-            pendingReloadRef.current = null;
-            setShouldTriggerReload(false);
-            reloadScheduledRef.current = false; // Reset for next time
-          }
-        }, 500); // 500ms: minimal delay since files are already ready
-
-        return () => {
-          clearTimeout(reloadTimer);
-          reloadScheduledRef.current = false; // Reset on cleanup
-        };
+      // Allow reload even if scheduled (we manage that manually in the callback now)
+      // Only check pendingReloadRef and isStreaming for the "fallback" behavior
+      if (shouldTriggerReload && !isStreaming && pendingReloadRef.current && onReloadPreview) {
+        console.log('[ChatPanel] fallback reload trigger (stream ended)');
+        if (onReloadPreview && pendingReloadRef.current) {
+          onReloadPreview(pendingReloadRef.current);
+          pendingReloadRef.current = null;
+          setShouldTriggerReload(false);
+        }
       }
-    }, [shouldTriggerReload, isStreaming, onReloadPreview]); // Removed 'messages' to prevent loop
+    }, [shouldTriggerReload, isStreaming, onReloadPreview]);
 
     const handleSend = async (messageOverride?: string) => {
       const messageContent = messageOverride || input;
@@ -461,27 +451,26 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
 
               if (onReloadPreview && !reloadScheduledRef.current) {
                 console.log('[ChatPanel] 🔄 Triggering DOUBLE WebContainer reload strategy...');
-                reloadScheduledRef.current = true;
+                reloadScheduledRef.current = true; // Prevent other events from interfering
 
-                // First reload: Quick check (1.5s)
+                const triggerReload = () => {
+                  if (onReloadPreview) {
+                    onReloadPreview(data);
+                  }
+                };
+
+                // First reload: Quick check (1.0s)
                 setTimeout(() => {
                   console.log('[ChatPanel] 🔄 executing FIRST reload...');
-                  setShouldTriggerReload(true);
-
-                  // Reset scheduled flag briefly to allow second reload to pass checks if needed
-                  // But actually, the useEffect handles the reset of shouldTriggerReload
-                  // We just need to make sure we can trigger it again.
-                }, 1500);
+                  triggerReload();
+                }, 1000);
 
                 // Second reload: Safety check (4.0s) to ensure everything is caught
                 setTimeout(() => {
                   console.log('[ChatPanel] 🔄 executing SECOND reload (final consistency check)...');
-                  setShouldTriggerReload(true);
-                  // We keep reloadScheduledRef true until the very end to prevent 
-                  // other events from interfering, but we might need to toggle it 
-                  // if the useEffect checks it strictly.
-                  // Let's rely on the fact that useEffect resets `shouldTriggerReload` to false.
-                }, 1500);
+                  triggerReload();
+                  reloadScheduledRef.current = false; // Reset flag after final reload
+                }, 4000);
               }
             },
             onComplete: (data) => {
