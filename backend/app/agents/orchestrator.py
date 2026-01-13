@@ -121,26 +121,32 @@ class AgentOrchestrator:
                 return "Coder"
 
             last_message = messages[-1]
+            logger.info(f"🔄 [Selector] Last message from: {last_message.source}, type: {type(last_message).__name__}")
 
-            # If Planner just spoke, it's Coder's turn
+            # CRITICAL: If Planner just spoke, it's ALWAYS Coder's turn (never terminate after Planner)
             if last_message.source == "Planner":
+                logger.info("🔄 [Selector] Planner just spoke -> Selecting Coder (MANDATORY)")
                 return "Coder"
 
             # If Coder just spoke
             if last_message.source == "Coder":
                 # Check for explicit signals in TextMessage
                 if isinstance(last_message, TextMessage):
+                    if "TERMINATE" in last_message.content:
+                        logger.info("🔄 [Selector] Coder said TERMINATE -> Ending conversation")
+                        return None  # Let termination condition handle it
                     if "DELEGATE_TO_PLANNER" in last_message.content:
+                        logger.info("🔄 [Selector] Coder delegating to Planner")
                         return "Planner"
                     if "SUBTASK_DONE" in last_message.content:
+                        logger.info("🔄 [Selector] Coder subtask done -> Back to Planner")
                         return "Planner"
-                    if "TERMINATE" in last_message.content:
-                        return None  # Let termination condition handle it
 
                 # If Coder just sent a tool call (AssistantMessage with tool calls)
                 # We usually want Coder to receive the result.
                 # But here we assume the runtime executes the tool and appends the result.
                 # We want to ensure Coder gets the next turn to read the result.
+                logger.info("🔄 [Selector] Coder waiting for tool result -> Keep Coder")
                 return "Coder"
 
             # If the last message was a tool execution result
@@ -148,24 +154,29 @@ class AgentOrchestrator:
             # We must verify the type to be sure.
             if type(last_message).__name__ == "FunctionExecutionResultMessage":
                 # Tool finished, give control back to Coder to handle the output
+                logger.info("🔄 [Selector] Tool result received -> Back to Coder")
                 return "Coder"
 
             # If the last message is from the User
             if last_message.source == "user":
                 # Check for visual edit tag
                 if "[VISUAL EDIT]" in last_message.content:
-                    logger.info("🎨 Visual Edit detected - Routing directly to Coder")
+                    logger.info("🎨 [Selector] Visual Edit detected - Routing directly to Coder")
                     return "Coder"
 
                 # Check for bug fix tag
                 if "[BUG FIX]" in last_message.content:
-                    logger.info("🐛 Bug Fix detected - Routing directly to Coder")
+                    logger.info("🐛 [Selector] Bug Fix detected - Routing directly to Coder")
                     return "Coder"
 
                 # Default to Planner for normal requests
+                logger.info("�� [Selector] User message -> Starting with Planner")
                 return "Planner"
 
-            return None
+            # FALLBACK: Never return None unless we explicitly want to terminate
+            # If we don't recognize the source, default to Coder to continue
+            logger.warning(f"⚠️ [Selector] Unknown message source: {last_message.source} -> Defaulting to Coder")
+            return "Coder"
 
         # Use SelectorGroupChat with custom selector
         self.main_team = SelectorGroupChat(

@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useProjects, useCreateProject, useDeleteProject } from '@/hooks/useProjects';
 import { Button } from '@/components/ui/button';
 import { Plus, Folder, Calendar, Trash2, MoreVertical, Sparkles, ArrowRight } from 'lucide-react';
@@ -35,6 +35,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
 const Projects = () => {
+  const navigate = useNavigate();
   const { data: projects, isLoading } = useProjects();
   const createProject = useCreateProject();
   const deleteProject = useDeleteProject();
@@ -66,10 +67,6 @@ const Projects = () => {
     } catch (error) {
       console.error('Failed to create project:', error);
     }
-  };
-
-  const openCreateDialog = () => {
-    setShowCreateDialog(true);
   };
 
   const handleDeleteProject = (id: number, name: string, e: React.MouseEvent) => {
@@ -147,7 +144,7 @@ const Projects = () => {
                 </p>
               </div>
               <Button
-                onClick={openCreateDialog}
+                onClick={() => navigate('/')}
                 size="lg"
                 className="mt-6 md:mt-0 bg-gradient-primary hover:scale-105 transition-all glow-primary"
               >
@@ -168,7 +165,7 @@ const Projects = () => {
                     Create your first project and start building with AI assistance
                   </p>
                   <Button
-                    onClick={openCreateDialog}
+                    onClick={() => navigate('/')}
                     size="lg"
                     className="bg-gradient-primary hover:scale-105 transition-all glow-primary"
                   >
