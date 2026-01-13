@@ -481,6 +481,7 @@ export async function reloadProjectFiles(
   onLog?: (message: string) => void
 ): Promise<void> {
   const log = (msg: string) => {
+    console.log(msg); // Force log to console for debugging!
     if (onLog) onLog(msg);
   };
 
