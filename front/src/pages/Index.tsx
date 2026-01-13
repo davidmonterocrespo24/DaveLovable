@@ -4,6 +4,8 @@ import { Plus, ArrowUp, Sparkles, Loader2 } from "lucide-react";
 import { useCreateProject } from "@/hooks/useProjects";
 import { useProjects } from "@/hooks/useProjects";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { AuthModal } from "@/components/auth/AuthModal";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import FeaturesSection from "@/components/FeaturesSection";
@@ -15,9 +17,12 @@ const Index = () => {
   const [showGallery, setShowGallery] = useState(false);
   const [displayedProjects, setDisplayedProjects] = useState(16);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [pendingMessage, setPendingMessage] = useState("");
   const galleryRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const createProject = useCreateProject();
   const { data: projects } = useProjects();
 
@@ -40,6 +45,13 @@ const Index = () => {
         description: "Please describe what you want to build",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!isAuthenticated) {
+      setPendingMessage(message);
+      setShowAuthModal(true);
       return;
     }
 
@@ -87,6 +99,16 @@ const Index = () => {
         variant: "destructive",
       });
       setIsSubmitting(false);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    // After successful authentication, submit the pending message
+    if (pendingMessage.trim()) {
+      setMessage(pendingMessage);
+      setPendingMessage("");
+      // Trigger submit with the pending message
+      setTimeout(() => handleSubmit(), 100);
     }
   };
 
@@ -258,6 +280,13 @@ const Index = () => {
       <DocsSection />
 
       <Footer />
+
+      {/* Auth Modal */}
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={handleAuthSuccess}
+      />
     </main>
   );
 };

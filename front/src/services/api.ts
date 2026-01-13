@@ -53,6 +53,32 @@ export interface ChatSession {
   messages?: ChatMessage[];
 }
 
+// Auth types
+export interface User {
+  id: number;
+  email: string;
+  username: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+}
+
 export interface CreateProjectRequest {
   name: string;
   description?: string;
@@ -107,19 +133,42 @@ class ApiError extends Error {
   }
 }
 
+// Get auth token from localStorage
+export function getAuthToken(): string | null {
+  return localStorage.getItem('auth_token');
+}
+
+// Set auth token in localStorage
+export function setAuthToken(token: string): void {
+  localStorage.setItem('auth_token', token);
+}
+
+// Remove auth token from localStorage
+export function removeAuthToken(): void {
+  localStorage.removeItem('auth_token');
+}
+
 // Helper function for API requests
 async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
+  const token = getAuthToken();
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options.headers as Record<string, string>),
+  };
+
+  // Add Authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
 
   const response = await fetch(url, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {
@@ -433,6 +482,42 @@ export const chatApi = {
       total_messages: number;
       has_more: boolean;
     }>(`/chat/${projectId}/sessions/${sessionId}/reconnect?since_message_id=${sinceMessageId}`);
+  },
+};
+
+// Auth API
+export const authApi = {
+  // Register new user
+  register: (data: RegisterRequest): Promise<User> => {
+    return fetchApi<User>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  // Login user
+  login: (email: string, password: string): Promise<AuthResponse> => {
+    const params = new URLSearchParams();
+    params.append('email', email);
+    params.append('password', password);
+
+    return fetchApi<AuthResponse>('/auth/login', {
+      method: 'POST',
+      body: params.toString(),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
+  },
+
+  // Get current user
+  me: (): Promise<User> => {
+    return fetchApi<User>('/auth/me');
+  },
+
+  // Logout (client-side only - removes token)
+  logout: (): void => {
+    removeAuthToken();
   },
 };
 

@@ -5,7 +5,9 @@ from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import get_current_active_user
 from app.db import get_db
+from app.models.user import User
 from app.schemas import (
     ChatMessage,
     ChatRequest,
@@ -15,12 +17,18 @@ from app.schemas import (
     ChatSessionWithMessages,
 )
 from app.services import ChatService
+from app.services.project_service import ProjectService
 
 router = APIRouter()
 
 
 @router.post("/{project_id}/stream")
-async def send_chat_message_stream(project_id: int, chat_request: ChatRequest, db: Session = Depends(get_db)):
+async def send_chat_message_stream(
+    project_id: int,
+    chat_request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Send a chat message and stream AI response with real-time agent interactions
 
@@ -30,6 +38,8 @@ async def send_chat_message_stream(project_id: int, chat_request: ChatRequest, d
     - Tool execution results
     - Final response with code changes
     """
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     async def event_generator():
         import asyncio
@@ -72,7 +82,12 @@ async def send_chat_message_stream(project_id: int, chat_request: ChatRequest, d
 
 
 @router.post("/{project_id}", response_model=ChatResponse)
-async def send_chat_message(project_id: int, chat_request: ChatRequest, db: Session = Depends(get_db)):
+async def send_chat_message(
+    project_id: int,
+    chat_request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Send a chat message and get AI response (non-streaming, backward compatible)
 
@@ -83,25 +98,51 @@ async def send_chat_message(project_id: int, chat_request: ChatRequest, db: Sess
     - Updates project files based on AI response
     - Returns the assistant's message and code changes
     """
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
+
     return await ChatService.process_chat_message(db, project_id, chat_request)
 
 
 @router.post("/{project_id}/sessions", response_model=ChatSession, status_code=status.HTTP_201_CREATED)
-def create_chat_session(project_id: int, session_data: ChatSessionCreate, db: Session = Depends(get_db)):
+def create_chat_session(
+    project_id: int,
+    session_data: ChatSessionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Create a new chat session"""
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
+
     return ChatService.create_session(db, session_data)
 
 
 @router.get("/{project_id}/sessions", response_model=List[ChatSession])
-def get_chat_sessions(project_id: int, db: Session = Depends(get_db)):
+def get_chat_sessions(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get all chat sessions for a project"""
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
+
     return ChatService.get_sessions(db, project_id)
 
 
 @router.get("/{project_id}/sessions/{session_id}", response_model=ChatSessionWithMessages)
-def get_chat_session(project_id: int, session_id: int, db: Session = Depends(get_db)):
+def get_chat_session(
+    project_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get a specific chat session with all messages"""
     from app.schemas.chat import ChatMessage as ChatMessageSchema
+
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     session = ChatService.get_session(db, session_id, project_id)
     db_messages = ChatService.get_messages(db, session_id)
@@ -120,8 +161,17 @@ def get_chat_session(project_id: int, session_id: int, db: Session = Depends(get
 
 
 @router.get("/{project_id}/sessions/{session_id}/messages", response_model=List[ChatMessage])
-def get_session_messages(project_id: int, session_id: int, limit: int = 100, db: Session = Depends(get_db)):
+def get_session_messages(
+    project_id: int,
+    session_id: int,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get messages for a chat session"""
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
+
     # Verify session belongs to project
     ChatService.get_session(db, session_id, project_id)
     return ChatService.get_messages(db, session_id, limit)
@@ -129,7 +179,11 @@ def get_session_messages(project_id: int, session_id: int, limit: int = 100, db:
 
 @router.get("/{project_id}/sessions/{session_id}/reconnect")
 async def reconnect_to_session(
-    project_id: int, session_id: int, since_message_id: int = 0, db: Session = Depends(get_db)
+    project_id: int,
+    session_id: int,
+    since_message_id: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     Reconnect to a session and get any new messages since the last known message
@@ -140,6 +194,9 @@ async def reconnect_to_session(
     - Allows frontend to catch up after refresh/disconnection
     """
     from app.schemas.chat import ChatMessage as ChatMessageSchema
+
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Verify session belongs to project
     session = ChatService.get_session(db, session_id, project_id)
@@ -163,7 +220,15 @@ async def reconnect_to_session(
 
 
 @router.delete("/{project_id}/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_chat_session(project_id: int, session_id: int, db: Session = Depends(get_db)):
+def delete_chat_session(
+    project_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Delete a chat session"""
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
+
     ChatService.delete_session(db, session_id, project_id)
     return None

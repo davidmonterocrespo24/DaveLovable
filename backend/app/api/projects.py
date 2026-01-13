@@ -12,8 +12,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.api.dependencies import get_current_active_user
 from app.core.config import settings
 from app.db import get_db
+from app.models.user import User
 from app.schemas import (
     Project,
     ProjectCreate,
@@ -30,9 +32,6 @@ from app.services.screenshot_service import ScreenshotService
 
 router = APIRouter()
 
-# Mock user ID for now (in production, get from JWT token)
-MOCK_USER_ID = 1
-
 
 class ProjectFromMessageRequest(BaseModel):
     message: str
@@ -44,7 +43,11 @@ class ProjectFromMessageResponse(BaseModel):
 
 
 @router.post("/from-message", response_model=ProjectFromMessageResponse, status_code=status.HTTP_201_CREATED)
-async def create_project_from_message(request: ProjectFromMessageRequest, db: Session = Depends(get_db)):
+async def create_project_from_message(
+    request: ProjectFromMessageRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Create a new project from a user message.
     Uses AI to generate project name and description from the message.
@@ -121,27 +124,40 @@ Remember to return ONLY the JSON object, nothing else."""
     # Create the project
     project_data = ProjectCreate(name=project_name, description=project_description)
 
-    project = ProjectService.create_project(db, project_data, MOCK_USER_ID)
+    project = ProjectService.create_project(db, project_data, current_user.id)
 
     return ProjectFromMessageResponse(project=project, initial_message=user_message)
 
 
 @router.post("", response_model=Project, status_code=status.HTTP_201_CREATED)
-def create_project(project: ProjectCreate, db: Session = Depends(get_db)):
+def create_project(
+    project: ProjectCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Create a new project"""
-    return ProjectService.create_project(db, project, MOCK_USER_ID)
+    return ProjectService.create_project(db, project, current_user.id)
 
 
 @router.get("", response_model=List[Project])
-def get_projects(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def get_projects(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get all projects for the current user"""
-    return ProjectService.get_projects(db, MOCK_USER_ID, skip, limit)
+    return ProjectService.get_projects(db, current_user.id, skip, limit)
 
 
 @router.get("/{project_id}", response_model=ProjectWithFiles)
-def get_project(project_id: int, db: Session = Depends(get_db)):
+def get_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get a specific project with its files (read from filesystem)"""
-    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    project = ProjectService.get_project(db, project_id, current_user.id)
 
     # Get files from filesystem (not database)
     files = FileSystemService.get_all_project_files(project_id)
@@ -165,33 +181,51 @@ def get_project(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.put("/{project_id}", response_model=Project)
-def update_project(project_id: int, project_update: ProjectUpdate, db: Session = Depends(get_db)):
+def update_project(
+    project_id: int,
+    project_update: ProjectUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Update a project"""
-    return ProjectService.update_project(db, project_id, MOCK_USER_ID, project_update)
+    return ProjectService.update_project(db, project_id, current_user.id, project_update)
 
 
 @router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(project_id: int, db: Session = Depends(get_db)):
+def delete_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Delete a project"""
-    ProjectService.delete_project(db, project_id, MOCK_USER_ID)
+    ProjectService.delete_project(db, project_id, current_user.id)
     return None
 
 
 @router.get("/{project_id}/files", response_model=List[ProjectFile])
-def get_project_files(project_id: int, db: Session = Depends(get_db)):
+def get_project_files(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get all files for a project (read from filesystem)"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Get files from filesystem
     return FileSystemService.get_all_project_files(project_id)
 
 
 @router.post("/{project_id}/files", response_model=ProjectFile, status_code=status.HTTP_201_CREATED)
-def add_file_to_project(project_id: int, file_data: ProjectFileCreate, db: Session = Depends(get_db)):
+def add_file_to_project(
+    project_id: int,
+    file_data: ProjectFileCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Add a file to a project (writes to filesystem only)"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Write file to filesystem
     FileSystemService.write_file(project_id, file_data.filepath, file_data.content)
@@ -220,11 +254,15 @@ def add_file_to_project(project_id: int, file_data: ProjectFileCreate, db: Sessi
 
 @router.put("/{project_id}/files/{file_id}", response_model=ProjectFile)
 def update_file(
-    project_id: int, file_id: int, file_update: ProjectFileUpdate = Body(...), db: Session = Depends(get_db)
+    project_id: int,
+    file_id: int,
+    file_update: ProjectFileUpdate = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
 ):
     """Update a file's content (writes to filesystem only)"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Get the filepath - we need to find it by file_id
     # Since we're not using DB anymore, we need filepath from the update
@@ -256,10 +294,16 @@ def update_file(
 
 
 @router.delete("/{project_id}/files/{file_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_file(project_id: int, file_id: int, filepath: str = Body(..., embed=True), db: Session = Depends(get_db)):
+def delete_file(
+    project_id: int,
+    file_id: int,
+    filepath: str = Body(..., embed=True),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Delete a file from a project (deletes from filesystem only)"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Delete from filesystem
     FileSystemService.delete_file(project_id, filepath)
@@ -267,13 +311,17 @@ def delete_file(project_id: int, file_id: int, filepath: str = Body(..., embed=T
 
 
 @router.get("/{project_id}/bundle")
-def get_project_bundle(project_id: int, db: Session = Depends(get_db)):
+def get_project_bundle(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Get all project files as a bundle for WebContainers
     Returns: { "files": { "path": "content", ... } }
     """
     # Verify ownership
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Get all files from filesystem
     files_list = FileSystemService.get_all_files(project_id)
@@ -294,7 +342,12 @@ def get_project_bundle(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{project_id}/git/history")
-def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_db)):
+def get_git_history(
+    project_id: int,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Get Git commit history for a project
 
@@ -306,7 +359,7 @@ def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_
         List of commits with hash, author, date, and message
     """
     # Verify ownership
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    ProjectService.get_project(db, project_id, current_user.id)
 
     # Limit to max 100 commits
     limit = min(limit, 100)
@@ -317,7 +370,12 @@ def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_
 
 
 @router.get("/{project_id}/git/diff")
-def get_git_diff(project_id: int, filepath: str = None, db: Session = Depends(get_db)):
+def get_git_diff(
+    project_id: int,
+    filepath: str = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Get Git diff of uncommitted changes
 
@@ -329,7 +387,7 @@ def get_git_diff(project_id: int, filepath: str = None, db: Session = Depends(ge
         Git diff output
     """
     # Verify ownership
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    ProjectService.get_project(db, project_id, current_user.id)
 
     diff_output = GitService.get_diff(project_id, filepath)
 
@@ -337,7 +395,13 @@ def get_git_diff(project_id: int, filepath: str = None, db: Session = Depends(ge
 
 
 @router.get("/{project_id}/git/file/{commit_hash}")
-def get_file_at_commit(project_id: int, commit_hash: str, filepath: str, db: Session = Depends(get_db)):
+def get_file_at_commit(
+    project_id: int,
+    commit_hash: str,
+    filepath: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Get file content at a specific commit
 
@@ -350,7 +414,7 @@ def get_file_at_commit(project_id: int, commit_hash: str, filepath: str, db: Ses
         File content at the specified commit
     """
     # Verify ownership
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    ProjectService.get_project(db, project_id, current_user.id)
 
     content = GitService.get_file_at_commit(project_id, filepath, commit_hash)
 
@@ -363,7 +427,12 @@ def get_file_at_commit(project_id: int, commit_hash: str, filepath: str, db: Ses
 
 
 @router.post("/{project_id}/git/restore/{commit_hash}")
-def restore_to_commit(project_id: int, commit_hash: str, db: Session = Depends(get_db)):
+def restore_to_commit(
+    project_id: int,
+    commit_hash: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Restore project to a specific commit (creates a new commit)
 
@@ -375,7 +444,7 @@ def restore_to_commit(project_id: int, commit_hash: str, db: Session = Depends(g
         Success status
     """
     # Verify ownership
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    ProjectService.get_project(db, project_id, current_user.id)
 
     success = GitService.restore_commit(project_id, commit_hash)
 
@@ -391,10 +460,14 @@ def restore_to_commit(project_id: int, commit_hash: str, db: Session = Depends(g
 
 
 @router.get("/{project_id}/git/branch")
-def get_current_branch(project_id: int, db: Session = Depends(get_db)):
+def get_current_branch(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get current Git branch for a project"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     branch = GitService.get_current_branch(project_id)
 
@@ -402,10 +475,14 @@ def get_current_branch(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/{project_id}/git/config")
-def get_git_config(project_id: int, db: Session = Depends(get_db)):
+def get_git_config(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Get Git remote configuration for a project"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     config = GitService.get_remote_config(project_id)
 
@@ -413,10 +490,15 @@ def get_git_config(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{project_id}/git/config")
-def set_git_config(project_id: int, config: dict, db: Session = Depends(get_db)):
+def set_git_config(
+    project_id: int,
+    config: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Set or update Git remote configuration for a project"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     remote_url = config.get("remote_url", "")
     remote_name = config.get("remote_name", "origin")
@@ -439,10 +521,14 @@ def set_git_config(project_id: int, config: dict, db: Session = Depends(get_db))
 
 
 @router.post("/{project_id}/git/sync")
-def sync_with_remote(project_id: int, db: Session = Depends(get_db)):
+def sync_with_remote(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """Sync project with remote repository (fetch, pull, commit, push)"""
-    # Verify project exists
-    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    ProjectService.get_project(db, project_id, current_user.id)
 
     result = GitService.sync_with_remote(project_id)
 
@@ -450,7 +536,12 @@ def sync_with_remote(project_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{project_id}/thumbnail")
-def update_project_thumbnail(project_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+def update_project_thumbnail(
+    project_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Update project thumbnail by capturing screenshot of preview URL (DEPRECATED - use /thumbnail/upload)
 
@@ -461,8 +552,8 @@ def update_project_thumbnail(project_id: int, data: dict = Body(...), db: Sessio
     Returns:
         Success status and project_id
     """
-    # Verify project exists
-    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    project = ProjectService.get_project(db, project_id, current_user.id)
 
     preview_url = data.get("url", "")
 
@@ -486,7 +577,12 @@ def update_project_thumbnail(project_id: int, data: dict = Body(...), db: Sessio
 
 
 @router.post("/{project_id}/thumbnail/upload")
-def upload_project_thumbnail(project_id: int, data: dict = Body(...), db: Session = Depends(get_db)):
+def upload_project_thumbnail(
+    project_id: int,
+    data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Upload project thumbnail from frontend (base64 screenshot)
 
@@ -503,8 +599,8 @@ def upload_project_thumbnail(project_id: int, data: dict = Body(...), db: Sessio
 
     logger.info(f"📸 Receiving thumbnail upload for project {project_id}")
 
-    # Verify project exists
-    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    project = ProjectService.get_project(db, project_id, current_user.id)
 
     thumbnail_data = data.get("thumbnail", "")
 
@@ -535,7 +631,12 @@ def upload_project_thumbnail(project_id: int, data: dict = Body(...), db: Sessio
 
 
 @router.post("/{project_id}/visual-edit")
-def apply_visual_edit(project_id: int, edit_data: dict = Body(...), db: Session = Depends(get_db)):
+def apply_visual_edit(
+    project_id: int,
+    edit_data: dict = Body(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Apply visual style changes directly to a component file.
 
@@ -556,13 +657,17 @@ def apply_visual_edit(project_id: int, edit_data: dict = Body(...), db: Session 
     if not filepath or not element_selector or not style_changes:
         raise HTTPException(status_code=400, detail="filepath, element_selector, and style_changes are required")
 
-    result = ProjectService.apply_visual_edits(db, project_id, MOCK_USER_ID, filepath, element_selector, style_changes)
+    result = ProjectService.apply_visual_edits(db, project_id, current_user.id, filepath, element_selector, style_changes)
 
     return result
 
 
 @router.get("/{project_id}/download")
-def download_project(project_id: int, db: Session = Depends(get_db)):
+def download_project(
+    project_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
     """
     Download project as ZIP file
 
@@ -572,8 +677,8 @@ def download_project(project_id: int, db: Session = Depends(get_db)):
     Returns:
         ZIP file containing all project files
     """
-    # Verify project exists
-    project = ProjectService.get_project(db, project_id, MOCK_USER_ID)
+    # Verify project exists and user owns it
+    project = ProjectService.get_project(db, project_id, current_user.id)
 
     # Get project directory path
     project_dir = Path(__file__).parent.parent.parent / "projects" / f"project_{project_id}"
