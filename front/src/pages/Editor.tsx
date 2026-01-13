@@ -407,6 +407,13 @@ const Editor = () => {
     }
   };
 
+  const handleFileUpdate = (files: Array<{ path: string, content: string }>) => {
+    if (previewPanelRef.current) {
+      console.log(`[Editor] 🚀 Pushing ${files.length} file updates to preview panel`);
+      previewPanelRef.current.applyFileUpdates(files);
+    }
+  };
+
   const handleGitCommit = async (data: { success: boolean; error?: string; message?: string; commit_count?: number }) => {
     // Capture screenshot on first user commit (commit_count == 2)
     // commit_count == 1 is the initial "Project created" commit
