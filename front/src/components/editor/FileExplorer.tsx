@@ -226,6 +226,26 @@ export const FileExplorer = forwardRef<HTMLDivElement, FileExplorerProps>(
     const createFileMutation = useCreateFile();
     const deleteFileMutation = useDeleteFile();
 
+    // Auto-update selected file when backend updates it
+    useEffect(() => {
+      if (!selectedFile || files.length === 0) return;
+
+      // Find the currently selected file in the updated file list
+      const updatedFile = files.find(f => f.filename === selectedFile);
+
+      if (updatedFile) {
+        // Trigger a re-selection to force content update in the editor
+        // This ensures that when the agent updates a file that's currently open,
+        // the editor shows the new content immediately
+        onSelectFile({
+          name: updatedFile.filename,
+          id: updatedFile.id,
+          content: updatedFile.content,
+          filepath: updatedFile.filepath
+        });
+      }
+    }, [files]); // Trigger when files change (e.g., when agent updates them)
+
     const handleToggleFolder = (path: string) => {
       setExpandedFolders(prev => {
         const next = new Set(prev);
