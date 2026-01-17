@@ -30,13 +30,14 @@ class CommitMessageService:
             return len(text) // 4
 
     @staticmethod
-    def truncate_diff(diff: str, max_tokens: int = 100000) -> str:
+    def truncate_diff(diff: str, max_tokens: int = 900000) -> str:
         """
         Truncate diff to stay under token limit
 
         Args:
             diff: The git diff output
-            max_tokens: Maximum allowed tokens (default: 100k, leaving 20k for prompt/response)
+            max_tokens: Maximum allowed tokens (default: 900k for input, leaving 100k buffer and 64k for output)
+                       Gemini-3 Flash supports 1M input tokens and 64K output tokens
 
         Returns:
             Truncated diff
@@ -82,8 +83,8 @@ class CommitMessageService:
         Returns:
             Dictionary with 'title' (short message) and 'body' (detailed description)
         """
-        # Truncate diff to stay under token limit
-        truncated_diff = CommitMessageService.truncate_diff(diff, max_tokens=100000)
+        # Truncate diff to stay under token limit (Gemini-3 Flash: 1M input tokens)
+        truncated_diff = CommitMessageService.truncate_diff(diff, max_tokens=900000)
 
         # Build system and user messages
         system_prompt = "You are a helpful assistant that generates concise, meaningful Git commit messages. Always respond in valid JSON format."

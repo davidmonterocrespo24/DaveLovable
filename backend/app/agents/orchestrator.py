@@ -80,15 +80,16 @@ class AgentOrchestrator:
         ]
 
         # Create Gemini-3 Flash client with centralized configuration
+        # Gemini-3 Flash Preview: 1M input tokens, 64K output tokens
         self.model_client = Gemini3FlashChatCompletionClient(
             temperature=0.7,
-            max_tokens=8000,  # Gemini-3 Flash max output: 8K tokens (increase to prevent "length" finish reason)
+            max_tokens=64000,  # Gemini-3 Flash max output: 64K tokens
             parallel_tool_calls=False,  # Disable parallel tool calls to prevent token limit issues with large files
         )
-        # Create buffered contexts to prevent token overflow
-        # Keep last 20 messages (~10 exchanges) for context
-        coder_context = BufferedChatCompletionContext(buffer_size=20)
-        planner_context = BufferedChatCompletionContext(buffer_size=20)
+        # Create buffered contexts with larger buffers to leverage Gemini's 1M input context
+        # Keep last 100 messages (~50 exchanges) for richer context
+        coder_context = BufferedChatCompletionContext(buffer_size=100)
+        planner_context = BufferedChatCompletionContext(buffer_size=100)
 
         self.coder_agent = AssistantAgent(
             name="Coder",
@@ -236,12 +237,13 @@ class AgentOrchestrator:
                 team_state = json.load(f)
 
             # CRITICAL: Truncate message history to prevent token overflow
-            # Keep only the last 30 messages from the saved state
+            # With Gemini-3 Flash's 1M input tokens, we can keep more history
+            # Keep only the last 150 messages from the saved state (~75 exchanges)
             if "message_thread" in team_state and isinstance(team_state["message_thread"], list):
                 original_count = len(team_state["message_thread"])
-                if original_count > 30:
-                    # Keep last 30 messages
-                    team_state["message_thread"] = team_state["message_thread"][-30:]
+                if original_count > 150:
+                    # Keep last 150 messages
+                    team_state["message_thread"] = team_state["message_thread"][-150:]
                     logger.warning(
                         f"⚠️  Truncated message history from {original_count} to {len(team_state['message_thread'])} messages to prevent token overflow"
                     )

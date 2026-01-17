@@ -97,7 +97,7 @@ class Gemini3FlashChatCompletionClient(OpenAIChatCompletionClient):
 
 def create_gemini_client(
     temperature: float = 0.7,
-    max_tokens: int = 8000,
+    max_tokens: int = 64000,
     http_client: Optional[httpx.AsyncClient] = None,
     response_format: Optional[dict] = None,
 ) -> Gemini3FlashChatCompletionClient:
@@ -108,7 +108,7 @@ def create_gemini_client(
 
     Args:
         temperature: Sampling temperature (default: 0.7)
-        max_tokens: Maximum tokens in response (default: 8000)
+        max_tokens: Maximum tokens in response (default: 64000 - Gemini-3 Flash max)
         http_client: Optional HTTP client for requests
         response_format: Optional response format configuration
 
