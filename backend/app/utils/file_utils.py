@@ -13,8 +13,10 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 # Constants for text file processing
-DEFAULT_MAX_LINES_TEXT_FILE = 2000
-MAX_LINE_LENGTH_TEXT_FILE = 2000
+# Updated for Gemini-3 Flash: 1M input tokens allows reading much larger files
+# Approximate: 1 token ≈ 4 characters, so 1M tokens ≈ 4M chars ≈ 100K lines of code
+DEFAULT_MAX_LINES_TEXT_FILE = 50000  # Increased from 2000 to 50000 (25x more)
+MAX_LINE_LENGTH_TEXT_FILE = 10000  # Increased from 2000 to 10000 (5x more) for long lines
 DEFAULT_ENCODING = "utf-8"
 
 # Binary extensions list (migrated from ignorePatterns.js concept)
@@ -246,12 +248,14 @@ async def process_single_file_content(
                 "errorType": ToolErrorType.TARGET_IS_DIRECTORY,
             }
 
+        # Updated for Gemini-3 Flash: 1M input tokens = ~4MB of text
+        # Allow up to 50MB to support larger files (will be truncated by line limits)
         file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
-        if file_size_mb > 20:
+        if file_size_mb > 50:
             return {
-                "llmContent": "File size exceeds the 20MB limit.",
-                "returnDisplay": "File size exceeds the 20MB limit.",
-                "error": f"File size exceeds the 20MB limit: {file_path} ({file_size_mb:.2f}MB)",
+                "llmContent": "File size exceeds the 50MB limit.",
+                "returnDisplay": "File size exceeds the 50MB limit.",
+                "error": f"File size exceeds the 50MB limit: {file_path} ({file_size_mb:.2f}MB)",
                 "errorType": ToolErrorType.FILE_TOO_LARGE,
             }
 

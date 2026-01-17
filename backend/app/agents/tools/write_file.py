@@ -48,8 +48,9 @@ These files are for internal agent memory only and must not be written to the pr
                 old_lines = len(old_content.splitlines())
                 new_lines = len(file_content.splitlines())
 
-                # Rule: If overwriting a large file (>200 lines) with a small one (<50 lines)
-                if old_lines > 200 and new_lines < 50:
+                # Rule: If overwriting a large file (>1000 lines) with a small one (<100 lines)
+                # Updated for Gemini-3 Flash: can handle much larger files
+                if old_lines > 1000 and new_lines < 100:
                     return f"Error: You are trying to overwrite a large file ({old_lines} lines) with very little content ({new_lines} lines). This looks like accidental data loss. If you meant to edit the file, use 'edit_file' instead. If you actually want to replace the file, delete it first using 'delete_file' and then write it."
             except Exception:
                 # If we can't read the file (e.g. binary), skip check
