@@ -79,12 +79,13 @@ class AgentOrchestrator:
             run_terminal_cmd,
         ]
 
-        # Create Gemini-3 Flash client with centralized configuration
+        # Create Gemini-3 Flash client
+        # NOTE: Using OpenAI-compatible API. There's a known issue with thought_signature
+        # when using many sequential tool calls. We mitigate this with max_tool_iterations=5
         # Gemini-3 Flash Preview: 1M input tokens, 64K output tokens
         self.model_client = Gemini3FlashChatCompletionClient(
             temperature=0.7,
             max_tokens=64000,  # Gemini-3 Flash max output: 64K tokens
-            parallel_tool_calls=False,  # Disable parallel tool calls to prevent token limit issues with large files
         )
         # Create buffered contexts with larger buffers to leverage Gemini's 1M input context
         # Keep last 100 messages (~50 exchanges) for richer context
