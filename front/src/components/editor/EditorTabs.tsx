@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { X, Code, Eye, GitBranch, Play, RefreshCw, Settings } from 'lucide-react';
+import { X, Code, Eye, GitBranch, Play, RefreshCw, Settings, Camera, Download } from 'lucide-react';
 
 interface Tab {
   id: string;
@@ -19,10 +19,12 @@ interface EditorTabsProps {
   onGitSync?: () => void;
   onGitConfig?: () => void;
   isSyncing?: boolean;
+  onManualScreenshot?: () => void;
+  onDownloadProject?: () => void;
 }
 
 export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
-  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect, onRunProject, onShowGitHistory, currentBranch = 'main', onGitSync, onGitConfig, isSyncing = false }, ref) => {
+  ({ activeView, onViewChange, tabs, onTabClose, onTabSelect, onRunProject, onShowGitHistory, currentBranch = 'main', onGitSync, onGitConfig, isSyncing = false, onManualScreenshot, onDownloadProject }, ref) => {
     return (
       <div ref={ref} className="flex items-center justify-between bg-background/80 border-b border-border/50 px-2">
         {/* File Tabs */}
@@ -135,6 +137,23 @@ export const EditorTabs = forwardRef<HTMLDivElement, EditorTabsProps>(
           >
             <Play className="w-3.5 h-3.5" />
             Run
+          </button>
+
+          {/* Camera and Download buttons */}
+          <button
+            onClick={onManualScreenshot}
+            className="p-1 hover:bg-muted/30 rounded transition-colors text-muted-foreground hover:text-foreground"
+            title="Capture project thumbnail"
+          >
+            <Camera className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            onClick={onDownloadProject}
+            className="p-1 hover:bg-muted/30 rounded transition-colors text-muted-foreground hover:text-foreground"
+            title="Download project as ZIP"
+          >
+            <Download className="w-3.5 h-3.5" />
           </button>
         </div>
       </div>

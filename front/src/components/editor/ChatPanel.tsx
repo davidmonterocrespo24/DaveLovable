@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Send, Sparkles, User, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, GitCommit, Undo2 } from 'lucide-react';
+import { Send, Sparkles, User, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, GitCommit, Undo2, Camera, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useChatSession, useChatSessions } from '@/hooks/useChat';
 import { chatApi } from '@/services/api';
 import ReactMarkdown from 'react-markdown';
@@ -1119,23 +1120,28 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 return (
                   <div
                     key={message.id}
-                    className={`flex gap-3 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}
+                    className={`flex flex-col gap-2 ${message.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
-                        ? 'bg-primary/20'
-                        : 'bg-gradient-to-br from-primary to-purple-600'
-                        }`}
-                    >
-                      {message.role === 'user' ? (
-                        <User className="w-4 h-4 text-primary" />
-                      ) : (
-                        <Bot className="w-4 h-4 text-primary-foreground" />
-                      )}
-                    </div>
-                    <div className={`flex flex-col gap-1 ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div className="flex items-center gap-2">
                       <div
-                        className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 ${message.role === 'user'
+                          ? 'bg-primary/20'
+                          : 'bg-gradient-to-br from-primary to-purple-600'
+                          }`}
+                      >
+                        {message.role === 'user' ? (
+                          <User className="w-3 h-3 text-primary" />
+                        ) : (
+                          <Bot className="w-3 h-3 text-primary-foreground" />
+                        )}
+                      </div>
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {message.role === 'user' ? 'You' : 'Lovable AI'}
+                      </span>
+                    </div>
+                    <div className={`flex flex-col gap-1 w-full`}>
+                      <div
+                        className={`w-full p-3 rounded-2xl text-sm leading-relaxed ${message.role === 'user'
                           ? 'bg-primary text-primary-foreground rounded-tr-sm'
                           : 'bg-muted/30 text-foreground rounded-tl-sm border border-border/30'
                           }`}
