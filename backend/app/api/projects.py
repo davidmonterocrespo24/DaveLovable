@@ -297,14 +297,14 @@ def get_project_bundle(project_id: int, db: Session = Depends(get_db)):
 @router.get("/{project_id}/git/history")
 def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_db)):
     """
-    Get Git commit history for a project
+    Get Git commit history for a project (returns UTC timestamps)
 
     Args:
         project_id: The project ID
         limit: Maximum number of commits to return (default: 20, max: 100)
 
     Returns:
-        List of commits with hash, author, date, and message
+        List of commits with hash, author, date (UTC), and message
     """
     # Verify ownership
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
@@ -312,6 +312,7 @@ def get_git_history(project_id: int, limit: int = 20, db: Session = Depends(get_
     # Limit to max 100 commits
     limit = min(limit, 100)
 
+    # Get commits with UTC timestamps
     commits = GitService.get_commit_history(project_id, limit)
 
     return {"project_id": project_id, "commits": commits, "total": len(commits)}

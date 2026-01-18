@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 from app.models.chat import MessageRole
 
@@ -24,6 +24,14 @@ class ChatMessageInDB(ChatMessageBase):
 
     class Config:
         from_attributes = True
+
+    @field_serializer('created_at')
+    def serialize_created_at(self, dt: datetime, _info):
+        """Serialize datetime as ISO format with UTC timezone"""
+        # Ensure datetime is UTC-aware
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
 
 class ChatMessage(ChatMessageInDB):
@@ -75,6 +83,14 @@ class ChatSessionInDB(ChatSessionBase):
 
     class Config:
         from_attributes = True
+
+    @field_serializer('created_at', 'updated_at')
+    def serialize_datetime(self, dt: datetime, _info):
+        """Serialize datetime as ISO format with UTC timezone"""
+        # Ensure datetime is UTC-aware
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.isoformat()
 
 
 class ChatSession(ChatSessionInDB):
