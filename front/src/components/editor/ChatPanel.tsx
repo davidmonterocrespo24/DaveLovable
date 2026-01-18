@@ -125,11 +125,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     // Expose sendMessage method to parent
     useImperativeHandle(ref, () => ({
       sendMessage: (message: string, attachments?: FileAttachment[]) => {
-        // Set attachments if provided
-        if (attachments && attachments.length > 0) {
-          setAttachedFiles(attachments);
-        }
-        handleSend(message);
+        // Pass attachments directly to handleSend (don't use setState)
+        // This avoids React state timing issues where setState is async
+        handleSend(message, attachments);
       },
     }));
 
@@ -458,9 +456,12 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       });
     };
 
-    const handleSend = async (messageOverride?: string) => {
+    const handleSend = async (messageOverride?: string, attachmentsOverride?: FileAttachment[]) => {
       let messageContent = messageOverride || input;
-      if (!messageContent.trim() && attachedFiles.length === 0) return;
+      // Use provided attachments or current state
+      const filesToSend = attachmentsOverride || attachedFiles;
+
+      if (!messageContent.trim() && filesToSend.length === 0) return;
       if (isStreaming) return;
 
       if (!messageOverride) {
@@ -477,7 +478,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       abortControllerRef.current = new AbortController();
 
       // Auto-enhance message if images are attached
-      const hasImages = attachedFiles.some(f => f.type === 'image');
+      const hasImages = filesToSend.some(f => f.type === 'image');
       if (hasImages && !messageContent.toLowerCase().includes('ui') && !messageContent.toLowerCase().includes('design')) {
         messageContent = `${messageContent}\n\n[Note: The attached image(s) show a UI/UX design that should be converted to React code with Tailwind CSS. Analyze the design, layout, colors, typography, and components shown in the image(s).]`;
       }
@@ -488,7 +489,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
         role: 'user',
         content: messageContent,
         timestamp: new Date(),
-        attachments: attachedFiles.length > 0 ? [...attachedFiles] : undefined,
+        attachments: filesToSend.length > 0 ? [...filesToSend] : undefined,
       };
 
       const streamingMessageId = (Date.now() + 1).toString();
@@ -516,12 +517,42 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       });
 
       try {
+        // Log what we're sending
+        console.log('[ChatPanel] Sending message with attachments:', {
+          messageLength: messageContent.length,
+          attachmentCount: filesToSend.length,
+          attachments: filesToSend.map(f => ({
+            name: f.name,
+            type: f.type,
+            dataLength: f.data?.length || 0
+          }))
+        });
+
+        // Check total payload size (rough estimate)
+        const payloadSize = JSON.stringify({
+          message: messageContent,
+          session_id: currentSessionId,
+          attachments: filesToSend
+        }).length;
+
+        console.log('[ChatPanel] Estimated payload size:', (payloadSize / 1024 / 1024).toFixed(2), 'MB');
+
+        if (payloadSize > 50 * 1024 * 1024) { // 50MB limit
+          toast({
+            title: "Request too large",
+            description: "The attached files are too large. Please use smaller images.",
+            variant: "destructive"
+          });
+          setIsStreaming(false);
+          return;
+        }
+
         await chatApi.sendMessageStream(
           projectId,
           {
             message: messageContent,
             session_id: currentSessionId,
-            attachments: attachedFiles.length > 0 ? attachedFiles.map(file => ({
+            attachments: filesToSend.length > 0 ? filesToSend.map(file => ({
               type: file.type,
               mime_type: file.mime_type,
               data: file.data,
@@ -708,6 +739,10 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   onCodeChange();
                 }
               }
+
+              // Clear attached files after successful send
+              console.log('[ChatPanel] Clearing attached files after successful send');
+              setAttachedFiles([]);
 
               // CRITICAL FIX: Delay setIsStreaming(false) to prevent race condition
               // The issue: onCodeChange() invalidates queries, which refetches session data

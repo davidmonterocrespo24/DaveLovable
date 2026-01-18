@@ -283,8 +283,6 @@ export const chatApi = {
           'Accept': 'text/event-stream',
         },
         body: JSON.stringify(data),
-        // Prevent any timeout - let the stream run as long as needed
-        keepalive: true,
       })
         .then(async (response) => {
           console.log('[SSE] Response received:', response.status, response.statusText);

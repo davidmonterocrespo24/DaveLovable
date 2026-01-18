@@ -380,9 +380,19 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     "name": attachment.name
                 })
 
-        # Save user message
+        # Save user message with attachments in metadata
+        user_message_metadata = None
+        if processed_attachments:
+            import json
+            user_message_metadata = json.dumps({"attachments": processed_attachments})
+
         user_message = ChatService.add_message(
-            db, ChatMessageCreate(session_id=session.id, role=MessageRole.USER, content=chat_request.message)
+            db, ChatMessageCreate(
+                session_id=session.id,
+                role=MessageRole.USER,
+                content=chat_request.message,
+                message_metadata=user_message_metadata
+            )
         )
 
         # Yield initial event

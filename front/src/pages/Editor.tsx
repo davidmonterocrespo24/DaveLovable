@@ -45,7 +45,7 @@ const Editor = () => {
   const [selectedFile, setSelectedFile] = useState<{ name: string; id: number; content: string; filepath: string } | null>(null);
   const [editedContent, setEditedContent] = useState<string>('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [activeView, setActiveView] = useState<'code' | 'preview' | 'split'>('split');
+  const [activeView, setActiveView] = useState<'code' | 'preview' | 'split'>('preview');
   const [showExplorer, setShowExplorer] = useState(true);
   const [showChat, setShowChat] = useState(true);
   const [isPreviewLoading, setIsPreviewLoading] = useState(true);
@@ -543,7 +543,7 @@ const Editor = () => {
         {/* Chat Panel */}
         {showChat && (
           <>
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+            <ResizablePanel defaultSize={20} minSize={15} maxSize={40}>
               <div className="h-full relative">
                 <ChatPanel
                   ref={chatPanelRef}
