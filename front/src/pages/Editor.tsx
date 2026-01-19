@@ -383,9 +383,9 @@ const Editor = () => {
       queryClient.invalidateQueries({ queryKey: ['project', Number(projectId)] });
     }
 
-    // Use handleRefresh for proper WebContainer reload
+    // Use reload() to properly reinitialize WebContainer and re-apply visual mode
     if (previewPanelRef.current) {
-      previewPanelRef.current.handleRefresh();
+      previewPanelRef.current.reload();
     }
   };
 

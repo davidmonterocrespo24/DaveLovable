@@ -281,37 +281,64 @@ class ProjectService:
 
         react_styles = {to_camel_case(k): v for k, v in style_changes.items()}
 
-        # Build style string for inline styles
-        style_string = ", ".join([f"{k}: '{v}'" for k, v in react_styles.items()])
+        # Pattern to find the FIRST JSX opening tag with the given element name
+        # This matches: <tagname ... > or <tagname ... />
+        # We use a more careful approach to avoid breaking JSX syntax
+        tag_pattern = rf"<{element_selector}(?:\s+[^>]*?)?"
 
-        # Pattern to find JSX elements with the given tag name
-        # Matches: <Button ... > or <Button ... />
-        tag_pattern = rf"(<{element_selector}(?:\s+[^>]*?)?)((?:\s+style={{[^}}]*}})?)((?:\s+[^>]*?)?(?:>|/>))"
+        # Find the first occurrence
+        match = re.search(tag_pattern, content)
+        if not match:
+            return content
 
-        def replace_style(match):
-            opening = match.group(1)  # <Button ...
-            existing_style = match.group(2)  # existing style={{...}}
-            closing = match.group(3)  # ... > or />
+        tag_start = match.start()
+        tag_end_pattern = r"(?:>|/>)"
 
-            if existing_style:
-                # Merge with existing styles
-                # Extract existing style object content
-                style_content_match = re.search(r"style={{([^}}]*)}}", existing_style)
-                if style_content_match:
-                    existing_style_content = style_content_match.group(1).strip()
-                    # Merge styles (new styles override existing ones)
-                    merged_styles = f"{existing_style_content}, {style_string}"
-                    new_style = f" style={{{{{merged_styles}}}}}"
-                else:
-                    new_style = f" style={{{{{style_string}}}}}"
-            else:
-                # Add new style attribute
-                new_style = f" style={{{{{style_string}}}}}"
+        # Find where this tag ends (> or />)
+        tag_end_match = re.search(tag_end_pattern, content[tag_start:])
+        if not tag_end_match:
+            return content
 
-            return f"{opening}{new_style}{closing}"
+        tag_full_end = tag_start + tag_end_match.end()
+        tag_content = content[tag_start:tag_full_end]
 
-        # Apply the replacement
-        modified_content = re.sub(tag_pattern, replace_style, content, count=1)
+        # Check if there's already a style attribute
+        existing_style_match = re.search(r'style=\{\{([^}]*)\}\}', tag_content)
+
+        if existing_style_match:
+            # Extract existing style properties
+            existing_style_str = existing_style_match.group(1).strip()
+
+            # Parse existing styles into a dict
+            existing_styles = {}
+            if existing_style_str:
+                # Split by comma, handling quoted values
+                style_pairs = re.findall(r"(\w+):\s*'([^']*)'", existing_style_str)
+                for prop, val in style_pairs:
+                    existing_styles[prop] = val
+
+            # Merge new styles (new styles override existing ones)
+            existing_styles.update(react_styles)
+
+            # Build new style string
+            new_style_string = ", ".join([f"{k}: '{v}'" for k, v in existing_styles.items()])
+            new_style_attr = f"style={{{{{new_style_string}}}}}"
+
+            # Replace the old style attribute with the new one
+            new_tag_content = re.sub(r'style=\{\{[^}]*\}\}', new_style_attr, tag_content)
+        else:
+            # No existing style attribute - add it
+            # Build style string
+            style_string = ", ".join([f"{k}: '{v}'" for k, v in react_styles.items()])
+            new_style_attr = f" style={{{{{style_string}}}}}"
+
+            # Find a good place to insert it - right after the tag name
+            # Insert after the tag name and any whitespace
+            insert_pos = len(f"<{element_selector}")
+            new_tag_content = tag_content[:insert_pos] + new_style_attr + tag_content[insert_pos:]
+
+        # Replace the original tag with the modified one
+        modified_content = content[:tag_start] + new_tag_content + content[tag_full_end:]
 
         return modified_content
 

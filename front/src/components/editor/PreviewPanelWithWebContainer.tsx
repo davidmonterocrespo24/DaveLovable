@@ -69,6 +69,7 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
     const [urlCopied, setUrlCopied] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const isVisualModeRef = useRef<boolean>(isVisualMode);
 
     const deviceWidths = {
       mobile: 'max-w-[375px]',
@@ -100,23 +101,38 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       return consoleLogs.filter(log => log.type === 'error' && !isIgnorableError(log.message));
     };
 
+    // Keep ref in sync with prop
+    useEffect(() => {
+      isVisualModeRef.current = isVisualMode;
+    }, [isVisualMode]);
+
     // Communicate visual mode change to iframe
     // Also re-send when previewUrl changes (when WebContainer reloads)
     useEffect(() => {
       if (!iframeRef.current?.contentWindow || !previewUrl) return;
 
-      // Delay to ensure iframe and visual-editor-helper.js are fully loaded
-      const timer = setTimeout(() => {
-        if (iframeRef.current?.contentWindow) {
-          console.log('[PreviewPanel] Sending visual mode state to iframe:', isVisualMode);
-          iframeRef.current.contentWindow.postMessage({
-            type: 'visual-editor:toggle-mode',
-            enabled: isVisualMode
-          }, '*');
-        }
-      }, 2000); // Increased delay to ensure visual-editor-helper.js is loaded
+      // Send message multiple times with increasing delays to ensure it's received
+      // This handles cases where the iframe is still loading
+      const delays = [1000, 2000, 3000, 4000];
+      const timers: NodeJS.Timeout[] = [];
 
-      return () => clearTimeout(timer);
+      delays.forEach(delay => {
+        const timer = setTimeout(() => {
+          if (iframeRef.current?.contentWindow) {
+            // eslint-disable-next-line no-console
+            console.log(`[PreviewPanel] Sending visual-editor:toggle-mode (delay: ${delay}ms, enabled: ${isVisualMode})`);
+            iframeRef.current.contentWindow.postMessage({
+              type: 'visual-editor:toggle-mode',
+              enabled: isVisualMode
+            }, '*');
+          }
+        }, delay);
+        timers.push(timer);
+      });
+
+      return () => {
+        timers.forEach(timer => clearTimeout(timer));
+      };
     }, [isVisualMode, previewUrl]);
 
     // Listen for browser logs AND visual editor events from the iframe
@@ -351,15 +367,23 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         handleRefresh();
 
         // After reload, re-apply visual mode if it's enabled
-        setTimeout(() => {
-          if (iframeRef.current?.contentWindow && isVisualMode) {
-            console.log('[PreviewPanel] Re-enabling visual mode after reload');
-            iframeRef.current.contentWindow.postMessage({
-              type: 'visual-editor:toggle-mode',
-              enabled: true
-            }, '*');
-          }
-        }, 2000);
+        // Send multiple times to ensure it's received
+        // Use ref to get current value, not the captured prop value
+        if (isVisualModeRef.current) {
+          const delays = [2000, 3000, 4000, 5000];
+          delays.forEach(delay => {
+            setTimeout(() => {
+              if (iframeRef.current?.contentWindow) {
+                // eslint-disable-next-line no-console
+                console.log(`[PreviewPanel] reload() sending visual-editor:toggle-mode (delay: ${delay}ms)`);
+                iframeRef.current.contentWindow.postMessage({
+                  type: 'visual-editor:toggle-mode',
+                  enabled: true
+                }, '*');
+              }
+            }, delay);
+          });
+        }
       },
       handleRefresh,  // Expose handleRefresh directly
       updateStyle: (property: string, value: string) => {
@@ -388,14 +412,22 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           });
 
           // If we're in visual mode, re-send visual mode state after update
-          // to ensure overlays are preserved/re-attached if DOM changed
-          if (isVisualMode && iframeRef.current?.contentWindow) {
-            setTimeout(() => {
-              iframeRef.current?.contentWindow?.postMessage({
-                type: 'visual-editor:toggle-mode',
-                enabled: true
-              }, '*');
-            }, 500);
+          // Send multiple times to ensure it's received after HMR
+          // Use ref to get current value
+          if (isVisualModeRef.current && iframeRef.current?.contentWindow) {
+            const delays = [500, 1000, 1500, 2000];
+            delays.forEach(delay => {
+              setTimeout(() => {
+                if (iframeRef.current?.contentWindow) {
+                  // eslint-disable-next-line no-console
+                  console.log(`[PreviewPanel] applyFileUpdates() sending visual-editor:toggle-mode (delay: ${delay}ms)`);
+                  iframeRef.current.contentWindow.postMessage({
+                    type: 'visual-editor:toggle-mode',
+                    enabled: true
+                  }, '*');
+                }
+              }, delay);
+            });
           }
         } catch (e) {
           const msg = e instanceof Error ? e.message : String(e);
