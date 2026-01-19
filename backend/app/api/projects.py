@@ -392,9 +392,53 @@ def restore_to_commit(project_id: int, commit_hash: str, db: Session = Depends(g
     }
 
 
+@router.post("/{project_id}/git/checkout/{commit_hash}")
+def checkout_commit(project_id: int, commit_hash: str, db: Session = Depends(get_db)):
+    """
+    Checkout a specific commit temporarily (detached HEAD state).
+    This allows viewing the project at that commit without modifying history.
+    """
+    # Verify ownership
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    success = GitService.checkout_commit(project_id, commit_hash)
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to checkout commit")
+
+    return {
+        "success": True,
+        "message": f"Checked out commit {commit_hash[:7]}",
+        "project_id": project_id,
+        "commit_hash": commit_hash,
+    }
+
+
+@router.post("/{project_id}/git/checkout-branch")
+def checkout_branch(project_id: int, branch_data: dict = Body(...), db: Session = Depends(get_db)):
+    """
+    Return to a branch from detached HEAD state.
+    """
+    # Verify ownership
+    ProjectService.get_project(db, project_id, MOCK_USER_ID)
+
+    branch_name = branch_data.get("branch_name", "main")
+    success = GitService.checkout_branch(project_id, branch_name)
+
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to checkout branch")
+
+    return {
+        "success": True,
+        "message": f"Checked out branch {branch_name}",
+        "project_id": project_id,
+        "branch": branch_name,
+    }
+
+
 @router.get("/{project_id}/git/branch")
 def get_current_branch(project_id: int, db: Session = Depends(get_db)):
-    """Get current Git branch for a project"""
+    """Get current Git branch or commit hash if in detached HEAD state"""
     # Verify project exists
     ProjectService.get_project(db, project_id, MOCK_USER_ID)
 

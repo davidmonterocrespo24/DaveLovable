@@ -449,4 +449,40 @@ export const chatApi = {
   },
 };
 
+// Git API
+export const gitApi = {
+  // Checkout a specific commit (detached HEAD state)
+  checkoutCommit: async (projectId: number, commitHash: string): Promise<{
+    success: boolean;
+    message: string;
+    project_id: number;
+    commit_hash: string;
+  }> => {
+    return fetchApi(`/projects/${projectId}/git/checkout/${commitHash}`, {
+      method: 'POST',
+    });
+  },
+
+  // Checkout a branch (return to normal state)
+  checkoutBranch: async (projectId: number, branchName: string = 'main'): Promise<{
+    success: boolean;
+    message: string;
+    project_id: number;
+    branch: string;
+  }> => {
+    return fetchApi(`/projects/${projectId}/git/checkout-branch`, {
+      method: 'POST',
+      body: JSON.stringify({ branch_name: branchName }),
+    });
+  },
+
+  // Get current branch or commit hash
+  getCurrentBranch: async (projectId: number): Promise<{
+    project_id: number;
+    branch: string;
+  }> => {
+    return fetchApi(`/projects/${projectId}/git/branch`);
+  },
+};
+
 export { ApiError };

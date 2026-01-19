@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
-import { Send, Sparkles, User, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, GitCommit, Undo2, Camera, Download } from 'lucide-react';
+import { Send, Sparkles, User, Bot, Paperclip, Image as ImageIcon, FileText, X, Loader2, GitCommit, Undo2, Camera, Download, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useChatSession, useChatSessions } from '@/hooks/useChat';
-import { chatApi } from '@/services/api';
+import { chatApi, gitApi } from '@/services/api';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -109,6 +109,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const pendingReloadRef = useRef<{ message: string } | null>(null);
     const [shouldTriggerReload, setShouldTriggerReload] = useState(false);
     const reloadScheduledRef = useRef(false); // Prevent duplicate reload scheduling
+    const [currentCommitHash, setCurrentCommitHash] = useState<string | null>(null); // Track current commit when viewing
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -733,7 +734,7 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               if (data.success && data.commit_hash) {
                 // Add commit message to chat
                 const commitMessage: Message = {
-                  id: `commit-${Date.now()}`,
+                  id: `commit-${data.commit_hash}`,  // Use commit hash for consistent ID
                   role: 'system',
                   content: data.message || 'Changes committed',
                   timestamp: new Date(),
@@ -745,7 +746,19 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   }
                 };
 
-                setMessages((prev) => [...prev, commitMessage]);
+                // Add commit message, removing duplicates by ID
+                setMessages((prev) => {
+                  // Check if this commit already exists
+                  const existingIndex = prev.findIndex(msg => msg.id === commitMessage.id);
+                  if (existingIndex !== -1) {
+                    // Replace existing commit with new one (updated timestamp)
+                    const newMessages = [...prev];
+                    newMessages[existingIndex] = commitMessage;
+                    return newMessages;
+                  }
+                  // Add new commit
+                  return [...prev, commitMessage];
+                });
 
                 toast({
                   title: "✅ Git Commit Created",
@@ -1009,6 +1022,70 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       }
     };
 
+    const handleViewCommit = async (commitHash: string) => {
+      try {
+        // Checkout the specific commit
+        const result = await gitApi.checkoutCommit(projectId, commitHash);
+
+        // Set the current commit hash to show the indicator
+        setCurrentCommitHash(commitHash);
+
+        // Show success message
+        toast({
+          title: 'Viewing Commit',
+          description: `Switched to commit ${commitHash.substring(0, 7)}. Preview will update.`,
+          duration: 5000,
+        });
+
+        // Reload files to show the commit state
+        queryClient.invalidateQueries({ queryKey: fileKeys.list(projectId) });
+
+        // Trigger preview reload
+        if (onReloadPreview) {
+          onReloadPreview();
+        }
+      } catch (error) {
+        console.error('Error viewing commit:', error);
+        toast({
+          title: 'View Commit Failed',
+          description: error instanceof Error ? error.message : 'Failed to view commit',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    const handleReturnToMain = async () => {
+      try {
+        // Checkout the main branch
+        const result = await gitApi.checkoutBranch(projectId, 'main');
+
+        // Clear the current commit hash
+        setCurrentCommitHash(null);
+
+        // Show success message
+        toast({
+          title: 'Returned to Main',
+          description: 'Back to the latest version of your project.',
+          duration: 3000,
+        });
+
+        // Reload files to show the latest state
+        queryClient.invalidateQueries({ queryKey: fileKeys.list(projectId) });
+
+        // Trigger preview reload
+        if (onReloadPreview) {
+          onReloadPreview();
+        }
+      } catch (error) {
+        console.error('Error returning to main:', error);
+        toast({
+          title: 'Return to Main Failed',
+          description: error instanceof Error ? error.message : 'Failed to return to main branch',
+          variant: 'destructive',
+        });
+      }
+    };
+
     return (
       <div ref={containerRef} className="h-full flex flex-col bg-background/80 overflow-x-hidden">
         {/* Header */}
@@ -1033,6 +1110,27 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             {viewMode === 'visual' ? 'Back to Chat' : 'Visual Edits'}
           </Button>
         </div>
+
+        {/* Viewing Commit Indicator Banner */}
+        {currentCommitHash && (
+          <div className="mx-4 mt-2 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <GitCommit className="w-4 h-4 text-blue-500" />
+              <div className="flex-1 text-xs">
+                <p className="font-medium text-blue-500">Viewing Commit: {currentCommitHash.substring(0, 7)}</p>
+                <p className="text-muted-foreground mt-0.5">You are viewing a historical version. Changes cannot be made in this state.</p>
+              </div>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReturnToMain}
+              className="h-7 text-xs border-blue-500/20 hover:bg-blue-500/10 hover:text-blue-400"
+            >
+              Return to Latest
+            </Button>
+          </div>
+        )}
 
         {viewMode === 'visual' ? (
           <VisualEditorPanel
@@ -1080,23 +1178,29 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                 // Special rendering for git commit messages
                 if (message.role === 'system' && message.git_commit) {
                   const commit = message.git_commit;
+                  const isCurrentlyViewed = currentCommitHash === commit.commit_hash;
                   return (
                     <div
                       key={message.id}
                       className="flex gap-3 items-start"
                     >
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-green-500/20">
-                        <GitCommit className="w-4 h-4 text-green-500" />
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isCurrentlyViewed ? 'bg-blue-500/30' : 'bg-green-500/20'}`}>
+                        <GitCommit className={`w-4 h-4 ${isCurrentlyViewed ? 'text-blue-400' : 'text-green-500'}`} />
                       </div>
-                      <div className="max-w-[70%] bg-green-500/10 border border-green-500/30 rounded-lg p-3">
+                      <div className={`max-w-[70%] rounded-lg p-3 ${isCurrentlyViewed ? 'bg-blue-500/20 border-2 border-blue-500/50' : 'bg-green-500/10 border border-green-500/30'}`}>
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <span className="text-xs font-semibold text-green-500">Git Commit</span>
+                              <span className={`text-xs font-semibold ${isCurrentlyViewed ? 'text-blue-400' : 'text-green-500'}`}>Git Commit</span>
                               {commit.commit_hash && (
-                                <code className="text-[10px] bg-green-500/10 px-1.5 py-0.5 rounded font-mono text-green-400">
+                                <code className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${isCurrentlyViewed ? 'bg-blue-500/20 text-blue-300' : 'bg-green-500/10 text-green-400'}`}>
                                   {commit.commit_hash.substring(0, 7)}
                                 </code>
+                              )}
+                              {isCurrentlyViewed && (
+                                <span className="text-[10px] bg-blue-500/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">
+                                  Currently Viewing
+                                </span>
                               )}
                               <span className="text-[10px] text-muted-foreground">
                                 {message.timestamp.toLocaleString()}
@@ -1110,15 +1214,38 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                             )}
                           </div>
                           {commit.commit_hash && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs text-orange-500 hover:text-orange-400 hover:bg-orange-500/10 shrink-0"
-                              onClick={() => handleUndoCommit(commit.commit_hash!)}
-                            >
-                              <Undo2 className="w-3 h-3 mr-1" />
-                              Undo
-                            </Button>
+                            <div className="flex gap-1 shrink-0">
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
+                                    onClick={() => handleViewCommit(commit.commit_hash!)}
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>View this commit</p>
+                                </TooltipContent>
+                              </Tooltip>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 text-xs text-orange-500 hover:text-orange-400 hover:bg-orange-500/10"
+                                    onClick={() => handleUndoCommit(commit.commit_hash!)}
+                                  >
+                                    <Undo2 className="w-3 h-3" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Undo this commit</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           )}
                         </div>
                       </div>

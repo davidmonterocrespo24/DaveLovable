@@ -249,11 +249,86 @@ build/
             return False
 
     @staticmethod
+    def checkout_commit(project_id: int, commit_hash: str) -> bool:
+        """
+        Checkout a specific commit temporarily (detached HEAD state).
+        This allows viewing the project at that commit without modifying history.
+
+        Returns True if successful, False otherwise
+        """
+        from app.services.filesystem_service import FileSystemService
+
+        project_dir = FileSystemService.get_project_dir(project_id)
+
+        if not project_dir.exists() or not (project_dir / ".git").exists():
+            return False
+
+        try:
+            # Verify the commit exists
+            subprocess.run(
+                ["git", "rev-parse", "--verify", commit_hash],
+                cwd=project_dir,
+                check=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+
+            # Checkout the specific commit (detached HEAD)
+            subprocess.run(
+                ["git", "checkout", commit_hash],
+                cwd=project_dir,
+                check=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+
+            return True
+
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode('utf-8', errors='replace') if isinstance(e.stderr, bytes) else str(e.stderr)
+            print(f"Git checkout failed: {stderr}")
+            return False
+
+    @staticmethod
+    def checkout_branch(project_id: int, branch_name: str = "main") -> bool:
+        """
+        Checkout a branch (returns to normal branch state from detached HEAD).
+
+        Returns True if successful, False otherwise
+        """
+        from app.services.filesystem_service import FileSystemService
+
+        project_dir = FileSystemService.get_project_dir(project_id)
+
+        if not project_dir.exists() or not (project_dir / ".git").exists():
+            return False
+
+        try:
+            # Checkout the branch
+            subprocess.run(
+                ["git", "checkout", branch_name],
+                cwd=project_dir,
+                check=True,
+                capture_output=True,
+                encoding="utf-8",
+                errors="replace"
+            )
+
+            return True
+
+        except subprocess.CalledProcessError as e:
+            stderr = e.stderr.decode('utf-8', errors='replace') if isinstance(e.stderr, bytes) else str(e.stderr)
+            print(f"Git checkout branch failed: {stderr}")
+            return False
+
+    @staticmethod
     def get_current_branch(project_id: int) -> str:
         """
-        Get the current branch name
+        Get the current branch name or commit hash if in detached HEAD state
 
-        Returns the branch name or 'main' as default
+        Returns the branch name, commit hash (if detached), or 'main' as default
         """
         from app.services.filesystem_service import FileSystemService
 
@@ -272,7 +347,21 @@ build/
                 errors="replace",
             )
 
-            return result.stdout.strip()
+            branch = result.stdout.strip()
+
+            # If HEAD is detached, return the commit hash
+            if branch == "HEAD":
+                result = subprocess.run(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=project_dir,
+                    check=True,
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+                return f"detached:{result.stdout.strip()}"
+
+            return branch
 
         except subprocess.CalledProcessError:
             return "main"
