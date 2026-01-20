@@ -72,6 +72,7 @@ class FileSystemService:
                 "framer-motion": "^11.0.0",
                 "react-hook-form": "^7.51.0",
                 "zod": "^3.22.0",
+                "firebase": "^10.8.0",
             },
             "devDependencies": {
                 "@types/react": "^18.3.12",
@@ -278,6 +279,219 @@ code {
         GitService.init_repository(project_id)
 
         return files_created
+
+    # Firebase Template Files
+    FIREBASE_TEMPLATE_FILES = {
+        ".env.local": """# Firebase Configuration
+# IMPORTANT: Never commit this file to Git! It's already in .gitignore
+# Get these values from Firebase Console: https://console.firebase.google.com
+
+VITE_FIREBASE_API_KEY=your_api_key_here
+VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+""",
+        "src/lib/firebase.ts": """import { initializeApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
+import { getStorage } from 'firebase/storage';
+
+// Firebase configuration from environment variables
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+
+// Initialize Firebase
+export const app = initializeApp(firebaseConfig);
+
+// Initialize services
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const storage = getStorage(app);
+""",
+        "README.firebase.md": """# Firebase Setup Instructions
+
+## 1. Create Firebase Project
+
+1. Go to [Firebase Console](https://console.firebase.google.com/)
+2. Click "Add project"
+3. Enter project name and follow setup wizard
+4. Enable Google Analytics (optional)
+
+## 2. Get Firebase Configuration
+
+1. In Firebase Console, click ⚙️ (Settings) → Project settings
+2. Scroll down to "Your apps" section
+3. Click the Web icon (`</>`) to create a web app
+4. Register your app with a nickname
+5. Copy the `firebaseConfig` object values
+
+## 3. Configure Environment Variables
+
+Open `.env.local` and replace the placeholder values with your Firebase config:
+
+```env
+VITE_FIREBASE_API_KEY=AIzaSyC...
+VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
+VITE_FIREBASE_APP_ID=1:123456789:web:abcdef
+```
+
+## 4. Enable Required Services
+
+### Firestore Database
+1. In Firebase Console, go to "Firestore Database"
+2. Click "Create database"
+3. Select "Start in test mode" (for development)
+4. Choose a location close to your users
+
+### Authentication (if needed)
+1. Go to "Authentication" → "Sign-in method"
+2. Enable providers you want (Email/Password, Google, etc.)
+
+### Storage (if needed)
+1. Go to "Storage" → "Get started"
+2. Start in test mode for development
+
+## 5. Security Rules (Important for Production!)
+
+### Firestore Rules (test mode - CHANGE FOR PRODUCTION!)
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2025, 3, 1);
+    }
+  }
+}
+```
+
+### Production Rules Example
+```javascript
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /clients/{clientId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
+```
+
+## 6. Start Development
+
+Your Firebase is now configured! The agent will create database services automatically.
+
+Example usage:
+```typescript
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
+
+// Create document
+const docRef = await addDoc(collection(db, 'clients'), {
+  name: 'John Doe',
+  email: 'john@example.com'
+});
+
+// Read documents
+const snapshot = await getDocs(collection(db, 'clients'));
+const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+```
+
+## Troubleshooting
+
+- **"Firebase not configured" error**: Check `.env.local` values
+- **Permission denied**: Update Firestore security rules
+- **CORS errors**: Make sure you added your domain in Firebase Console → Authentication → Authorized domains
+
+## Resources
+
+- [Firebase Documentation](https://firebase.google.com/docs)
+- [Firestore Quickstart](https://firebase.google.com/docs/firestore/quickstart)
+- [Firebase Auth Guide](https://firebase.google.com/docs/auth/web/start)
+""",
+        ".firebase-state.json": """{"activated": true, "features": [], "activated_at": ""}"""
+    }
+
+    @staticmethod
+    def activate_firebase(project_id: int, features: List[str]) -> Dict:
+        """
+        Activate Firebase in an existing project
+
+        Args:
+            project_id: Project ID
+            features: List of Firebase features to activate ["firestore", "auth", "storage"]
+
+        Returns:
+            Dict with created files and status
+        """
+        project_dir = FileSystemService.get_project_dir(project_id)
+
+        if not project_dir.exists():
+            raise ValueError(f"Project {project_id} does not exist")
+
+        created_files = []
+
+        # Create Firebase template files
+        for filepath, content in FileSystemService.FIREBASE_TEMPLATE_FILES.items():
+            FileSystemService.write_file(project_id, filepath, content)
+            created_files.append(filepath)
+
+        # Update .firebase-state.json with activation details
+        from datetime import datetime
+        firebase_state = {
+            "activated": True,
+            "features": features,
+            "activated_at": datetime.utcnow().isoformat()
+        }
+        FileSystemService.write_file(project_id, ".firebase-state.json", json.dumps(firebase_state, indent=2))
+
+        # Update package.json to add Firebase dependencies
+        package_json_path = project_dir / "package.json"
+        if package_json_path.exists():
+            package_data = json.loads(package_json_path.read_text(encoding="utf-8"))
+
+            # Add Firebase SDK to dependencies
+            if "dependencies" not in package_data:
+                package_data["dependencies"] = {}
+
+            package_data["dependencies"]["firebase"] = "^10.8.0"
+
+            # Write updated package.json
+            package_json_path.write_text(json.dumps(package_data, indent=2), encoding="utf-8")
+            created_files.append("package.json (updated)")
+
+        # Update .gitignore to include .env.local if not already there
+        gitignore_path = project_dir / ".gitignore"
+        if gitignore_path.exists():
+            gitignore_content = gitignore_path.read_text(encoding="utf-8")
+            if ".env.local" not in gitignore_content:
+                gitignore_content += "\n# Firebase environment variables\n.env.local\n"
+                gitignore_path.write_text(gitignore_content, encoding="utf-8")
+        else:
+            gitignore_content = "# Firebase environment variables\n.env.local\n"
+            gitignore_path.write_text(gitignore_content, encoding="utf-8")
+            created_files.append(".gitignore")
+
+        return {
+            "success": True,
+            "created_files": created_files,
+            "features": features,
+            "message": f"Firebase activated with features: {', '.join(features)}"
+        }
 
     @staticmethod
     def write_file(project_id: int, filepath: str, content: str) -> None:

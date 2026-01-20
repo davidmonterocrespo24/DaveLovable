@@ -23,6 +23,52 @@ class ChatService:
     """Service for managing chat sessions and AI interactions"""
 
     @staticmethod
+    def detect_firebase_request(message_content: str) -> Dict | None:
+        """
+        Detects if the agent is requesting to activate Firebase
+
+        Returns:
+            dict with Firebase activation request details if detected, None otherwise
+        """
+        import json
+        import re
+
+        # Method 1: Look for exact JSON format from agent
+        if "FIREBASE_ACTIVATION_REQUEST" in message_content:
+            # Try to extract JSON object
+            json_match = re.search(
+                r'\{[^}]*"type"\s*:\s*"FIREBASE_ACTIVATION_REQUEST"[^}]*\}',
+                message_content,
+                re.DOTALL
+            )
+            if json_match:
+                try:
+                    return json.loads(json_match.group())
+                except json.JSONDecodeError:
+                    logger.warning("Failed to parse FIREBASE_ACTIVATION_REQUEST JSON")
+
+        # Method 2: Look for persistence-related keywords (fallback detection)
+        persistence_keywords = [
+            "necesitas una base de datos",
+            "activar firebase",
+            "persistir los datos",
+            "need a database",
+            "activate firebase",
+            "persist the data"
+        ]
+
+        if any(keyword in message_content.lower() for keyword in persistence_keywords):
+            logger.info(f"🔥 Firebase activation keywords detected in message")
+            return {
+                "type": "FIREBASE_ACTIVATION_REQUEST",
+                "message": message_content,
+                "features": ["firestore"],  # Default to Firestore
+                "reason": "Persistence keywords detected"
+            }
+
+        return None
+
+    @staticmethod
     def create_session(db: Session, session_data: ChatSessionCreate) -> ChatSession:
         """Create a new chat session"""
 
@@ -614,6 +660,25 @@ Please analyze the request, create a plan if needed, and implement the solution.
 
                     # TextMessage - Agent thoughts/responses
                     if event_type == "TextMessage":
+                        # Check for Firebase activation request FIRST (before skipping)
+                        firebase_request = ChatService.detect_firebase_request(message.content)
+                        if firebase_request:
+                            logger.info(f"🔥 FIREBASE ACTIVATION REQUEST DETECTED")
+                            logger.info(f"🔥 Features: {firebase_request.get('features', [])}")
+                            logger.info(f"🔥 Reason: {firebase_request.get('reason', 'N/A')}")
+
+                            # Send special event to frontend to show modal
+                            yield {
+                                "type": "firebase_activation_request",
+                                "data": {
+                                    "message": firebase_request.get("message", "Para esta funcionalidad necesitas una base de datos. ¿Quieres activar Firebase?"),
+                                    "features": firebase_request.get("features", ["firestore"]),
+                                    "reason": firebase_request.get("reason", "Persistence required")
+                                }
+                            }
+                            # Don't process this message further
+                            continue
+
                         # Skip user messages and filter out system/control messages
                         skip_patterns = ["TASK_COMPLETED", "TERMINATE", "DELEGATE_TO_PLANNER", "SUBTASK_DONE"]
                         should_skip = (

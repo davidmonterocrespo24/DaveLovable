@@ -111,6 +111,13 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
     const reloadScheduledRef = useRef(false); // Prevent duplicate reload scheduling
     const [currentCommitHash, setCurrentCommitHash] = useState<string | null>(null); // Track current commit when viewing
 
+    // Firebase activation modal state
+    const [firebaseRequest, setFirebaseRequest] = useState<{
+      message: string;
+      features: string[];
+      reason: string;
+    } | null>(null);
+
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
 
@@ -526,6 +533,80 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       });
     };
 
+    // Handle Firebase activation decision
+    const handleFirebaseDecision = async (activate: boolean) => {
+      if (!firebaseRequest) return;
+
+      if (activate) {
+        // User approved - activate Firebase
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/chat/${projectId}/activate-firebase`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              features: firebaseRequest.features,
+              session_id: currentSessionId
+            }),
+          });
+
+          const result = await response.json();
+
+          if (result.success) {
+            toast({
+              title: "🔥 Firebase Activated",
+              description: `Created ${result.created_files.length} files. Check README.firebase.md for setup instructions.`,
+              duration: 5000,
+            });
+
+            // Close modal
+            setFirebaseRequest(null);
+
+            // The agent will receive the FIREBASE_ACTIVATED message and continue
+          } else {
+            toast({
+              title: "Error activating Firebase",
+              description: result.message,
+              variant: "destructive",
+              duration: 3000,
+            });
+          }
+        } catch (error) {
+          toast({
+            title: "Error activating Firebase",
+            description: error instanceof Error ? error.message : "Unknown error",
+            variant: "destructive",
+            duration: 3000,
+          });
+        }
+      } else {
+        // User declined - use mock data/localStorage
+        toast({
+          title: "Firebase Declined",
+          description: "Will use localStorage for data persistence.",
+          duration: 3000,
+        });
+
+        // Send message to agent that Firebase was declined
+        if (currentSessionId) {
+          await chatApi.sendMessage(projectId, {
+            message: "FIREBASE_DECLINED: User chose not to activate Firebase. Please use localStorage or mock data for persistence.",
+            session_id: currentSessionId
+          });
+        }
+
+        // Close modal
+        setFirebaseRequest(null);
+
+        // Stop the current stream since we're changing approach
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort();
+        }
+        setIsStreaming(false);
+      }
+    };
+
     const handleSend = async (messageOverride?: string, attachmentsOverride?: FileAttachment[]) => {
       let messageContent = messageOverride || input;
       // Use provided attachments or current state
@@ -800,6 +881,19 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
                   reloadScheduledRef.current = false;
                 }, 2500);
               }
+            },
+            onFirebaseActivationRequest: (data) => {
+              console.log('[ChatPanel] 🔥 Firebase activation request received:', data);
+
+              // Show Firebase activation modal
+              setFirebaseRequest({
+                message: data.message,
+                features: data.features || ['firestore'],
+                reason: data.reason || 'Persistence required'
+              });
+
+              // Pause streaming while waiting for user decision
+              // The AbortController will be used if user declines
             },
             onComplete: (data) => {
               console.log('[ChatPanel] Complete event - updating message content');
@@ -1603,6 +1697,83 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
               </div>
             </div>
           </>
+        )}
+
+        {/* Firebase Activation Modal */}
+        {firebaseRequest && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-background border border-border rounded-lg shadow-2xl max-w-md w-full p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+              {/* Header */}
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-lg bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M13.5 2L3 14h9l-1 8 10.5-12h-9l1-8z"/>
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold">Persistencia de Datos Detectada</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {firebaseRequest.reason}
+                  </p>
+                </div>
+              </div>
+
+              {/* Message */}
+              <div className="bg-muted/50 rounded-lg p-4 border border-border/50">
+                <p className="text-sm leading-relaxed">
+                  {firebaseRequest.message}
+                </p>
+              </div>
+
+              {/* Features */}
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  Características a activar:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {firebaseRequest.features.map((feature) => (
+                    <span
+                      key={feature}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-md text-xs font-medium"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                      {feature === 'firestore' && '🔥 Firestore Database'}
+                      {feature === 'auth' && '🔐 Authentication'}
+                      {feature === 'storage' && '📦 Storage'}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => handleFirebaseDecision(false)}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Usar Mock Data
+                </Button>
+                <Button
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+                  onClick={() => handleFirebaseDecision(true)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M13.5 2L3 14h9l-1 8 10.5-12h-9l1-8z"/>
+                  </svg>
+                  Activar Firebase
+                </Button>
+              </div>
+
+              {/* Info */}
+              <p className="text-xs text-muted-foreground text-center pt-2 border-t border-border/50">
+                Firebase configurará automáticamente la base de datos en tu proyecto
+              </p>
+            </div>
+          </div>
         )}
       </div>
     );

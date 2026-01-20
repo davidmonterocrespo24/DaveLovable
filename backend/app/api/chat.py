@@ -167,3 +167,57 @@ def delete_chat_session(project_id: int, session_id: int, db: Session = Depends(
     """Delete a chat session"""
     ChatService.delete_session(db, session_id, project_id)
     return None
+
+
+@router.post("/{project_id}/activate-firebase")
+async def activate_firebase(project_id: int, request_body: dict, db: Session = Depends(get_db)):
+    """
+    Activate Firebase in a project
+
+    Expected body:
+    {
+        "features": ["firestore", "auth", "storage"],
+        "session_id": <optional session_id>
+    }
+    """
+    from app.services.filesystem_service import FileSystemService
+
+    features = request_body.get("features", ["firestore"])
+    session_id = request_body.get("session_id")
+
+    try:
+        # Activate Firebase in the project
+        result = FileSystemService.activate_firebase(project_id, features)
+
+        # Send confirmation message to the agent (if session exists)
+        if session_id:
+            from app.schemas import ChatMessageCreate
+            from app.models import MessageRole
+
+            # Add system message to let agent know Firebase was activated
+            ChatService.add_message(
+                db,
+                ChatMessageCreate(
+                    session_id=session_id,
+                    role=MessageRole.USER,
+                    content=f"FIREBASE_ACTIVATED: {', '.join(features)} features enabled. You can now create Firebase client-side code.",
+                ),
+            )
+
+        return {
+            "success": True,
+            "message": result["message"],
+            "created_files": result["created_files"],
+            "features": result["features"]
+        }
+
+    except ValueError as e:
+        return {
+            "success": False,
+            "message": str(e)
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error activating Firebase: {str(e)}"
+        }

@@ -267,6 +267,7 @@ export const chatApi = {
       onFilesReady?: (data: { message: string; project_id: number }) => void;
       onGitCommit?: (data: { success: boolean; message?: string; full_message?: string; error?: string; commit_count?: number; commit_hash?: string }) => void;
       onReloadPreview?: (data: { tool_call_count: number; message: string }) => void;
+      onFirebaseActivationRequest?: (data: { message: string; features: string[]; reason: string }) => void;
       onComplete?: (data: SendChatMessageResponse) => void;
       onError?: (error: string) => void;
     }
@@ -358,6 +359,10 @@ export const chatApi = {
                     case 'reload_preview':
                       console.log('[SSE] Reload preview event:', event.data);
                       callbacks.onReloadPreview?.(event.data);
+                      break;
+                    case 'firebase_activation_request':
+                      console.log('[SSE] 🔥 Firebase activation request:', event.data);
+                      callbacks.onFirebaseActivationRequest?.(event.data);
                       break;
                     case 'complete':
                       console.log('[SSE] Complete event');
