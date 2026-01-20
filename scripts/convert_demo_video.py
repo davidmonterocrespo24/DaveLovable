@@ -14,11 +14,11 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Your video path (cleaned - remove zero-width spaces)
-INPUT_VIDEO = r"C:\Users\David\Videos\Captures\editor.mp4"
+INPUT_VIDEO = r"C:\Users\David\Videos\Captures\multimodal.mp4"
 
 # Output settings
 OUTPUT_DIR = r"e:\AI\DaveLovable\DaveLovable\docs\videos"
-OUTPUT_FILENAME = "editor.gif"
+OUTPUT_FILENAME = "multimodal.gif"
 
 # Conversion settings (adjust these as needed)
 SETTINGS = {
