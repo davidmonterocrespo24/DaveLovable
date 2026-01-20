@@ -14,11 +14,11 @@ if sys.platform == 'win32':
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Your video path (cleaned - remove zero-width spaces)
-INPUT_VIDEO = r"C:\Users\David\Videos\Captures\DaveLovable - AI-Powered Web Development Platform _ Build Apps 10x Faster - Personal_ Microsoft Edge 2026-01-19 12-59-02.mp4"
+INPUT_VIDEO = r"C:\Users\David\Videos\Captures\editor.mp4"
 
 # Output settings
 OUTPUT_DIR = r"e:\AI\DaveLovable\DaveLovable\docs\videos"
-OUTPUT_FILENAME = "demo-overview.gif"
+OUTPUT_FILENAME = "editor.gif"
 
 # Conversion settings (adjust these as needed)
 SETTINGS = {

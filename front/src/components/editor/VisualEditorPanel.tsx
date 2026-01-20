@@ -424,9 +424,13 @@ export const VisualEditorPanel: React.FC<VisualEditorPanelProps> = ({
                     description: `Successfully updated ${selectedElementTagName} in ${selectedElementFilepath}`,
                 });
 
-                // Reload preview to show changes
-                if (onReloadPreview) {
-                    onReloadPreview();
+                // Push file update to WebContainer for instant HMR (no full reload!)
+                if (onFileUpdate && result.modified_content) {
+                    console.log('[VisualEditor] Pushing file update for HMR...');
+                    onFileUpdate([{
+                        path: relativePath,
+                        content: result.modified_content
+                    }]);
                 }
 
                 // Clear modified styles and reset className after successful save
