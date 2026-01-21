@@ -205,6 +205,56 @@ class ChatService:
                 os.chdir(project_dir)
                 logger.info(f"📂 Changed working directory to: {project_dir}")
 
+                # Check if Firebase was just activated and inject technical context
+                firebase_context = ""
+                if "FIREBASE_ACTIVATED" in chat_request.message:
+                    # Read Firebase state to get project info
+                    firebase_state_path = project_dir / ".firebase-state.json"
+                    if firebase_state_path.exists():
+                        import json
+                        with open(firebase_state_path, 'r', encoding='utf-8') as f:
+                            firebase_state = json.load(f)
+
+                        firebase_context = f"""
+
+**FIREBASE ACTIVATED - Technical Context:**
+This project uses a SHARED Firebase database with automatic collection prefixing.
+
+- **Your project prefix**: `{firebase_state.get('collection_prefix', 'proj_')}`
+- **Project unique ID**: `{firebase_state.get('project_unique_id', 'unknown')}`
+- **How it works**: The wrapper at `src/lib/firestore.ts` automatically adds/removes prefixes transparently
+
+**CRITICAL RULES:**
+1. **ALWAYS import from `@/lib/firestore`** (NOT from `firebase/firestore`)
+2. **Just use normal Firestore syntax** - prefixing is automatic!
+3. The wrapper handles everything behind the scenes
+
+Configuration files ready:
+- .env.local (with VITE_PROJECT_ID={firebase_state.get('project_unique_id', 'unknown')})
+- src/lib/firebase.ts (Firebase app, auth, storage initialized)
+- src/lib/firestore.ts (Firestore wrapper with auto-prefixing)
+
+**Example service pattern:**
+```typescript
+//  CORRECT - Import from @/lib/firestore wrapper
+import {{ db }} from '@/lib/firestore';
+import {{ collection, addDoc, getDocs, doc, updateDoc }} from '@/lib/firestore';
+
+export const createItem = async (data) => {{
+  const docRef = await addDoc(collection(db, 'items'), data);
+  return {{ id: docRef.id, ...data }};
+}};
+
+export const getItems = async () => {{
+  const snapshot = await getDocs(collection(db, 'items'));
+  return snapshot.docs.map(doc => ({{ id: doc.id, ...doc.data() }}));
+}};
+
+//  WRONG - Don't import from firebase/firestore
+// import {{ collection }} from 'firebase/firestore'; // DON'T DO THIS
+```
+"""
+
                 # Build task description with context for the agents
                 task_description = f"""User Request: {chat_request.message}
 
@@ -213,7 +263,7 @@ Project Context:
 - Working Directory: {project_dir}
 - Existing Files: {len(context["files"])} files
 - Files: {", ".join([f["filepath"] for f in context["files"]])}
-
+{firebase_context}
 IMPORTANT: You are working in the project directory. All file operations will be relative to this directory.
 Please analyze the request, create a plan if needed, and implement the solution."""
 
@@ -525,6 +575,44 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             ag_image = AGImage(pil_img)
                             content_parts.append(ag_image)
 
+                # Check if Firebase was just activated and inject technical context
+                firebase_context = ""
+                if "FIREBASE_ACTIVATED" in chat_request.message:
+                    # Read Firebase state to get project info
+                    firebase_state_path = project_dir / ".firebase-state.json"
+                    if firebase_state_path.exists():
+                        import json
+                        with open(firebase_state_path, 'r', encoding='utf-8') as f:
+                            firebase_state = json.load(f)
+
+                        firebase_context = f"""
+
+**🔥 FIREBASE ACTIVATED - Technical Context:**
+This project uses a SHARED Firebase database with automatic collection prefixing.
+
+- **Your project prefix**: `{firebase_state.get('collection_prefix', 'proj_')}`
+- **Project unique ID**: `{firebase_state.get('project_unique_id', 'unknown')}`
+- **How it works**: The wrapper at `src/lib/firestore.ts` automatically adds/removes prefixes
+
+**CRITICAL RULES:**
+1. **ALWAYS import from `@/lib/firestore`** (NOT from `firebase/firestore`)
+2. **Just use normal Firestore syntax** - prefixing is automatic!
+
+Configuration files ready:
+- .env.local (VITE_PROJECT_ID={firebase_state.get('project_unique_id', 'unknown')})
+- src/lib/firebase.ts (auth, storage)
+- src/lib/firestore.ts (wrapper with auto-prefixing)
+
+**Example:**
+```typescript
+import {{ db }} from '@/lib/firestore';
+import {{ collection, addDoc, getDocs }} from '@/lib/firestore';
+
+const docRef = await addDoc(collection(db, 'items'), data);
+const snapshot = await getDocs(collection(db, 'items'));
+```
+"""
+
                 # Build task description with optimizations for first message
                 if is_first_message:
                     # FIRST MESSAGE: Provide complete file structure and content to avoid wasteful tool calls
@@ -565,7 +653,7 @@ Project Context:
 - Entry point: index.html → main.tsx → App.tsx
 - Base styles: index.css with Tailwind directives
 - Dev server runs automatically in WebContainer - NEVER run npm run dev or npm start
-
+{firebase_context}
 ⚡ CRITICAL OPTIMIZATION RULES:
 1. 🚫 **NEVER use list_dir** - The file tree is provided above in your context
 2. 🚫 **NEVER use read_file** - All file contents are provided above
@@ -586,7 +674,7 @@ Project Context:
 - Working Directory: {project_dir}
 - Existing Files: {len(context["files"])} files
 - Files: {", ".join([f["filepath"] for f in context["files"]])}
-
+{firebase_context}
 ⚡ OPTIMIZATION REMINDER:
 - **write_file AUTOMATICALLY creates parent directories** - NEVER use mkdir
 

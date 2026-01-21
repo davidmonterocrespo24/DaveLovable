@@ -52,33 +52,54 @@ You are pair programming with a USER to solve their coding task.
   - Use Firebase Storage for file uploads (if needed)
   - **ALL logic stays in the frontend - NEVER create backend API endpoints**
 
+- **CRITICAL: Use Firestore Wrapper (Transparent Collection Prefixing)**
+  - **ALWAYS import from `@/lib/firestore`** instead of `firebase/firestore` for Firestore operations
+  - The wrapper at `src/lib/firestore.ts` handles collection prefixing **automatically and transparently**
+  - You don't need to use any special functions or think about prefixes - just use normal Firestore syntax!
+  - The wrapper ensures data isolation in the shared Firebase database
+  - **Import pattern**: `import { collection, addDoc, getDocs, doc } from '@/lib/firestore'`
+
 - **Example Firebase code patterns to use AFTER activation:**
   ```typescript
-  // src/lib/firebase.ts
-  import { initializeApp } from 'firebase/app';
-  import { getFirestore } from 'firebase/firestore';
-
-  const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    // ... config from .env.local
-  };
-
-  export const app = initializeApp(firebaseConfig);
-  export const db = getFirestore(app);
-
   // src/services/clientService.ts
-  import { db } from '@/lib/firebase';
-  import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+  //  CORRECT - Import from the wrapper (NOT from firebase/firestore)
+  import { db } from '@/lib/firestore';
+  import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from '@/lib/firestore';
 
-  export const createClient = async (data) => {
+  export interface Client {
+    id?: string;
+    name: string;
+    email: string;
+    phone?: string;
+  }
+
+  //  Just use normal Firestore syntax - prefixing is automatic!
+  export const createClient = async (data: Omit<Client, 'id'>): Promise<Client> => {
     const docRef = await addDoc(collection(db, 'clients'), data);
     return { id: docRef.id, ...data };
   };
 
-  export const getClients = async () => {
+  export const getClients = async (): Promise<Client[]> => {
     const snapshot = await getDocs(collection(db, 'clients'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Client);
   };
+
+  export const getActiveClients = async (): Promise<Client[]> => {
+    const q = query(collection(db, 'clients'), where('status', '==', 'active'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Client);
+  };
+
+  export const updateClient = async (id: string, data: Partial<Client>): Promise<void> => {
+    await updateDoc(doc(db, 'clients', id), data);
+  };
+
+  export const deleteClient = async (id: string): Promise<void> => {
+    await deleteDoc(doc(db, 'clients', id));
+  };
+
+  // X WRONG - Don't import from firebase/firestore directly!
+  // import { collection } from 'firebase/firestore'; // DON'T DO THIS
   ```
 
 - **IF Firebase is NOT activated (user declines):**

@@ -189,18 +189,20 @@ async def activate_firebase(project_id: int, request_body: dict, db: Session = D
         # Activate Firebase in the project
         result = FileSystemService.activate_firebase(project_id, features)
 
-        # Send confirmation message to the agent (if session exists)
+        # Send simple confirmation message to user (visible in chat)
         if session_id:
             from app.schemas import ChatMessageCreate
             from app.models import MessageRole
 
-            # Add system message to let agent know Firebase was activated
+            # Simple user-facing message
+            user_message = f"FIREBASE_ACTIVATED"
+
             ChatService.add_message(
                 db,
                 ChatMessageCreate(
                     session_id=session_id,
                     role=MessageRole.USER,
-                    content=f"FIREBASE_ACTIVATED: {', '.join(features)} features enabled. You can now create Firebase client-side code.",
+                    content=user_message,
                 ),
             )
 
@@ -208,7 +210,9 @@ async def activate_firebase(project_id: int, request_body: dict, db: Session = D
             "success": True,
             "message": result["message"],
             "created_files": result["created_files"],
-            "features": result["features"]
+            "features": result["features"],
+            "project_unique_id": result["project_unique_id"],
+            "collection_prefix": result["collection_prefix"]
         }
 
     except ValueError as e:

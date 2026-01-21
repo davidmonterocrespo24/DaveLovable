@@ -292,9 +292,12 @@ VITE_FIREBASE_PROJECT_ID=your_project_id
 VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
+
+# Project Identifier - DO NOT CHANGE THIS VALUE
+# This ensures your Firestore collections are unique across all projects
+VITE_PROJECT_ID={project_unique_id}
 """,
         "src/lib/firebase.ts": """import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -312,10 +315,10 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 
 // Initialize services
-export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 """,
+        "src/lib/firestore.ts": """{firestore_wrapper_content}""",
         "README.firebase.md": """# Firebase Setup Instructions
 
 ## 1. Create Firebase Project
@@ -395,20 +398,79 @@ service cloud.firestore {
 
 Your Firebase is now configured! The agent will create database services automatically.
 
-Example usage:
-```typescript
-import { db } from '@/lib/firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+### Important: Transparent Collection Prefixing
 
-// Create document
+**This project uses a SHARED Firebase database with automatic collection prefixing.**
+
+✨ **You don't need to do anything special!** The `src/lib/firestore.ts` wrapper automatically handles prefixing.
+
+### How It Works
+
+Your collections are automatically prefixed behind the scenes:
+- You write: `collection(db, 'users')` → Actually queries: `proj_abc123_users`
+- You write: `collection(db, 'products')` → Actually queries: `proj_abc123_products`
+
+### Usage (Just Use Normal Firestore!)
+
+```typescript
+// Import from the wrapper instead of 'firebase/firestore'
+import { db } from '@/lib/firestore';  // Note: firestore, not firebase!
+import { collection, addDoc, getDocs, doc, setDoc, query, where } from '@/lib/firestore';
+
+// ✅ Just use it normally - prefixing is automatic!
 const docRef = await addDoc(collection(db, 'clients'), {
   name: 'John Doe',
   email: 'john@example.com'
 });
 
-// Read documents
+// ✅ Reading documents - works exactly like normal Firestore
 const snapshot = await getDocs(collection(db, 'clients'));
 const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+// ✅ Specific document reference
+const clientRef = doc(db, 'clients', 'client123');
+await setDoc(clientRef, { name: 'Jane Smith', email: 'jane@example.com' });
+
+// ✅ Queries work too
+const q = query(collection(db, 'clients'), where('status', '==', 'active'));
+const activeClients = await getDocs(q);
+
+// ✅ Subcollections - also automatic
+const ordersRef = collection(db, 'users', 'user123', 'orders');
+await addDoc(ordersRef, { total: 99.99 });
+```
+
+### What's Different?
+
+**Only ONE thing**: Import from `@/lib/firestore` instead of `firebase/firestore`:
+
+```typescript
+// ❌ OLD way (direct Firebase):
+import { collection, addDoc } from 'firebase/firestore';
+
+// ✅ NEW way (with automatic prefixing):
+import { collection, addDoc } from '@/lib/firestore';
+```
+
+Everything else is **exactly the same** as normal Firestore!
+
+### Technical Details (Optional Reading)
+
+The wrapper in `src/lib/firestore.ts`:
+1. Wraps `collection()` and `doc()` functions
+2. Automatically adds `proj_{PROJECT_ID}_` prefix to collection names
+3. Re-exports all other Firestore functions unchanged
+4. Works transparently - you don't need to think about it
+
+### Debugging
+
+If you need to see the actual collection name in Firestore Console:
+
+```typescript
+import { getPrefixedName, getProjectId } from '@/lib/firestore';
+
+console.log(getPrefixedName('users')); // 'proj_abc123_users'
+console.log(getProjectId()); // 'abc123'
 ```
 
 ## Troubleshooting
@@ -438,15 +500,38 @@ const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         Returns:
             Dict with created files and status
         """
+        import hashlib
+        import time
+
         project_dir = FileSystemService.get_project_dir(project_id)
 
         if not project_dir.exists():
             raise ValueError(f"Project {project_id} does not exist")
 
+        # Generate unique project identifier for Firestore collection prefixing
+        # Format: {project_id}_{timestamp_hash} (e.g., "1_a3f2b9")
+        # This ensures collections are unique even if project IDs are reused
+        timestamp = str(int(time.time()))
+        hash_input = f"{project_id}_{timestamp}".encode()
+        unique_hash = hashlib.sha256(hash_input).hexdigest()[:6]
+        project_unique_id = f"{project_id}_{unique_hash}"
+
         created_files = []
 
-        # Create Firebase template files
-        for filepath, content in FileSystemService.FIREBASE_TEMPLATE_FILES.items():
+        # Load firestore wrapper template
+        firestore_wrapper_path = Path(__file__).parent.parent / "templates" / "firestore_wrapper.ts"
+        try:
+            with open(firestore_wrapper_path, encoding="utf-8") as f:
+                firestore_wrapper_content = f.read()
+        except FileNotFoundError:
+            firestore_wrapper_content = "// Firestore wrapper template not found"
+
+        # Create Firebase template files with project_unique_id injected
+        for filepath, content_template in FileSystemService.FIREBASE_TEMPLATE_FILES.items():
+            # Replace placeholder with actual unique ID
+            content = content_template.replace("{project_unique_id}", project_unique_id)
+            # Replace firestore wrapper placeholder
+            content = content.replace("{firestore_wrapper_content}", firestore_wrapper_content)
             FileSystemService.write_file(project_id, filepath, content)
             created_files.append(filepath)
 
@@ -455,7 +540,9 @@ const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         firebase_state = {
             "activated": True,
             "features": features,
-            "activated_at": datetime.utcnow().isoformat()
+            "activated_at": datetime.utcnow().isoformat(),
+            "project_unique_id": project_unique_id,
+            "collection_prefix": f"proj_{project_unique_id}_"
         }
         FileSystemService.write_file(project_id, ".firebase-state.json", json.dumps(firebase_state, indent=2))
 
@@ -490,7 +577,9 @@ const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             "success": True,
             "created_files": created_files,
             "features": features,
-            "message": f"Firebase activated with features: {', '.join(features)}"
+            "project_unique_id": project_unique_id,
+            "collection_prefix": f"proj_{project_unique_id}_",
+            "message": f"Firebase activated with features: {', '.join(features)}. Collection prefix: proj_{project_unique_id}_"
         }
 
     @staticmethod

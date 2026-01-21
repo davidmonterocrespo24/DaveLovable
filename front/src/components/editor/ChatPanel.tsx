@@ -556,8 +556,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
           if (result.success) {
             toast({
               title: "🔥 Firebase Activated",
-              description: `Created ${result.created_files.length} files. Check README.firebase.md for setup instructions.`,
-              duration: 5000,
+              description: `Created ${result.created_files.length} files. Collection prefix: ${result.collection_prefix || 'proj_*'}. Check README.firebase.md for setup instructions.`,
+              duration: 7000,
             });
 
             // Close modal
