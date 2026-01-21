@@ -49,12 +49,22 @@ class ChatService:
 
         # Method 2: Look for persistence-related keywords (fallback detection)
         persistence_keywords = [
+            # Spanish keywords
             "necesitas una base de datos",
             "activar firebase",
             "persistir los datos",
+            "base de datos",
+            "guardar",
+            "crud",
+            # English keywords
             "need a database",
             "activate firebase",
-            "persist the data"
+            "persist the data",
+            "persist",
+            "database",
+            "save multiple",
+            "store multiple",
+            "load data",
         ]
 
         if any(keyword in message_content.lower() for keyword in persistence_keywords):

@@ -35,3 +35,6 @@ pathspec
 
 # Image processing (for multimodal)
 Pillow==11.0.0
+
+# Firebase Admin SDK (optional - for backend Firebase operations)
+firebase-admin==7.1.0
