@@ -45,26 +45,24 @@ You are pair programming with a USER to solve their coding task.
   - `"storage"` - File uploads (images, PDFs, etc.)
 
 - **AFTER Firebase is activated (you'll receive "FIREBASE_ACTIVATED" message):**
-  - Create Firebase client-side code using the Firebase JavaScript SDK
-  - Create TypeScript services for database operations (src/lib/firebase.ts, src/services/...)
-  - Use Firestore for data persistence (collections, documents, queries)
-  - Use Firebase Auth for user management (if needed)
-  - Use Firebase Storage for file uploads (if needed)
-  - **ALL logic stays in the frontend - NEVER create backend API endpoints**
+  - Create TypeScript services for database operations (src/services/...)
+  - Use the **Firestore Proxy Client** (`src/lib/firestore.ts`) which communicates with the backend
+  - The proxy client provides a Firestore-like API but keeps credentials secure on the backend
+  - **NO Firebase packages needed** - The proxy client handles everything
+  - **ALL database operations go through the backend proxy** - Frontend just calls the client functions
 
-- **CRITICAL: Use Firestore Wrapper (Transparent Collection Prefixing)**
-  - **ALWAYS import from `@/lib/firestore`** instead of `firebase/firestore` for Firestore operations
-  - The wrapper at `src/lib/firestore.ts` handles collection prefixing **automatically and transparently**
-  - You don't need to use any special functions or think about prefixes - just use normal Firestore syntax!
-  - The wrapper ensures data isolation in the shared Firebase database
-  - **Import pattern**: `import { collection, addDoc, getDocs, doc } from '@/lib/firestore'`
+- **CRITICAL: Use Firestore Proxy Client**
+  - **ALWAYS import from `@/lib/firestore`** for all Firestore operations
+  - The client at `src/lib/firestore.ts` sends HTTP requests to the backend proxy
+  - The backend handles actual Firebase operations with secure credentials
+  - Collection prefixing is handled automatically by the backend
+  - **Import pattern**: `import { db, collection, addDoc, getDocs, doc } from '@/lib/firestore'`
 
 - **Example Firebase code patterns to use AFTER activation:**
   ```typescript
   // src/services/clientService.ts
-  //  CORRECT - Import from the wrapper (NOT from firebase/firestore)
-  import { db } from '@/lib/firestore';
-  import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc, query, where } from '@/lib/firestore';
+  // ✅ CORRECT - Import from the proxy client
+  import { db, collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from '@/lib/firestore';
 
   export interface Client {
     id?: string;
@@ -73,7 +71,7 @@ You are pair programming with a USER to solve their coding task.
     phone?: string;
   }
 
-  //  Just use normal Firestore syntax - prefixing is automatic!
+  // Just use Firestore-like syntax - backend handles everything!
   export const createClient = async (data: Omit<Client, 'id'>): Promise<Client> => {
     const docRef = await addDoc(collection(db, 'clients'), data);
     return { id: docRef.id, ...data };
@@ -81,12 +79,6 @@ You are pair programming with a USER to solve their coding task.
 
   export const getClients = async (): Promise<Client[]> => {
     const snapshot = await getDocs(collection(db, 'clients'));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Client);
-  };
-
-  export const getActiveClients = async (): Promise<Client[]> => {
-    const q = query(collection(db, 'clients'), where('status', '==', 'active'));
-    const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Client);
   };
 
@@ -98,8 +90,11 @@ You are pair programming with a USER to solve their coding task.
     await deleteDoc(doc(db, 'clients', id));
   };
 
-  // X WRONG - Don't import from firebase/firestore directly!
-  // import { collection } from 'firebase/firestore'; // DON'T DO THIS
+  // ❌ WRONG - Don't import from firebase/firestore!
+  // import { collection } from 'firebase/firestore'; // NO Firebase SDK!
+
+  // ❌ WRONG - Don't create backend API endpoints!
+  // Backend proxy already exists at /api/v1/firebase/...
   ```
 
 - **IF Firebase is NOT activated (user declines):**

@@ -282,208 +282,142 @@ code {
 
     # Firebase Template Files
     FIREBASE_TEMPLATE_FILES = {
-        ".env.local": """# Firebase Configuration
+        ".env.local": """# Firebase Proxy Configuration
 # IMPORTANT: Never commit this file to Git! It's already in .gitignore
-# Get these values from Firebase Console: https://console.firebase.google.com
 
-VITE_FIREBASE_API_KEY=your_api_key_here
-VITE_FIREBASE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_project_id.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
+# API URL - Backend proxy endpoint
+VITE_API_URL=http://localhost:8000
 
 # Project Identifier - DO NOT CHANGE THIS VALUE
 # This ensures your Firestore collections are unique across all projects
-VITE_PROJECT_ID={project_unique_id}
+VITE_PROJECT_ID={project_id}
 """,
-        "src/lib/firebase.ts": """import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getStorage } from 'firebase/storage';
+        "src/lib/firestore.ts": """{firestore_client_content}""",
+        "README.firebase.md": """# Firebase Proxy Setup
 
-// Firebase configuration from environment variables
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
-};
+## Overview
 
-// Initialize Firebase
-export const app = initializeApp(firebaseConfig);
+This project uses a **secure proxy architecture** for Firebase Firestore. All database operations go through your backend, keeping Firebase credentials safe.
 
-// Initialize services
-export const auth = getAuth(app);
-export const storage = getStorage(app);
-""",
-        "src/lib/firestore.ts": """{firestore_wrapper_content}""",
-        "README.firebase.md": """# Firebase Setup Instructions
+### ✅ Benefits
+- **Secure**: Firebase credentials never leave the backend
+- **Simple**: No Firebase setup needed in your project
+- **Multi-project**: Automatic collection prefixing isolates data
 
-## 1. Create Firebase Project
+## How It Works
 
-1. Go to [Firebase Console](https://console.firebase.google.com/)
-2. Click "Add project"
-3. Enter project name and follow setup wizard
-4. Enable Google Analytics (optional)
+1. Your frontend calls functions like `addDoc()`, `getDocs()`, etc.
+2. These functions send HTTP requests to your backend proxy
+3. The backend handles Firebase operations with real credentials
+4. Your data is automatically prefixed with `proj_{project_id}_`
 
-## 2. Get Firebase Configuration
+## Usage
 
-1. In Firebase Console, click ⚙️ (Settings) → Project settings
-2. Scroll down to "Your apps" section
-3. Click the Web icon (`</>`) to create a web app
-4. Register your app with a nickname
-5. Copy the `firebaseConfig` object values
-
-## 3. Configure Environment Variables
-
-Open `.env.local` and replace the placeholder values with your Firebase config:
-
-```env
-VITE_FIREBASE_API_KEY=AIzaSyC...
-VITE_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-VITE_FIREBASE_PROJECT_ID=your-project-id
-VITE_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-VITE_FIREBASE_APP_ID=1:123456789:web:abcdef
-```
-
-## 4. Enable Required Services
-
-### Firestore Database
-1. In Firebase Console, go to "Firestore Database"
-2. Click "Create database"
-3. Select "Start in test mode" (for development)
-4. Choose a location close to your users
-
-### Authentication (if needed)
-1. Go to "Authentication" → "Sign-in method"
-2. Enable providers you want (Email/Password, Google, etc.)
-
-### Storage (if needed)
-1. Go to "Storage" → "Get started"
-2. Start in test mode for development
-
-## 5. Security Rules (Important for Production!)
-
-### Firestore Rules (test mode - CHANGE FOR PRODUCTION!)
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2025, 3, 1);
-    }
-  }
-}
-```
-
-### Production Rules Example
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-    match /clients/{clientId} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-```
-
-## 6. Start Development
-
-Your Firebase is now configured! The agent will create database services automatically.
-
-### Important: Transparent Collection Prefixing
-
-**This project uses a SHARED Firebase database with automatic collection prefixing.**
-
-✨ **You don't need to do anything special!** The `src/lib/firestore.ts` wrapper automatically handles prefixing.
-
-### How It Works
-
-Your collections are automatically prefixed behind the scenes:
-- You write: `collection(db, 'users')` → Actually queries: `proj_abc123_users`
-- You write: `collection(db, 'products')` → Actually queries: `proj_abc123_products`
-
-### Usage (Just Use Normal Firestore!)
+### Import from `@/lib/firestore`
 
 ```typescript
-// Import from the wrapper instead of 'firebase/firestore'
-import { db } from '@/lib/firestore';  // Note: firestore, not firebase!
-import { collection, addDoc, getDocs, doc, setDoc, query, where } from '@/lib/firestore';
+import { db, collection, addDoc, getDocs, doc, getDoc, updateDoc, deleteDoc } from '@/lib/firestore';
 
-// ✅ Just use it normally - prefixing is automatic!
-const docRef = await addDoc(collection(db, 'clients'), {
+// ✅ Add a document
+const docRef = await addDoc(collection(db, 'users'), {
   name: 'John Doe',
-  email: 'john@example.com'
+  email: 'john@example.com',
+  createdAt: serverTimestamp()
+});
+console.log('Created document:', docRef.id);
+
+// ✅ Get all documents
+const snapshot = await getDocs(collection(db, 'users'));
+const users = snapshot.docs.map(doc => ({
+  id: doc.id,
+  ...doc.data()
+}));
+
+// ✅ Get single document
+const userRef = doc(db, 'users', 'user123');
+const userDoc = await getDoc(userRef);
+if (userDoc.exists) {
+  console.log('User data:', userDoc.data());
+}
+
+// ✅ Update document
+await updateDoc(userRef, {
+  name: 'Jane Smith',
+  updatedAt: serverTimestamp()
 });
 
-// ✅ Reading documents - works exactly like normal Firestore
-const snapshot = await getDocs(collection(db, 'clients'));
-const clients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-// ✅ Specific document reference
-const clientRef = doc(db, 'clients', 'client123');
-await setDoc(clientRef, { name: 'Jane Smith', email: 'jane@example.com' });
-
-// ✅ Queries work too
-const q = query(collection(db, 'clients'), where('status', '==', 'active'));
-const activeClients = await getDocs(q);
-
-// ✅ Subcollections - also automatic
-const ordersRef = collection(db, 'users', 'user123', 'orders');
-await addDoc(ordersRef, { total: 99.99 });
+// ✅ Delete document
+await deleteDoc(userRef);
 ```
 
-### What's Different?
+### API Reference
 
-**Only ONE thing**: Import from `@/lib/firestore` instead of `firebase/firestore`:
+All standard Firestore operations are supported:
 
-```typescript
-// ❌ OLD way (direct Firebase):
-import { collection, addDoc } from 'firebase/firestore';
+- `collection(db, path)` - Get collection reference
+- `doc(db, path, id)` - Get document reference
+- `addDoc(collectionRef, data)` - Add new document
+- `setDoc(docRef, data)` - Set document with ID
+- `getDoc(docRef)` - Get single document
+- `getDocs(collectionRef)` - Get all documents
+- `updateDoc(docRef, data)` - Update document
+- `deleteDoc(docRef)` - Delete document
+- `serverTimestamp()` - Server timestamp
 
-// ✅ NEW way (with automatic prefixing):
-import { collection, addDoc } from '@/lib/firestore';
+### Environment Variables
+
+Your `.env.local` file contains:
+
+```env
+# Backend API URL
+VITE_API_URL=http://localhost:8000
+
+# Your unique project ID (DO NOT CHANGE)
+VITE_PROJECT_ID={project_id}
 ```
 
-Everything else is **exactly the same** as normal Firestore!
+**IMPORTANT**: Make sure your backend is running on `http://localhost:8000`
 
-### Technical Details (Optional Reading)
+## Collection Prefixing
 
-The wrapper in `src/lib/firestore.ts`:
-1. Wraps `collection()` and `doc()` functions
-2. Automatically adds `proj_{PROJECT_ID}_` prefix to collection names
-3. Re-exports all other Firestore functions unchanged
-4. Works transparently - you don't need to think about it
+Your collections are automatically prefixed in Firestore:
+- Your code: `collection(db, 'users')`
+- Actual collection: `proj_{project_id}_users`
 
-### Debugging
+This allows multiple projects to share one Firebase database safely.
 
-If you need to see the actual collection name in Firestore Console:
+## Security
 
-```typescript
-import { getPrefixedName, getProjectId } from '@/lib/firestore';
+**✅ Credentials are secure**: Firebase service account credentials stay in the backend
 
-console.log(getPrefixedName('users')); // 'proj_abc123_users'
-console.log(getProjectId()); // 'abc123'
-```
+**✅ No configuration needed**: The backend handles all Firebase setup
+
+**✅ No Firebase SDK**: Your frontend doesn't need Firebase packages installed
+
+## For Production
+
+When deploying:
+
+1. Update `VITE_API_URL` in `.env.local` to your production backend URL
+2. Ensure your backend has the Firebase service account credentials
+3. The proxy endpoints are at `/api/v1/firebase/projects/{project_id}/firestore/*`
 
 ## Troubleshooting
 
-- **"Firebase not configured" error**: Check `.env.local` values
-- **Permission denied**: Update Firestore security rules
-- **CORS errors**: Make sure you added your domain in Firebase Console → Authentication → Authorized domains
+**"Failed to add/get document" errors**:
+- Make sure backend is running on port 8000
+- Check VITE_API_URL in `.env.local`
+- Check browser console for CORS errors
+
+**"Firebase not activated" error**:
+- This means Firebase wasn't enabled for your project
+- Ask the AI agent to activate Firebase
 
 ## Resources
 
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [Firestore Quickstart](https://firebase.google.com/docs/firestore/quickstart)
-- [Firebase Auth Guide](https://firebase.google.com/docs/auth/web/start)
+- Backend proxy code: `backend/app/api/firebase_proxy.py`
+- Frontend client: `src/lib/firestore.ts`
+- Firestore proxy architecture documentation
 """,
         ".firebase-state.json": """{"activated": true, "features": [], "activated_at": ""}"""
     }
@@ -518,20 +452,22 @@ console.log(getProjectId()); // 'abc123'
 
         created_files = []
 
-        # Load firestore wrapper template
-        firestore_wrapper_path = Path(__file__).parent.parent / "templates" / "firestore_wrapper.ts"
+        # Load firestore proxy client template
+        firestore_client_path = Path(__file__).parent.parent / "templates" / "firebase" / "firestore_proxy_client.ts"
         try:
-            with open(firestore_wrapper_path, encoding="utf-8") as f:
-                firestore_wrapper_content = f.read()
+            with open(firestore_client_path, encoding="utf-8") as f:
+                firestore_client_content = f.read()
         except FileNotFoundError:
-            firestore_wrapper_content = "// Firestore wrapper template not found"
+            firestore_client_content = "// Firestore proxy client template not found"
 
-        # Create Firebase template files with project_unique_id injected
+        # Create Firebase template files with project_unique_id and project_id injected
         for filepath, content_template in FileSystemService.FIREBASE_TEMPLATE_FILES.items():
             # Replace placeholder with actual unique ID
             content = content_template.replace("{project_unique_id}", project_unique_id)
-            # Replace firestore wrapper placeholder
-            content = content.replace("{firestore_wrapper_content}", firestore_wrapper_content)
+            # Replace project_id placeholder (for API calls)
+            content = content.replace("{project_id}", str(project_id))
+            # Replace firestore client placeholder
+            content = content.replace("{firestore_client_content}", firestore_client_content)
             FileSystemService.write_file(project_id, filepath, content)
             created_files.append(filepath)
 
