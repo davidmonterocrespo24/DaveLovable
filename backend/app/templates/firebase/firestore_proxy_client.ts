@@ -39,9 +39,73 @@ export interface CollectionReference {
   _collectionName: string;
 }
 
+export interface Query {
+  _collection: CollectionReference;
+  _orderByField?: string;
+  _orderByDirection?: 'asc' | 'desc';
+  _whereConstraints?: Array<{field: string, operator: string, value: any}>;
+}
+
+export interface QueryConstraint {
+  type: 'orderBy' | 'where';
+  field?: string;
+  direction?: 'asc' | 'desc';
+  operator?: string;
+  value?: any;
+}
+
 // Firebase proxy configuration
+// When running in WebContainer (iframe), we need to use postMessage to communicate with parent
+const IS_IN_WEBCONTAINER = window.self !== window.top;
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-const PROJECT_ID = import.meta.env.VITE_PROJECT_ID || '';
+const PROJECT_ID = import.meta.env.VITE_PROJECT_ID || '{project_id}';
+
+// Helper to make requests through parent window when in WebContainer
+async function proxyFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  if (!IS_IN_WEBCONTAINER) {
+    // Direct fetch when not in iframe
+    return fetch(url, options);
+  }
+
+  // Use postMessage to ask parent window to make the request
+  return new Promise((resolve, reject) => {
+    const requestId = `firebase-${Date.now()}-${Math.random()}`;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'firebase-response' && event.data.requestId === requestId) {
+        window.removeEventListener('message', handleMessage);
+
+        if (event.data.error) {
+          reject(new Error(event.data.error));
+        } else {
+          // Create a mock Response object
+          resolve({
+            ok: event.data.ok,
+            status: event.data.status,
+            json: async () => event.data.data,
+            text: async () => JSON.stringify(event.data.data)
+          } as Response);
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+
+    // Send request to parent
+    window.parent.postMessage({
+      type: 'firebase-request',
+      requestId,
+      url,
+      options
+    }, '*');
+
+    // Timeout after 30 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', handleMessage);
+      reject(new Error('Firebase request timeout'));
+    }, 30000);
+  });
+}
 
 /**
  * Mock Firestore instance
@@ -70,7 +134,7 @@ export async function addDoc(
   data: DocumentData
 ): Promise<DocumentReference> {
   try {
-    const response = await fetch(
+    const response = await proxyFetch(
       `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/add`,
       {
         method: 'POST',
@@ -112,7 +176,7 @@ export async function setDoc(
     const pathParts = docRef.path.split('/');
     const collectionName = pathParts[0];
 
-    const response = await fetch(
+    const response = await proxyFetch(
       `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/add`,
       {
         method: 'POST',
@@ -138,21 +202,91 @@ export async function setDoc(
 }
 
 /**
- * Get all documents from a collection
+ * Create a query
+ */
+export function query(
+  collectionRef: CollectionReference,
+  ...queryConstraints: QueryConstraint[]
+): Query {
+  const q: Query = {
+    _collection: collectionRef
+  };
+
+  for (const constraint of queryConstraints) {
+    if (constraint.type === 'orderBy') {
+      q._orderByField = constraint.field;
+      q._orderByDirection = constraint.direction || 'asc';
+    } else if (constraint.type === 'where') {
+      if (!q._whereConstraints) {
+        q._whereConstraints = [];
+      }
+      q._whereConstraints.push({
+        field: constraint.field!,
+        operator: constraint.operator!,
+        value: constraint.value
+      });
+    }
+  }
+
+  return q;
+}
+
+/**
+ * Create an orderBy constraint
+ */
+export function orderBy(field: string, direction: 'asc' | 'desc' = 'asc'): QueryConstraint {
+  return {
+    type: 'orderBy',
+    field,
+    direction
+  };
+}
+
+/**
+ * Create a where constraint
+ */
+export function where(field: string, operator: string, value: any): QueryConstraint {
+  return {
+    type: 'where',
+    field,
+    operator,
+    value
+  };
+}
+
+/**
+ * Get all documents from a collection or query
  */
 export async function getDocs(
-  collectionRef: CollectionReference
+  collectionRefOrQuery: CollectionReference | Query
 ): Promise<QuerySnapshot> {
   try {
-    const response = await fetch(
-      `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/get?collection=${encodeURIComponent(collectionRef._collectionName)}`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        }
+    // Determine if it's a query or collection reference
+    const isQuery = '_collection' in collectionRefOrQuery;
+    const collectionName = isQuery
+      ? (collectionRefOrQuery as Query)._collection._collectionName
+      : (collectionRefOrQuery as CollectionReference)._collectionName;
+
+    // Build query parameters
+    let url = `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/get?collection=${encodeURIComponent(collectionName)}`;
+
+    if (isQuery) {
+      const q = collectionRefOrQuery as Query;
+      if (q._orderByField) {
+        url += `&order_by=${encodeURIComponent(q._orderByField)}&order_direction=${q._orderByDirection || 'asc'}`;
       }
-    );
+      if (q._whereConstraints && q._whereConstraints.length > 0) {
+        // For now, we'll pass where constraints as JSON in the query string
+        url += `&where=${encodeURIComponent(JSON.stringify(q._whereConstraints))}`;
+      }
+    }
+
+    const response = await proxyFetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
 
     if (!response.ok) {
       const error = await response.json();
@@ -234,7 +368,7 @@ export async function updateDoc(
     const pathParts = docRef.path.split('/');
     const collectionName = pathParts[0];
 
-    const response = await fetch(
+    const response = await proxyFetch(
       `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/update`,
       {
         method: 'PUT',
@@ -268,7 +402,7 @@ export async function deleteDoc(docRef: DocumentReference): Promise<void> {
     const pathParts = docRef.path.split('/');
     const collectionName = pathParts[0];
 
-    const response = await fetch(
+    const response = await proxyFetch(
       `${API_BASE_URL}/api/v1/firebase/projects/${PROJECT_ID}/firestore/delete?collection=${encodeURIComponent(collectionName)}&doc_id=${encodeURIComponent(docRef.id)}`,
       {
         method: 'DELETE',

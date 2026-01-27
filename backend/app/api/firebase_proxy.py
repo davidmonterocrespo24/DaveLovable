@@ -13,7 +13,7 @@ from firebase_admin import credentials, firestore
 from pathlib import Path
 import json
 
-from app.db.session import get_db
+from app.db import get_db
 
 router = APIRouter()
 
@@ -31,8 +31,13 @@ def get_firebase_app():
         if not cred_path.exists():
             raise FileNotFoundError(f"Firebase service account key not found at {cred_path}")
 
-        cred = credentials.Certificate(str(cred_path))
-        _firebase_app = firebase_admin.initialize_app(cred)
+        try:
+            # Check if already initialized
+            _firebase_app = firebase_admin.get_app()
+        except ValueError:
+            # Not initialized yet, create new app
+            cred = credentials.Certificate(str(cred_path))
+            _firebase_app = firebase_admin.initialize_app(cred)
 
     return _firebase_app
 
@@ -112,6 +117,9 @@ async def get_documents(
     project_id: int,
     collection: str,
     doc_id: str = None,
+    order_by: str = None,
+    order_direction: str = "asc",
+    where: str = None,
     db: Session = Depends(get_db)
 ):
     """
@@ -120,6 +128,9 @@ async def get_documents(
     Query params:
     - collection: Collection name (e.g., "users")
     - doc_id: Optional document ID. If not provided, returns all documents
+    - order_by: Optional field to order by
+    - order_direction: Order direction ('asc' or 'desc')
+    - where: Optional JSON string with where constraints
     """
     try:
         # Get collection prefix
@@ -152,8 +163,28 @@ async def get_documents(
             else:
                 raise HTTPException(status_code=404, detail="Document not found")
         else:
-            # Get all documents in collection
-            docs = fs_client.collection(prefixed_collection).stream()
+            # Get all documents in collection with optional query constraints
+            query_ref = fs_client.collection(prefixed_collection)
+
+            # Apply where constraints if provided
+            if where:
+                try:
+                    where_constraints = json.loads(where)
+                    for constraint in where_constraints:
+                        field = constraint.get('field')
+                        operator = constraint.get('operator')
+                        value = constraint.get('value')
+                        query_ref = query_ref.where(field, operator, value)
+                except json.JSONDecodeError:
+                    raise HTTPException(status_code=400, detail="Invalid where constraint JSON")
+
+            # Apply order by if provided
+            if order_by:
+                from google.cloud.firestore import Query
+                direction = Query.DESCENDING if order_direction == 'desc' else Query.ASCENDING
+                query_ref = query_ref.order_by(order_by, direction=direction)
+
+            docs = query_ref.stream()
             documents = []
 
             for doc in docs:

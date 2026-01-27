@@ -205,9 +205,19 @@ class ChatService:
                 os.chdir(project_dir)
                 logger.info(f"📂 Changed working directory to: {project_dir}")
 
-                # Check if Firebase was just activated and inject technical context
+                # Check if Firebase was activated (check session history)
                 firebase_context = ""
-                if "FIREBASE_ACTIVATED" in chat_request.message:
+                firebase_activated = "FIREBASE_ACTIVATED" in chat_request.message
+
+                # Also check session history for FIREBASE_ACTIVATED
+                if not firebase_activated:
+                    session_messages = ChatService.get_messages(db, session.id, limit=100)
+                    for msg in session_messages:
+                        if "FIREBASE_ACTIVATED" in msg.content:
+                            firebase_activated = True
+                            break
+
+                if firebase_activated:
                     # Read Firebase state to get project info
                     firebase_state_path = project_dir / ".firebase-state.json"
                     if firebase_state_path.exists():
@@ -503,6 +513,9 @@ Please analyze the request, create a plan if needed, and implement the solution.
         # Yield initial event
         yield {"type": "start", "data": {"session_id": session.id, "user_message_id": user_message.id}}
 
+        # Flag to track if Firebase activation was already requested
+        firebase_activation_sent = False
+
         # Get project context
         project_files = db.query(ProjectFile).filter(ProjectFile.project_id == project_id).all()
 
@@ -575,9 +588,19 @@ Please analyze the request, create a plan if needed, and implement the solution.
                             ag_image = AGImage(pil_img)
                             content_parts.append(ag_image)
 
-                # Check if Firebase was just activated and inject technical context
+                # Check if Firebase was activated (check session history)
                 firebase_context = ""
-                if "FIREBASE_ACTIVATED" in chat_request.message:
+                firebase_activated = "FIREBASE_ACTIVATED" in chat_request.message
+
+                # Also check session history for FIREBASE_ACTIVATED
+                if not firebase_activated:
+                    session_messages = ChatService.get_messages(db, session.id, limit=100)
+                    for msg in session_messages:
+                        if "FIREBASE_ACTIVATED" in msg.content:
+                            firebase_activated = True
+                            break
+
+                if firebase_activated:
                     # Read Firebase state to get project info
                     firebase_state_path = project_dir / ".firebase-state.json"
                     if firebase_state_path.exists():
@@ -759,11 +782,15 @@ Please analyze the request, create a plan if needed, and implement the solution.
                     # TextMessage - Agent thoughts/responses
                     if event_type == "TextMessage":
                         # Check for Firebase activation request FIRST (before skipping)
+                        # Only send once per session execution
                         firebase_request = ChatService.detect_firebase_request(message.content)
-                        if firebase_request:
-                            logger.info(f"🔥 FIREBASE ACTIVATION REQUEST DETECTED")
+                        if firebase_request and not firebase_activation_sent:
+                            logger.info(f"🔥 FIREBASE ACTIVATION REQUEST DETECTED (first time)")
                             logger.info(f"🔥 Features: {firebase_request.get('features', [])}")
                             logger.info(f"🔥 Reason: {firebase_request.get('reason', 'N/A')}")
+
+                            # Mark as sent to prevent duplicates
+                            firebase_activation_sent = True
 
                             # Send special event to frontend to show modal
                             yield {
@@ -774,7 +801,41 @@ Please analyze the request, create a plan if needed, and implement the solution.
                                     "reason": firebase_request.get("reason", "Persistence required")
                                 }
                             }
-                            # Don't process this message further
+
+                            # Save a message indicating we're waiting for approval
+                            waiting_message = ChatService.add_message(
+                                db,
+                                ChatMessageCreate(
+                                    session_id=session.id,
+                                    role=MessageRole.ASSISTANT,
+                                    content=firebase_request.get("message", "Para esta funcionalidad necesitas una base de datos. ¿Quieres activar Firebase?")
+                                )
+                            )
+
+                            # Yield the complete event with the waiting message
+                            yield {
+                                "type": "complete",
+                                "data": {
+                                    "session_id": session.id,
+                                    "message": {
+                                        "id": waiting_message.id,
+                                        "session_id": waiting_message.session_id,
+                                        "role": waiting_message.role.value,
+                                        "content": waiting_message.content,
+                                        "agent_name": "System",
+                                        "created_at": waiting_message.created_at.isoformat()
+                                    },
+                                    "code_changes": []
+                                }
+                            }
+
+                            # TERMINATE the agent execution immediately
+                            # This prevents further messages and waits for user's decision
+                            logger.info(f"🔥 Stopping agent execution to wait for Firebase approval")
+                            return  # Exit the generator completely
+                        elif firebase_request and firebase_activation_sent:
+                            # Already requested, skip subsequent detections
+                            logger.info(f"🔥 Firebase already requested in this execution, skipping duplicate")
                             continue
 
                         # Skip user messages and filter out system/control messages

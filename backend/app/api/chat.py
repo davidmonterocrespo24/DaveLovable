@@ -172,39 +172,80 @@ def delete_chat_session(project_id: int, session_id: int, db: Session = Depends(
 @router.post("/{project_id}/activate-firebase")
 async def activate_firebase(project_id: int, request_body: dict, db: Session = Depends(get_db)):
     """
-    Activate Firebase in a project
+    Activate Firebase in a project and trigger agent continuation
 
     Expected body:
     {
         "features": ["firestore", "auth", "storage"],
-        "session_id": <optional session_id>
+        "session_id": <required session_id>,
+        "original_request": <optional original user request>
     }
     """
     from app.services.filesystem_service import FileSystemService
 
     features = request_body.get("features", ["firestore"])
     session_id = request_body.get("session_id")
+    original_request = request_body.get("original_request", "")
+
+    if not session_id:
+        return {
+            "success": False,
+            "message": "session_id is required"
+        }
 
     try:
         # Activate Firebase in the project
         result = FileSystemService.activate_firebase(project_id, features)
 
-        # Send simple confirmation message to user (visible in chat)
-        if session_id:
-            from app.schemas import ChatMessageCreate
-            from app.models import MessageRole
+        # Add FIREBASE_ACTIVATED message to trigger agent continuation
+        from app.schemas import ChatMessageCreate
+        from app.models import MessageRole
 
-            # Simple user-facing message
-            user_message = f"FIREBASE_ACTIVATED"
+        # This message triggers the agent to continue with Firebase context
+        activation_message = "FIREBASE_ACTIVATED"
+        if original_request:
+            activation_message = f"FIREBASE_ACTIVATED: {original_request}"
 
-            ChatService.add_message(
-                db,
-                ChatMessageCreate(
-                    session_id=session_id,
-                    role=MessageRole.USER,
-                    content=user_message,
-                ),
-            )
+        # Add FIREBASE_ACTIVATED marker as a system-like message
+        ChatService.add_message(
+            db,
+            ChatMessageCreate(
+                session_id=session_id,
+                role=MessageRole.USER,  # Using USER role so it appears in history
+                content=activation_message,
+            ),
+        )
+
+        # Get the last user message before Firebase activation request
+        # This is the original request that needs to be processed with Firebase context
+        session_messages = ChatService.get_messages(db, session_id, limit=100)
+
+        # Find the original user request (before the activation request from agent)
+        original_user_request = None
+        for msg in reversed(session_messages):
+            if msg.role == MessageRole.USER and "FIREBASE_ACTIVATED" not in msg.content:
+                original_user_request = msg.content
+                break
+
+        if not original_user_request:
+            original_user_request = original_request if original_request else "Please implement data persistence with Firebase."
+
+        # Create a chat request that will be processed by the agent
+        # The agent will see FIREBASE_ACTIVATED in the session history and inject Firebase context
+        chat_request = ChatRequest(
+            message=original_user_request,
+            session_id=session_id
+        )
+
+        # Process through the agent - this will:
+        # 1. See FIREBASE_ACTIVATED in session history
+        # 2. Inject Firebase technical context
+        # 3. Continue with the original implementation request
+        agent_response = await ChatService.process_chat_message(
+            db=db,
+            project_id=project_id,
+            chat_request=chat_request
+        )
 
         return {
             "success": True,
@@ -212,7 +253,8 @@ async def activate_firebase(project_id: int, request_body: dict, db: Session = D
             "created_files": result["created_files"],
             "features": result["features"],
             "project_unique_id": result["project_unique_id"],
-            "collection_prefix": result["collection_prefix"]
+            "collection_prefix": result["collection_prefix"],
+            "agent_response": agent_response.get("response", "")
         }
 
     except ValueError as e:

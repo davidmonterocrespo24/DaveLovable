@@ -116,7 +116,11 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       message: string;
       features: string[];
       reason: string;
+      originalMessage?: string;
     } | null>(null);
+
+    // Store last user message for Firebase continuation
+    const lastUserMessageRef = useRef<string>('');
 
     // Get all chat sessions for this project
     const { data: sessions } = useChatSessions(projectId);
@@ -547,7 +551,8 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             },
             body: JSON.stringify({
               features: firebaseRequest.features,
-              session_id: currentSessionId
+              session_id: currentSessionId,
+              original_request: firebaseRequest.originalMessage || firebaseRequest.reason
             }),
           });
 
@@ -556,14 +561,29 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
           if (result.success) {
             toast({
               title: "🔥 Firebase Activated",
-              description: `Created ${result.created_files.length} files. Collection prefix: ${result.collection_prefix || 'proj_*'}. Check README.firebase.md for setup instructions.`,
-              duration: 7000,
+              description: `Created ${result.created_files.length} files. Agent is continuing implementation...`,
+              duration: 5000,
             });
 
             // Close modal
             setFirebaseRequest(null);
 
-            // The agent will receive the FIREBASE_ACTIVATED message and continue
+            // Add agent response to messages if available
+            if (result.agent_response) {
+              const agentMessage: Message = {
+                id: `agent-${Date.now()}`,
+                role: 'assistant',
+                content: result.agent_response,
+                timestamp: new Date(),
+                agent_interactions: [],
+                attachments: []
+              };
+              setMessages(prev => [...prev, agentMessage]);
+            }
+
+            // Invalidate queries to refetch messages and files from backend
+            queryClient.invalidateQueries({ queryKey: ['chatSession', projectId, currentSessionId] });
+            queryClient.invalidateQueries({ queryKey: fileKeys.list(projectId) });
           } else {
             toast({
               title: "Error activating Firebase",
@@ -633,6 +653,9 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
       if (hasImages && !messageContent.toLowerCase().includes('ui') && !messageContent.toLowerCase().includes('design')) {
         messageContent = `${messageContent}\n\n[Note: The attached image(s) show a UI/UX design that should be converted to React code with Tailwind CSS. Analyze the design, layout, colors, typography, and components shown in the image(s).]`;
       }
+
+      // Store last user message for potential Firebase continuation
+      lastUserMessageRef.current = messageContent;
 
       // Create both messages at once to avoid race conditions
       const userMessage: Message = {
@@ -885,11 +908,12 @@ export const ChatPanel = forwardRef<ChatPanelRef, ChatPanelProps>(
             onFirebaseActivationRequest: (data) => {
               console.log('[ChatPanel] 🔥 Firebase activation request received:', data);
 
-              // Show Firebase activation modal
+              // Show Firebase activation modal with original user message
               setFirebaseRequest({
                 message: data.message,
                 features: data.features || ['firestore'],
-                reason: data.reason || 'Persistence required'
+                reason: data.reason || 'Persistence required',
+                originalMessage: lastUserMessageRef.current
               });
 
               // Pause streaming while waiting for user decision

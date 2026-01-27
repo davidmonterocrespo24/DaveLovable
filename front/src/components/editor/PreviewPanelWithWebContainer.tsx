@@ -135,9 +135,9 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
       };
     }, [isVisualMode, previewUrl]);
 
-    // Listen for browser logs AND visual editor events from the iframe
+    // Listen for browser logs AND visual editor events AND Firebase proxy requests from the iframe
     useEffect(() => {
-      const handleMessage = (event: MessageEvent) => {
+      const handleMessage = async (event: MessageEvent) => {
         // Security: verify the message is from our WebContainer (roughly)
         // Ideally we check origin, but WebContainer origin is dynamic
 
@@ -156,6 +156,30 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
               attributes,
               source
             });
+          }
+        } else if (event.data?.type === 'firebase-request') {
+          // Proxy Firebase requests from WebContainer to backend
+          const { requestId, url, options } = event.data;
+
+          try {
+            const response = await fetch(url, options);
+            const data = await response.json();
+
+            // Send response back to iframe
+            iframeRef.current?.contentWindow?.postMessage({
+              type: 'firebase-response',
+              requestId,
+              ok: response.ok,
+              status: response.status,
+              data
+            }, '*');
+          } catch (error) {
+            // Send error back to iframe
+            iframeRef.current?.contentWindow?.postMessage({
+              type: 'firebase-response',
+              requestId,
+              error: error instanceof Error ? error.message : 'Unknown error'
+            }, '*');
           }
         }
       };
