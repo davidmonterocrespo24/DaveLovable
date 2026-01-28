@@ -244,7 +244,7 @@ DaveLovable is optimized for speed with strategic database indexes and query opt
 
 - ✅ **~4ms** average response time for project lists
 - ✅ Database indexes on critical columns (`owner_id`, `updated_at`)
-- ✅ Prevented N+1 query problems with eager loading
+- ✅ Prevented N+1 query problems by disabling lazy loading of unnecessary relationships
 - ✅ Optimized queries with indexed filtering and sorting
 
 See [Performance Optimization Guide](docs/PERFORMANCE_OPTIMIZATION.md) for details.

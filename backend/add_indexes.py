@@ -19,11 +19,11 @@ def add_indexes():
     """Add performance indexes to the database"""
     print("Adding performance indexes to database...")
     
-    with engine.connect() as conn:
+    with engine.begin() as conn:
         # Add index on owner_id if it doesn't exist
         try:
             conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_projects_owner_id ON projects(owner_id)"
+                "CREATE INDEX IF NOT EXISTS ix_projects_owner_id ON projects(owner_id)"
             ))
             print("✓ Created index on projects.owner_id")
         except Exception as e:
@@ -32,7 +32,7 @@ def add_indexes():
         # Add index on updated_at if it doesn't exist
         try:
             conn.execute(text(
-                "CREATE INDEX IF NOT EXISTS idx_projects_updated_at ON projects(updated_at)"
+                "CREATE INDEX IF NOT EXISTS ix_projects_updated_at ON projects(updated_at)"
             ))
             print("✓ Created index on projects.updated_at")
         except Exception as e:
@@ -55,15 +55,13 @@ def add_indexes():
             print("✓ Created index on project_files.project_id")
         except Exception as e:
             print(f"  Index on project_files.project_id might already exist: {e}")
-        
-        conn.commit()
     
     print("\n✅ Database indexes added successfully!")
     print("\nIndexes created:")
-    print("  - projects.owner_id")
-    print("  - projects.updated_at")
-    print("  - projects(owner_id, updated_at) - composite")
-    print("  - project_files.project_id")
+    print("  - projects.owner_id (ix_projects_owner_id)")
+    print("  - projects.updated_at (ix_projects_updated_at)")
+    print("  - projects(owner_id, updated_at) - composite (idx_owner_updated)")
+    print("  - project_files.project_id (idx_project_files)")
 
 
 if __name__ == "__main__":

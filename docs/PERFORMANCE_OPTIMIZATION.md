@@ -141,7 +141,7 @@ Expected output:
 ## Troubleshooting
 
 ### Slow queries after update
-- Ensure indexes are created: `sqlite3 davelovable.db ".indexes projects"`
+- Ensure indexes are created: `sqlite3 backend/davelovable.db ".indexes projects"` (adjust path based on your DATABASE_URL)
 - Check if lazy loading is disabled: relationships should use `lazy="noload"`
 - Verify query uses indexed columns: `EXPLAIN QUERY PLAN` in SQLite
 
