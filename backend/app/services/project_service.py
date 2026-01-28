@@ -62,8 +62,15 @@ class ProjectService:
     @staticmethod
     def get_projects(db: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Project]:
         """Get all projects for a user"""
-
-        return db.query(Project).filter(Project.owner_id == owner_id).offset(skip).limit(limit).all()
+        # Query with ordering - noload is already set at model level
+        return (
+            db.query(Project)
+            .filter(Project.owner_id == owner_id)
+            .order_by(Project.updated_at.desc())  # Most recently updated first
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def update_project(db: Session, project_id: int, owner_id: int, project_update: ProjectUpdate) -> Project:
