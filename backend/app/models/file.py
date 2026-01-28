@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
@@ -24,3 +24,8 @@ class ProjectFile(Base):
 
     # Relationships
     project = relationship("Project", back_populates="files")
+
+    # Add index for project_id for faster file queries
+    __table_args__ = (
+        Index('idx_project_files', 'project_id'),
+    )

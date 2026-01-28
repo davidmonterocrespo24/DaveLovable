@@ -62,8 +62,19 @@ class ProjectService:
     @staticmethod
     def get_projects(db: Session, owner_id: int, skip: int = 0, limit: int = 100) -> List[Project]:
         """Get all projects for a user"""
+        from sqlalchemy.orm import noload
 
-        return db.query(Project).filter(Project.owner_id == owner_id).offset(skip).limit(limit).all()
+        # Use noload to prevent lazy loading of relationships we don't need
+        # This prevents N+1 queries by explicitly not loading files and chat_sessions
+        return (
+            db.query(Project)
+            .options(noload(Project.files), noload(Project.chat_sessions))
+            .filter(Project.owner_id == owner_id)
+            .order_by(Project.updated_at.desc())  # Most recently updated first
+            .offset(skip)
+            .limit(limit)
+            .all()
+        )
 
     @staticmethod
     def update_project(db: Session, project_id: int, owner_id: int, project_update: ProjectUpdate) -> Project:
