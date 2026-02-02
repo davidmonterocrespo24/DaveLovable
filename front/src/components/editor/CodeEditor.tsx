@@ -325,7 +325,7 @@ export const CodeEditor = forwardRef<HTMLDivElement, CodeEditorProps>(
         {/* Inline Ask Agent Widget */}
         {selection.visible && (
           <div
-            className="absolute z-10 bg-popover/95 border border-border shadow-lg rounded-lg p-2 flex gap-2 items-center animate-in fade-in zoom-in-95 duration-200"
+            className="fixed z-[9999] bg-popover/95 backdrop-blur-sm border border-border shadow-2xl rounded-lg p-2 flex gap-2 items-center animate-in fade-in zoom-in-95 duration-200"
             style={{
               top: selection.rect.top,
               left: selection.rect.left + 50, // Slight offset
