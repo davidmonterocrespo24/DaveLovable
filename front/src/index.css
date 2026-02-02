@@ -201,3 +201,44 @@
 .delay-400 { animation-delay: 400ms; }
 .delay-500 { animation-delay: 500ms; }
 .delay-600 { animation-delay: 600ms; }
+
+/* Fix for react-resizable-panels cursor behavior */
+[data-panel-resize-handle-enabled="true"][data-panel-group-direction="horizontal"] {
+  cursor: col-resize !important;
+}
+
+[data-panel-resize-handle-enabled="true"][data-panel-group-direction="vertical"] {
+  cursor: row-resize !important;
+}
+
+[data-panel-resize-handle-enabled="true"][data-panel-group-direction="horizontal"]:hover {
+  cursor: col-resize !important;
+}
+
+[data-panel-resize-handle-enabled="true"][data-panel-group-direction="vertical"]:hover {
+  cursor: row-resize !important;
+}
+
+/* Ensure resize handle is visible and interactive */
+[data-panel-resize-handle-id] {
+  position: relative;
+  touch-action: none;
+  user-select: none;
+}
+
+/* Ensure the hit area for the resize handle is large enough */
+[data-panel-resize-handle-id]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
+[data-panel-group-direction="vertical"] [data-panel-resize-handle-id]::after {
+  top: -4px;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+}

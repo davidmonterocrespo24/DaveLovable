@@ -591,9 +591,9 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
         </div>
 
         {/* Preview and Console Area */}
-        <ResizablePanelGroup direction="vertical" className="flex-1">
+        <ResizablePanelGroup direction="vertical" className="flex-1" id="preview-console-panel-group">
           {/* Preview Area */}
-          <ResizablePanel defaultSize={showConsole ? 85 : 100} minSize={40}>
+          <ResizablePanel defaultSize={showConsole ? 85 : 100} minSize={40} id="preview-iframe-panel">
             <div className="h-full overflow-auto p-4 flex justify-center bg-[#1a1a2e]">
               <div
                 className={`${deviceWidths[device]} w-full h-full bg-white
@@ -647,8 +647,8 @@ export const PreviewPanel = forwardRef<PreviewPanelRef, PreviewPanelProps>(
           {/* Console */}
           {showConsole && (
             <>
-              <ResizableHandle />
-              <ResizablePanel defaultSize={15} minSize={10} maxSize={50}>
+              <ResizableHandle id="preview-console-resize-handle" />
+              <ResizablePanel defaultSize={15} minSize={10} maxSize={50} id="console-panel">
                 <div className="h-full border-t border-border/50 bg-[#0d1117] flex flex-col">
             <div className="flex items-center justify-between px-3  border-b border-border/50">
               <div className="flex items-center gap-4">
