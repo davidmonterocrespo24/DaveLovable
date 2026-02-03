@@ -82,12 +82,22 @@ const Projects = () => {
       });
       setDeleteProjectId(null);
       setDeleteProjectName('');
-    } catch (error) {
-      toast({
-        title: "Error deleting project",
-        description: "There was an error deleting the project. Please try again.",
-        variant: "destructive",
-      });
+    } catch (error: any) {
+      // If 404, project doesn't exist (already deleted or never existed)
+      if (error.response?.status === 404) {
+        toast({
+          title: "Project not found",
+          description: `${deleteProjectName} no longer exists. Refreshing project list...`,
+        });
+        setDeleteProjectId(null);
+        setDeleteProjectName('');
+      } else {
+        toast({
+          title: "Error deleting project",
+          description: "There was an error deleting the project. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
