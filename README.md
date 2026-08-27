@@ -235,6 +235,19 @@ Navigate to [http://localhost:8080](http://localhost:8080) and start building!
 
 ## 📖 Documentation
 
+Comprehensive documentation is available in the [`docs/`](docs/) folder:
+
+| Document | Description |
+|----------|-------------|
+| [API Reference](docs/API_REFERENCE.md) | Complete REST API documentation |
+| [Architecture](docs/ARCHITECTURE.md) | System architecture and design |
+| [Configuration](docs/CONFIGURATION.md) | Environment variables and settings |
+| [Contributing](docs/CONTRIBUTING.md) | Guidelines for contributors |
+| [Development](docs/DEVELOPMENT.md) | Development workflow and setup |
+| [WebContainers](docs/WEBCONTAINERS.md) | WebContainers integration guide |
+| [Installation](INSTALLATION.md) | Production deployment guide |
+| [Deployment](DEPLOYMENT.md) | Quick deployment reference |
+
 ### Environment Variables
 
 Create `backend/.env` with the following variables:
